@@ -10,10 +10,12 @@
     },
     "jobId": {
       "type": "string",
+      "pattern": "^[0-9a-fA-F]{24}$",
       "description": "Referencia al trabajo (ObjectId de jobs)"
     },
     "workerId": {
       "type": "string",
+      "pattern": "^[0-9a-fA-F]{24}$",
       "description": "Referencia al trabajador que oferta (ObjectId de users)"
     },
     "workerSnapshot": {
@@ -22,7 +24,8 @@
       "properties": {
         "name": { "type": "string", "description": "Nombre completo del trabajador" },
         "rating": { "type": "number", "minimum": 0, "maximum": 5 },
-        "completedJobs": { "type": "integer", "minimum": 0 }
+        "completedJobs": { "type": "integer", "minimum": 0 },
+        "avatarUrl": { "type": "string", "format": "uri" }
       },
       "required": ["name", "rating"]
     },
@@ -30,6 +33,12 @@
       "type": "number",
       "minimum": 0,
       "description": "Precio ofertado por el trabajador"
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "default": "GTQ",
+      "description": "Moneda ISO 4217"
     },
     "estimatedTime": {
       "type": "integer",
@@ -42,13 +51,16 @@
     },
     "status": {
       "type": "string",
-      "enum": ["pending", "accepted", "rejected"],
+      "enum": ["pending", "accepted", "rejected", "withdrawn", "expired"],
       "description": "Estado de la oferta"
     },
-    "createdAt": {
-      "type": "string",
-      "format": "date-time"
-    }
+    "expiresAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Fecha de expiración automática de la oferta"
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
   },
   "required": ["jobId", "workerId", "price", "estimatedTime", "status"],
   "additionalProperties": true

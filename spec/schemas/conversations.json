@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Conversation",
+  "type": "object",
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "Identificador único (ObjectId en MongoDB)",
+      "readOnly": true
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{24}$",
+      "description": "Trabajo asociado (ObjectId de jobs)"
+    },
+    "participantIds": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[0-9a-fA-F]{24}$" },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Dos participantes: client y worker (ObjectId de users)"
+    },
+    "lastMessage": {
+      "type": ["object", "null"],
+      "description": "Último mensaje para preview en lista",
+      "properties": {
+        "content": { "type": "string" },
+        "senderId": { "type": "string" },
+        "type": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "unreadCount": {
+      "type": "object",
+      "description": "Contador de no leídos por participante",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si la conversación está activa (job no completed/cancelled)"
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  },
+  "required": ["jobId", "participantIds"],
+  "additionalProperties": true
+}

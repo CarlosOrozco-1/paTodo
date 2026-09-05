@@ -31,7 +31,7 @@ tags:
     description: Historial de ubicaciones
 
 paths:
-  # ---------- AUTENTICACIÓN ----------
+  # ===================== AUTENTICACIÓN =====================
   /auth/register:
     post:
       tags: [auth]
@@ -95,7 +95,7 @@ paths:
         '200':
           description: Token renovado
 
-  # ---------- USUARIOS ----------
+  # ===================== USUARIOS =====================
   /users/me:
     get:
       tags: [users]
@@ -168,7 +168,7 @@ paths:
                 items:
                   $ref: './schemas/vehicle.json'
 
-  # ---------- CATEGORÍAS ----------
+  # ===================== CATEGORÍAS =====================
   /categories:
     get:
       tags: [categories]
@@ -182,7 +182,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: './schemas/category.json'
+                  $ref: './schemas/categories.json'
     post:
       tags: [categories]
       summary: Crear categoría (solo administrador)
@@ -192,12 +192,12 @@ paths:
         content:
           application/json:
             schema:
-              $ref: './schemas/category.json'
+              $ref: './schemas/categories.json'
       responses:
         '201':
           description: Categoría creada
 
-  # ---------- TRABAJOS ----------
+  # ===================== TRABAJOS =====================
   /jobs:
     post:
       tags: [jobs]
@@ -302,7 +302,7 @@ paths:
         '200':
           description: Estado actualizado
 
-  # ---------- OFERTAS ----------
+  # ===================== OFERTAS =====================
   /jobs/{id}/offers:
     post:
       tags: [offers]
@@ -369,7 +369,7 @@ paths:
         '200':
           description: Oferta rechazada
 
-  # ---------- MENSAJES ----------
+  # ===================== MENSAJES =====================
   /jobs/{id}/messages:
     post:
       tags: [messages]
@@ -411,7 +411,7 @@ paths:
                 items:
                   $ref: './schemas/message.json'
 
-  # ---------- RESEÑAS ----------
+  # ===================== RESEÑAS =====================
   /jobs/{id}/review:
     post:
       tags: [reviews]
@@ -452,7 +452,7 @@ paths:
                 items:
                   $ref: './schemas/review.json'
 
-  # ---------- RUTAS ----------
+  # ===================== RUTAS =====================
   /jobs/{id}/route:
     get:
       tags: [routes]
@@ -489,7 +489,7 @@ paths:
         '201':
           description: Ruta almacenada
 
-  # ---------- UBICACIONES ----------
+  # ===================== UBICACIONES =====================
   /jobs/{id}/locations:
     get:
       tags: [locations]

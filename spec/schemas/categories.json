@@ -14,12 +14,46 @@
     },
     "slug": {
       "type": "string",
+      "pattern": "^[a-z0-9-]+$",
       "description": "Identificador único para la categoría (ej: mecanica, plomeria)"
     },
-    "skills": {
+    "description": {
+      "type": "string",
+      "description": "Descripción detallada de la categoría"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Nombre del icono (ej: lucide:car, material:plumbing) o URL"
+    },
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}$",
+      "description": "Color hex para UI (ej: #3B82F6)"
+    },
+    "imageUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL de imagen/banner representativa"
+    },
+    "parentId": {
+      "type": ["string", "null"],
+      "description": "Referencia a categoría padre (ObjectId), null si es raíz"
+    },
+    "skillIds": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Lista de habilidades asociadas a la categoría (ej: cambio_llantas, reparacion_tuberias)"
+      "description": "Referencias a skills (ObjectId de skills)"
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si la categoría está disponible para uso"
+    },
+    "sortOrder": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Orden de visualización en listados"
     },
     "createdAt": {
       "type": "string",
@@ -32,6 +66,6 @@
       "description": "Fecha de última actualización"
     }
   },
-  "required": ["name", "slug", "skills"],
+  "required": ["name", "slug"],
   "additionalProperties": true
 }

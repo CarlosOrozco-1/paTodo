@@ -10,7 +10,8 @@
     },
     "ownerId": {
       "type": "string",
-      "description": "Referencia al usuario trabajador propietario (ObjectId de users)"
+      "pattern": "^[0-9a-fA-F]{24}$",
+      "description": "Referencia al usuario trabajador propietario (ObjectId de users con role worker/both)"
     },
     "type": {
       "type": "string",
@@ -28,15 +29,21 @@
     "color": { "type": "string", "description": "Color" },
     "plate": {
       "type": "string",
-      "description": "Número de placa (único)"
+      "pattern": "^[A-Z0-9]{6,8}$",
+      "description": "Número de placa (único, alfanumérico 6-8 chars)"
+    },
+    "vin": {
+      "type": ["string", "null"],
+      "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+      "description": "VIN opcional (17 chars estándar)"
     },
     "capacity": {
       "type": "object",
       "description": "Capacidad de carga o pasajeros",
       "properties": {
-        "passengers": { "type": "integer", "minimum": 0 },
-        "cargoKg": { "type": "number", "minimum": 0 },
-        "cargoVolume": { "type": "number", "minimum": 0 }
+        "passengers": { "type": "integer", "minimum": 0, "default": 0 },
+        "cargoKg": { "type": "number", "minimum": 0, "default": 0 },
+        "cargoVolume": { "type": "number", "minimum": 0, "description": "Volumen en m³" }
       },
       "required": ["passengers"]
     },
@@ -44,15 +51,23 @@
       "type": "object",
       "description": "Documentos legales del vehículo",
       "properties": {
-        "registration": { "type": "string" },
-        "insurance": { "type": "string" },
-        "insuranceExpiry": { "type": "string", "format": "date" }
+        "registration": { "type": "string", "description": "URL o referencia a tarjeta de circulación" },
+        "insurance": { "type": "string", "description": "URL o referencia a póliza de seguro" },
+        "insuranceExpiry": { "type": "string", "format": "date", "description": "Fecha de vencimiento del seguro (debe ser futura)" },
+        "technicalInspection": { "type": "string", "description": "URL o referencia a revisión técnica" },
+        "technicalInspectionExpiry": { "type": "string", "format": "date" }
       }
     },
     "status": {
       "type": "string",
       "enum": ["active", "inactive", "maintenance"],
+      "default": "active",
       "description": "Estado del vehículo"
+    },
+    "features": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Características extras (ej: aire_acondicionado, gps, rastreo_satelital)"
     },
     "createdAt": { "type": "string", "format": "date-time" },
     "updatedAt": { "type": "string", "format": "date-time" }

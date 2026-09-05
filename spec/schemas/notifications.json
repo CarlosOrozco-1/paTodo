@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Notification",
+  "type": "object",
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "Identificador único (ObjectId en MongoDB)",
+      "readOnly": true
+    },
+    "userId": {
+      "type": "string",
+      "description": "Usuario destinatario (ObjectId de users)"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "job_created",
+        "job_assigned",
+        "job_updated",
+        "job_completed",
+        "job_cancelled",
+        "offer_received",
+        "offer_accepted",
+        "offer_rejected",
+        "offer_withdrawn",
+        "message_received",
+        "payment_received",
+        "payment_failed",
+        "review_request",
+        "review_received",
+        "system_alert",
+        "promotion"
+      ],
+      "description": "Tipo de notificación para routing y preferencias"
+    },
+    "title": {
+      "type": "string",
+      "description": "Título corto para mostrar en lista/banner"
+    },
+    "body": {
+      "type": "string",
+      "description": "Cuerpo del mensaje"
+    },
+    "data": {
+      "type": "object",
+      "description": "Datos adicionales para deep linking y contexto",
+      "properties": {
+        "jobId": { "type": "string" },
+        "offerId": { "type": "string" },
+        "messageId": { "type": "string" },
+        "reviewId": { "type": "string" },
+        "actionUrl": { "type": "string", "format": "uri", "description": "Deep link para navegar al tocar (ej: /jobs/123)" }
+      }
+    },
+    "channels": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["push", "in_app", "email", "sms"] },
+      "description": "Canales por los que se envió/intenta enviar"
+    },
+    "readAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Fecha de lectura, null si no leída"
+    },
+    "sentAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Fecha de envío real, null si pendiente"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de creación del registro"
+    }
+  },
+  "required": ["userId", "type", "title", "body"],
+  "additionalProperties": true
+}

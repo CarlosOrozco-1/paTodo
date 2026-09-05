@@ -10,6 +10,7 @@
     },
     "clientId": {
       "type": "string",
+      "pattern": "^[0-9a-fA-F]{24}$",
       "description": "Referencia al usuario cliente que publica el trabajo (ObjectId de users)"
     },
     "details": {
@@ -18,56 +19,84 @@
       "properties": {
         "title": { "type": "string", "description": "Título breve del trabajo" },
         "description": { "type": "string", "description": "Descripción detallada del problema" },
-        "category": { "type": "string", "description": "Categoría del trabajo (slug de categories)" },
-        "skillsRequired": {
+        "categoryId": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{24}$",
+          "description": "Referencia a categoría (ObjectId de categories)"
+        },
+        "skillIds": {
           "type": "array",
-          "items": { "type": "string" },
-          "description": "Habilidades requeridas para el trabajo"
+          "items": { "type": "string", "pattern": "^[0-9a-fA-F]{24}$" },
+          "description": "Habilidades requeridas (ObjectId de skills)"
         }
       },
-      "required": ["title", "description", "category"]
+      "required": ["title", "description", "categoryId"]
     },
     "location": {
       "type": "object",
       "description": "Ubicación del trabajo",
       "properties": {
+        "type": { "type": "string", "enum": ["Point"] },
         "coordinates": {
           "type": "array",
           "items": { "type": "number" },
           "minItems": 2,
           "maxItems": 2,
-          "description": "Coordenadas [longitud, latitud]"
+          "description": "[longitud, latitud]"
         },
-        "address": { "type": "string", "description": "Dirección legible" }
+        "address": { "type": "string", "description": "Dirección legible" },
+        "placeId": { "type": ["string", "null"], "description": "Google Places ID opcional" }
       },
-      "required": ["coordinates", "address"]
+      "required": ["type", "coordinates", "address"]
     },
     "pricing": {
       "type": "object",
       "description": "Información de precio",
       "properties": {
         "proposedPrice": { "type": "number", "minimum": 0 },
-        "currency": { "type": "string", "default": "GTQ" }
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$", "default": "GTQ" },
+        "priceType": { "type": "string", "enum": ["fixed", "hourly", "estimate"], "default": "fixed" }
       },
       "required": ["proposedPrice", "currency"]
     },
     "status": {
       "type": "string",
-      "enum": ["pending", "accepted", "in_progress", "completed", "cancelled"],
+      "enum": ["pending", "accepted", "in_progress", "completed", "cancelled", "disputed"],
       "description": "Estado del trabajo"
     },
     "workerId": {
       "type": ["string", "null"],
+      "pattern": "^[0-9a-fA-F]{24}$",
       "description": "Trabajador asignado (ObjectId de users), null si no hay"
     },
     "acceptedOfferId": {
       "type": ["string", "null"],
+      "pattern": "^[0-9a-fA-F]{24}$",
       "description": "Oferta aceptada (ObjectId de offers), null si no hay"
     },
     "scheduledFor": {
       "type": ["string", "null"],
       "format": "date-time",
       "description": "Fecha programada para el trabajo, opcional"
+    },
+    "startedAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Fecha real de inicio (cuando worker marca in_progress)"
+    },
+    "completedAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Fecha real de finalización"
+    },
+    "cancelledAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Fecha de cancelación si aplica"
+    },
+    "cancellationReason": {
+      "type": ["string", "null"],
+      "description": "Motivo de cancelación"
     },
     "createdAt": { "type": "string", "format": "date-time" },
     "updatedAt": { "type": "string", "format": "date-time" }

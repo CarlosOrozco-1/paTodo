@@ -9,22 +9,20 @@
       "readOnly": true
     },
     "jobId": {
-      "type": "string",
-      "description": "Trabajo asociado (ObjectId de jobs)"
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-fA-F]{24}$",
+      "description": "Trabajo asociado (ObjectId de jobs), null si es tracking general de worker"
     },
     "userId": {
       "type": "string",
+      "pattern": "^[0-9a-fA-F]{24}$",
       "description": "Usuario que reporta su ubicación (ObjectId de users)"
     },
     "location": {
       "type": "object",
       "description": "Ubicación en formato GeoJSON Point",
       "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["Point"],
-          "description": "Tipo de geometría"
-        },
+        "type": { "type": "string", "enum": ["Point"] },
         "coordinates": {
           "type": "array",
           "items": { "type": "number" },
@@ -35,12 +33,43 @@
       },
       "required": ["type", "coordinates"]
     },
+    "accuracy": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Precisión GPS en metros (radio de confianza)"
+    },
+    "altitude": {
+      "type": ["number", "null"],
+      "description": "Altitud en metros sobre nivel del mar"
+    },
+    "speed": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Velocidad en m/s"
+    },
+    "heading": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 360,
+      "description": "Dirección en grados (0=Norte)"
+    },
+    "source": {
+      "type": "string",
+      "enum": ["gps", "network", "passive", "fused"],
+      "default": "gps",
+      "description": "Fuente de la ubicación"
+    },
     "timestamp": {
       "type": "string",
       "format": "date-time",
       "description": "Momento exacto del reporte de ubicación"
+    },
+    "receivedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Momento de recepción en servidor (para detectar lag)"
     }
   },
-  "required": ["jobId", "userId", "location", "timestamp"],
+  "required": ["userId", "location", "timestamp"],
   "additionalProperties": true
 }

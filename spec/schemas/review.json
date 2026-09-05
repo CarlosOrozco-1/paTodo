@@ -10,14 +10,17 @@
     },
     "jobId": {
       "type": "string",
-      "description": "Trabajo al que pertenece la reseña (ObjectId de jobs)"
+      "pattern": "^[0-9a-fA-F]{24}$",
+      "description": "Trabajo al que pertenece la reseña (ObjectId de jobs con status completed)"
     },
     "reviewerId": {
       "type": "string",
+      "pattern": "^[0-9a-fA-F]{24}$",
       "description": "Usuario que califica (ObjectId de users)"
     },
     "revieweeId": {
       "type": "string",
+      "pattern": "^[0-9a-fA-F]{24}$",
       "description": "Usuario que es calificado (ObjectId de users)"
     },
     "rating": {
@@ -30,11 +33,31 @@
       "type": "string",
       "description": "Comentario opcional sobre el servicio"
     },
-    "createdAt": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Fecha de creación de la reseña"
-    }
+    "aspects": {
+      "type": "object",
+      "description": "Calificaciones por aspecto (opcional)",
+      "properties": {
+        "quality": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "punctuality": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "communication": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "value": { "type": "integer", "minimum": 1, "maximum": 5 }
+      }
+    },
+    "isPublic": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si la reseña es visible públicamente"
+    },
+    "response": {
+      "type": ["object", "null"],
+      "description": "Respuesta del reviewee a la reseña",
+      "properties": {
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
   },
   "required": ["jobId", "reviewerId", "revieweeId", "rating"],
   "additionalProperties": true
