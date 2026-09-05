@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "JobRoute",
+  "type": "object",
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "Identificador único (ObjectId en MongoDB)",
+      "readOnly": true
+    },
+    "jobId": {
+      "type": "string",
+      "description": "Trabajo asociado a la ruta (ObjectId de jobs)"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["worker_to_job", "client_to_job"],
+      "description": "Tipo de ruta: del trabajador al trabajo o del cliente al trabajo"
+    },
+    "geometry": {
+      "type": "object",
+      "description": "Geometría de la ruta en formato GeoJSON LineString",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["LineString"],
+          "description": "Tipo de geometría"
+        },
+        "coordinates": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "Par [longitud, latitud]"
+          },
+          "minItems": 2,
+          "description": "Lista de puntos que forman la ruta"
+        }
+      },
+      "required": ["type", "coordinates"]
+    },
+    "distance": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Distancia total de la ruta en metros"
+    },
+    "duration": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Duración estimada en segundos"
+    },
+    "source": {
+      "type": "string",
+      "description": "Origen de la ruta (ej: osrm, google, manual)"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de creación"
+    },
+    "expiresAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Fecha de expiración opcional para invalidar rutas antiguas"
+    }
+  },
+  "required": ["jobId", "type", "geometry", "distance", "duration", "source"],
+  "additionalProperties": true
+}

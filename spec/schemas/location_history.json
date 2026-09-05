@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LocationHistory",
+  "type": "object",
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "Identificador único (ObjectId en MongoDB)",
+      "readOnly": true
+    },
+    "jobId": {
+      "type": "string",
+      "description": "Trabajo asociado (ObjectId de jobs)"
+    },
+    "userId": {
+      "type": "string",
+      "description": "Usuario que reporta su ubicación (ObjectId de users)"
+    },
+    "location": {
+      "type": "object",
+      "description": "Ubicación en formato GeoJSON Point",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["Point"],
+          "description": "Tipo de geometría"
+        },
+        "coordinates": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Coordenadas [longitud, latitud]"
+        }
+      },
+      "required": ["type", "coordinates"]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Momento exacto del reporte de ubicación"
+    }
+  },
+  "required": ["jobId", "userId", "location", "timestamp"],
+  "additionalProperties": true
+}

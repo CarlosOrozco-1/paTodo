@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Vehicle",
+  "type": "object",
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "Identificador único (ObjectId en MongoDB)",
+      "readOnly": true
+    },
+    "ownerId": {
+      "type": "string",
+      "description": "Referencia al usuario trabajador propietario (ObjectId de users)"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["auto", "moto", "bicicleta", "camioneta", "otro"],
+      "description": "Tipo de vehículo"
+    },
+    "brand": { "type": "string", "description": "Marca del vehículo" },
+    "model": { "type": "string", "description": "Modelo del vehículo" },
+    "year": {
+      "type": "integer",
+      "minimum": 1980,
+      "maximum": 2030,
+      "description": "Año de fabricación"
+    },
+    "color": { "type": "string", "description": "Color" },
+    "plate": {
+      "type": "string",
+      "description": "Número de placa (único)"
+    },
+    "capacity": {
+      "type": "object",
+      "description": "Capacidad de carga o pasajeros",
+      "properties": {
+        "passengers": { "type": "integer", "minimum": 0 },
+        "cargoKg": { "type": "number", "minimum": 0 },
+        "cargoVolume": { "type": "number", "minimum": 0 }
+      },
+      "required": ["passengers"]
+    },
+    "documents": {
+      "type": "object",
+      "description": "Documentos legales del vehículo",
+      "properties": {
+        "registration": { "type": "string" },
+        "insurance": { "type": "string" },
+        "insuranceExpiry": { "type": "string", "format": "date" }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "inactive", "maintenance"],
+      "description": "Estado del vehículo"
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  },
+  "required": ["ownerId", "type", "brand", "model", "plate", "status"],
+  "additionalProperties": true
+}

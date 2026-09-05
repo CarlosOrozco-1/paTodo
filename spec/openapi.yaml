@@ -1,0 +1,529 @@
+openapi: 3.0.0
+info:
+  title: API de Servicios bajo Demanda
+  description: |
+    Plataforma que conecta clientes con trabajadores cercanos,
+    permitiendo publicar trabajos, recibir ofertas y negociar precios.
+  version: 0.1.0
+servers:
+  - url: http://localhost:3000/api
+    description: Servidor local (desarrollo)
+  - url: https://tu-dominio.com/api
+    description: Servidor de producción (Oracle)
+tags:
+  - name: auth
+    description: Autenticación de usuarios
+  - name: users
+    description: Gestión de usuarios
+  - name: categories
+    description: Categorías y habilidades
+  - name: jobs
+    description: Publicación y gestión de trabajos
+  - name: offers
+    description: Ofertas de los trabajadores
+  - name: messages
+    description: Chat entre cliente y trabajador
+  - name: reviews
+    description: Calificaciones mutuas
+  - name: routes
+    description: Rutas almacenadas
+  - name: locations
+    description: Historial de ubicaciones
+
+paths:
+  # ---------- AUTENTICACIÓN ----------
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Registrar un nuevo usuario
+      description: Crea un usuario con rol client, worker o both.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/user.json'
+      responses:
+        '201':
+          description: Usuario creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/user.json'
+        '400':
+          description: Datos inválidos
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Iniciar sesión
+      description: Autentica al usuario y devuelve token JWT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+              required: [email, password]
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: './schemas/user.json'
+        '401':
+          description: Credenciales incorrectas
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Renovar token JWT
+      description: Obtiene un nuevo token a partir de uno vigente.
+      responses:
+        '200':
+          description: Token renovado
+
+  # ---------- USUARIOS ----------
+  /users/me:
+    get:
+      tags: [users]
+      summary: Obtener perfil del usuario autenticado
+      description: Devuelve los datos del usuario dueño del token.
+      responses:
+        '200':
+          description: Perfil del usuario
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/user.json'
+    put:
+      tags: [users]
+      summary: Actualizar perfil
+      description: Modifica campos del perfil propio.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/user.json'
+      responses:
+        '200':
+          description: Perfil actualizado
+
+  /users/me/location:
+    put:
+      tags: [users]
+      summary: Actualizar ubicación actual (trabajadores)
+      description: Guarda la coordenada actual del usuario.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                location:
+                  $ref: './schemas/user.json#/properties/location'
+      responses:
+        '200':
+          description: Ubicación actualizada
+
+  /users/me/vehicles:
+    post:
+      tags: [users]
+      summary: Agregar vehículo (solo trabajadores)
+      description: Crea un registro de vehículo asociado al usuario.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/vehicle.json'
+      responses:
+        '201':
+          description: Vehículo agregado
+    get:
+      tags: [users]
+      summary: Listar vehículos propios
+      description: Devuelve los vehículos asociados al usuario.
+      responses:
+        '200':
+          description: Lista de vehículos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './schemas/vehicle.json'
+
+  # ---------- CATEGORÍAS ----------
+  /categories:
+    get:
+      tags: [categories]
+      summary: Listar categorías y habilidades
+      description: Devuelve todas las categorías disponibles.
+      responses:
+        '200':
+          description: Lista de categorías
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './schemas/category.json'
+    post:
+      tags: [categories]
+      summary: Crear categoría (solo administrador)
+      description: Agrega una nueva categoría con habilidades.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/category.json'
+      responses:
+        '201':
+          description: Categoría creada
+
+  # ---------- TRABAJOS ----------
+  /jobs:
+    post:
+      tags: [jobs]
+      summary: Publicar un trabajo
+      description: Crea un nuevo trabajo con estado pending.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/job.json'
+      responses:
+        '201':
+          description: Trabajo publicado
+
+  /jobs/nearby:
+    get:
+      tags: [jobs]
+      summary: Listar trabajos cercanos
+      description: Devuelve trabajos pendientes dentro de un radio, filtrados por categoría/habilidades.
+      parameters:
+        - in: query
+          name: lat
+          schema:
+            type: number
+          required: true
+        - in: query
+          name: lng
+          schema:
+            type: number
+          required: true
+        - in: query
+          name: radius
+          schema:
+            type: integer
+          description: Radio en metros
+        - in: query
+          name: category
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de trabajos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './schemas/job.json'
+
+  /jobs/{id}:
+    get:
+      tags: [jobs]
+      summary: Detalle de un trabajo
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Datos del trabajo
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/job.json'
+    delete:
+      tags: [jobs]
+      summary: Cancelar trabajo (solo cliente)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trabajo cancelado
+
+  /jobs/{id}/status:
+    put:
+      tags: [jobs]
+      summary: Cambiar estado del trabajo
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [accepted, in_progress, completed, cancelled]
+      responses:
+        '200':
+          description: Estado actualizado
+
+  # ---------- OFERTAS ----------
+  /jobs/{id}/offers:
+    post:
+      tags: [offers]
+      summary: Enviar oferta a un trabajo
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/offer.json'
+      responses:
+        '201':
+          description: Oferta enviada
+    get:
+      tags: [offers]
+      summary: Listar ofertas recibidas (cliente)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de ofertas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './schemas/offer.json'
+
+  /offers/{id}/accept:
+    put:
+      tags: [offers]
+      summary: Aceptar una oferta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Oferta aceptada, trabajo asignado
+
+  /offers/{id}/reject:
+    put:
+      tags: [offers]
+      summary: Rechazar una oferta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Oferta rechazada
+
+  # ---------- MENSAJES ----------
+  /jobs/{id}/messages:
+    post:
+      tags: [messages]
+      summary: Enviar mensaje en el chat
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        '201':
+          description: Mensaje enviado
+    get:
+      tags: [messages]
+      summary: Obtener historial de mensajes del trabajo
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de mensajes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './schemas/message.json'
+
+  # ---------- RESEÑAS ----------
+  /jobs/{id}/review:
+    post:
+      tags: [reviews]
+      summary: Calificar al otro usuario al finalizar
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/review.json'
+      responses:
+        '201':
+          description: Reseña creada
+
+  /users/{id}/reviews:
+    get:
+      tags: [reviews]
+      summary: Obtener reseñas de un usuario
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de reseñas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './schemas/review.json'
+
+  # ---------- RUTAS ----------
+  /jobs/{id}/route:
+    get:
+      tags: [routes]
+      summary: Obtener ruta almacenada
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ruta encontrada
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/job_route.json'
+    post:
+      tags: [routes]
+      summary: Guardar/calcular ruta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/job_route.json'
+      responses:
+        '201':
+          description: Ruta almacenada
+
+  # ---------- UBICACIONES ----------
+  /jobs/{id}/locations:
+    get:
+      tags: [locations]
+      summary: Obtener historial de ubicaciones del trabajo
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de ubicaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './schemas/location_history.json'
+    post:
+      tags: [locations]
+      summary: Registrar una ubicación durante el seguimiento
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/location_history.json'
+      responses:
+        '201':
+          description: Ubicación registrada

@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Job",
+  "type": "object",
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "Identificador único (ObjectId en MongoDB)",
+      "readOnly": true
+    },
+    "clientId": {
+      "type": "string",
+      "description": "Referencia al usuario cliente que publica el trabajo (ObjectId de users)"
+    },
+    "details": {
+      "type": "object",
+      "description": "Detalles del trabajo",
+      "properties": {
+        "title": { "type": "string", "description": "Título breve del trabajo" },
+        "description": { "type": "string", "description": "Descripción detallada del problema" },
+        "category": { "type": "string", "description": "Categoría del trabajo (slug de categories)" },
+        "skillsRequired": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Habilidades requeridas para el trabajo"
+        }
+      },
+      "required": ["title", "description", "category"]
+    },
+    "location": {
+      "type": "object",
+      "description": "Ubicación del trabajo",
+      "properties": {
+        "coordinates": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Coordenadas [longitud, latitud]"
+        },
+        "address": { "type": "string", "description": "Dirección legible" }
+      },
+      "required": ["coordinates", "address"]
+    },
+    "pricing": {
+      "type": "object",
+      "description": "Información de precio",
+      "properties": {
+        "proposedPrice": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "default": "GTQ" }
+      },
+      "required": ["proposedPrice", "currency"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "accepted", "in_progress", "completed", "cancelled"],
+      "description": "Estado del trabajo"
+    },
+    "workerId": {
+      "type": ["string", "null"],
+      "description": "Trabajador asignado (ObjectId de users), null si no hay"
+    },
+    "acceptedOfferId": {
+      "type": ["string", "null"],
+      "description": "Oferta aceptada (ObjectId de offers), null si no hay"
+    },
+    "scheduledFor": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Fecha programada para el trabajo, opcional"
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  },
+  "required": ["clientId", "details", "location", "pricing", "status"],
+  "additionalProperties": true
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Review",
+  "type": "object",
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "Identificador único (ObjectId en MongoDB)",
+      "readOnly": true
+    },
+    "jobId": {
+      "type": "string",
+      "description": "Trabajo al que pertenece la reseña (ObjectId de jobs)"
+    },
+    "reviewerId": {
+      "type": "string",
+      "description": "Usuario que califica (ObjectId de users)"
+    },
+    "revieweeId": {
+      "type": "string",
+      "description": "Usuario que es calificado (ObjectId de users)"
+    },
+    "rating": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Puntuación de 1 a 5 estrellas"
+    },
+    "comment": {
+      "type": "string",
+      "description": "Comentario opcional sobre el servicio"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de creación de la reseña"
+    }
+  },
+  "required": ["jobId", "reviewerId", "revieweeId", "rating"],
+  "additionalProperties": true
+}

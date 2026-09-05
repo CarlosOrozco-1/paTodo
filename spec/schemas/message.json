@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Message",
+  "type": "object",
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "Identificador único (ObjectId en MongoDB)",
+      "readOnly": true
+    },
+    "jobId": {
+      "type": "string",
+      "description": "Trabajo al que pertenece el mensaje (ObjectId de jobs)"
+    },
+    "senderId": {
+      "type": "string",
+      "description": "Usuario que envía el mensaje (ObjectId de users)"
+    },
+    "receiverId": {
+      "type": "string",
+      "description": "Usuario que recibe el mensaje (ObjectId de users)"
+    },
+    "content": {
+      "type": "string",
+      "description": "Contenido del mensaje"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de envío del mensaje"
+    }
+  },
+  "required": ["jobId", "senderId", "receiverId", "content"],
+  "additionalProperties": true
+}

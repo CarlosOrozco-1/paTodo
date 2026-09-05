@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Offer",
+  "type": "object",
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "Identificador único (ObjectId en MongoDB)",
+      "readOnly": true
+    },
+    "jobId": {
+      "type": "string",
+      "description": "Referencia al trabajo (ObjectId de jobs)"
+    },
+    "workerId": {
+      "type": "string",
+      "description": "Referencia al trabajador que oferta (ObjectId de users)"
+    },
+    "workerSnapshot": {
+      "type": "object",
+      "description": "Resumen del trabajador en el momento de la oferta (denormalizado)",
+      "properties": {
+        "name": { "type": "string", "description": "Nombre completo del trabajador" },
+        "rating": { "type": "number", "minimum": 0, "maximum": 5 },
+        "completedJobs": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["name", "rating"]
+    },
+    "price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Precio ofertado por el trabajador"
+    },
+    "estimatedTime": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Tiempo estimado en minutos"
+    },
+    "message": {
+      "type": "string",
+      "description": "Nota opcional del trabajador"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "accepted", "rejected"],
+      "description": "Estado de la oferta"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["jobId", "workerId", "price", "estimatedTime", "status"],
+  "additionalProperties": true
+}

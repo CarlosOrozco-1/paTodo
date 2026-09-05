@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Category",
+  "type": "object",
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "Identificador único (ObjectId en MongoDB)",
+      "readOnly": true
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre de la categoría (ej: Mecánica, Plomería)"
+    },
+    "slug": {
+      "type": "string",
+      "description": "Identificador único para la categoría (ej: mecanica, plomeria)"
+    },
+    "skills": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Lista de habilidades asociadas a la categoría (ej: cambio_llantas, reparacion_tuberias)"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de creación"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de última actualización"
+    }
+  },
+  "required": ["name", "slug", "skills"],
+  "additionalProperties": true
+}
