@@ -1,0 +1,177 @@
+{
+  "users": [
+    {
+      "name": "location_2dsphere",
+      "keys": { "location": "2dsphere" },
+      "description": "Consultas geoespaciales: encontrar workers cercanos ($near, $geoWithin)"
+    },
+    {
+      "name": "role_availability",
+      "keys": { "role": 1, "availability.isOnline": 1 },
+      "description": "Filtrar workers online por rol (worker/both) para listado de disponibles"
+    },
+    {
+      "name": "skillIds_1",
+      "keys": { "skillIds": 1 },
+      "description": "Buscar usuarios que tienen una skill específica (para matching jobs)"
+    },
+    {
+      "name": "stats_rating_-1",
+      "keys": { "stats.rating": -1 },
+      "description": "Ordenar por rating descendente (top workers)"
+    },
+    {
+      "name": "contact_address_city_1",
+      "keys": { "contact.address.city": 1 },
+      "description": "Filtrar usuarios por ciudad"
+    }
+  ],
+  "jobs": [
+    {
+      "name": "status_location_2dsphere",
+      "keys": { "status": 1, "location.coordinates": "2dsphere" },
+      "description": "Jobs pendientes cercanos a coordenadas (query principal workers)"
+    },
+    {
+      "name": "clientId_status_1",
+      "keys": { "clientId": 1, "status": 1 },
+      "description": "Jobs de un cliente filtrados por estado (mis trabajos)"
+    },
+    {
+      "name": "workerId_status_1",
+      "keys": { "workerId": 1, "status": 1 },
+      "description": "Jobs asignados a un worker filtrados por estado"
+    },
+    {
+      "name": "categoryId_status_1",
+      "keys": { "details.categoryId": 1, "status": 1 },
+      "description": "Filtrar jobs por categoría y estado"
+    }
+  ],
+  "messages": [
+    {
+      "name": "conversationId_createdAt_-1",
+      "keys": { "conversationId": 1, "createdAt": -1 },
+      "description": "Paginar mensajes de una conversación (más recientes primero)"
+    },
+    {
+      "name": "jobId_createdAt_-1",
+      "keys": { "jobId": 1, "createdAt": -1 },
+      "description": "Historial de mensajes de un job (fallback si no hay conversationId)"
+    }
+  ],
+  "conversations": [
+    {
+      "name": "participantIds_updatedAt_-1",
+      "keys": { "participantIds": 1, "updatedAt": -1 },
+      "description": "Listar conversaciones de un usuario ordenadas por última actividad"
+    },
+    {
+      "name": "jobId_unique",
+      "keys": { "jobId": 1 },
+      "options": { "unique": true },
+      "description": "Una sola conversación por job (evita duplicados)"
+    }
+  ],
+  "location_history": [
+    {
+      "name": "userId_timestamp_-1",
+      "keys": { "userId": 1, "timestamp": -1 },
+      "description": "Historial de ubicaciones de un usuario (tracking worker)"
+    },
+    {
+      "name": "jobId_timestamp_-1",
+      "keys": { "jobId": 1, "timestamp": -1 },
+      "description": "Ubicaciones durante un job específico (ruta completa)"
+    },
+    {
+      "name": "timestamp_ttl_30d",
+      "keys": { "timestamp": 1 },
+      "options": { "expireAfterSeconds": 2592000 },
+      "description": "Auto-eliminar registros >30 días (ahorro storage, GDPR)"
+    }
+  ],
+  "notifications": [
+    {
+      "name": "userId_readAt_createdAt_-1",
+      "keys": { "userId": 1, "readAt": 1, "createdAt": -1 },
+      "description": "Listar notificaciones de usuario (no leídas primero, luego recientes)"
+    },
+    {
+      "name": "userId_type_1",
+      "keys": { "userId": 1, "type": 1 },
+      "description": "Filtrar notificaciones por tipo para preferencias de usuario"
+    }
+  ],
+  "skills": [
+    {
+      "name": "slug_unique",
+      "keys": { "slug": 1 },
+      "options": { "unique": true },
+      "description": "Slug único para lookup rápido (cambio_llantas, plomeria, etc.)"
+    },
+    {
+      "name": "categoryIds_1",
+      "keys": { "categoryIds": 1 },
+      "description": "Skills de una categoría (para dropdowns UI)"
+    }
+  ],
+  "categories": [
+    {
+      "name": "slug_unique",
+      "keys": { "slug": 1 },
+      "options": { "unique": true },
+      "description": "Slug único para routing (ej: /categories/mecanica)"
+    },
+    {
+      "name": "parentId_1",
+      "keys": { "parentId": 1 },
+      "description": "Sub-categorías de una categoría padre (jerarquía)"
+    }
+  ],
+  "vehicles": [
+    {
+      "name": "ownerId_1",
+      "keys": { "ownerId": 1 },
+      "description": "Vehículos de un worker (para listar/validar ownership)"
+    },
+    {
+      "name": "plate_unique",
+      "keys": { "plate": 1 },
+      "options": { "unique": true },
+      "description": "Placa única (evita duplicados)"
+    }
+  ],
+  "offers": [
+    {
+      "name": "jobId_status_1",
+      "keys": { "jobId": 1, "status": 1 },
+      "description": "Ofertas de un job filtradas por estado (para cliente)"
+    },
+    {
+      "name": "workerId_status_1",
+      "keys": { "workerId": 1, "status": 1 },
+      "description": "Ofertas enviadas por un worker (mis ofertas)"
+    }
+  ],
+  "reviews": [
+    {
+      "name": "jobId_unique",
+      "keys": { "jobId": 1 },
+      "options": { "unique": true },
+      "description": "Una review por job (evita duplicados)"
+    },
+    {
+      "name": "revieweeId_createdAt_-1",
+      "keys": { "revieweeId": 1, "createdAt": -1 },
+      "description": "Reviews recibidas por un usuario (perfil público)"
+    }
+  ],
+  "job_routes": [
+    {
+      "name": "jobId_type_1",
+      "keys": { "jobId": 1, "type": 1 },
+      "description": "Rutas de un job por tipo (worker_to_job, client_to_job, etc.)"
+    }
+  ]
+}
