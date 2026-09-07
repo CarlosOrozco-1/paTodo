@@ -1,0 +1,19 @@
+package com.paTodo.backend.repository;
+
+import com.paTodo.backend.model.Job;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.List;
+
+public interface JobRepository extends MongoRepository<Job, String> {
+    List<Job> findByClientId(String clientId);
+    List<Job> findByWorkerId(String workerId);
+    List<Job> findByStatus(String status);
+    List<Job> findByDetailsCategoryId(String categoryId);
+    Page<Job> findByStatus(String status, Pageable pageable);
+    Page<Job> findByDetailsCategoryId(String categoryId, Pageable pageable);
+    Page<Job> findByStatusAndDetailsCategoryId(String status, String categoryId, Pageable pageable);
+    List<Job> findByStatusInAndDetailsCategoryIdIn(List<String> statuses, List<String> categoryIds);
+}

@@ -1,0 +1,334 @@
+{
+  "info": {
+    "_postman_id": "c19b4f2a-9f31-4c5d-8a6e-2b0c1f3e9a11",
+    "name": "PaTodo API",
+    "description": "Colección de endpoints del backend PaTodo (Spring Boot + MongoDB Atlas).\n\nTODA solicitud autenticada usa el token guardado automáticamente en la variable `accessToken` tras un login exitoso (`POST /auth/login`).\n\nVariables:\n- `baseUrl`: base de la API (incluye el context-path `/api`). Por defecto usa el puerto 8081 porque el 8080 suele estar ocupado en este equipo.\n- `accessToken`: se llena automáticamente en el login.\n- `jobId`: se llena con el primer trabajo del listado para reutilizarlo en los detalles.\n\nRegla en el repo: esta colección se debe actualizar cada vez que un endpoint se agregue, elimine o modifique (ver AGENTS.md).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081/api" },
+    { "key": "accessToken", "value": "" },
+    { "key": "jobId", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{accessToken}}", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Registro y login. Devuelven access token (Bearer).",
+      "item": [
+        {
+          "name": "POST /auth/register",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Carlos\",\n  \"lastName\": \"Orozco\",\n  \"email\": \"carlos@example.com\",\n  \"password\": \"password123\",\n  \"phone\": \"+50212345678\",\n  \"role\": \"client\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Registro exitoso\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "POST /auth/login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"carlos@example.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Login exitoso\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set(\"accessToken\", json.accessToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ],
+      "event": []
+    },
+    {
+      "name": "Catálogo (público)",
+      "description": "Categorías y skills. No requieren token.",
+      "item": [
+        {
+          "name": "GET /categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /categories/root",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/root",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories", "root"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /categories/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/6a9b68a938f191673bfe1323",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories", "6a9b68a938f191673bfe1323"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /categories/{parentId}/children",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoryId}}/children",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories", "{{categoryId}}", "children"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /categories/slug/{slug}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/slug/mecanica",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories", "slug", "mecanica"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/skills",
+              "host": ["{{baseUrl}}"],
+              "path": ["skills"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /skills?categoryId=",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/skills?categoryId=6a9b68a938f191673bfe1323",
+              "host": ["{{baseUrl}}"],
+              "path": ["skills"],
+              "query": [
+                { "key": "categoryId", "value": "6a9b68a938f191673bfe1323" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /skills/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/skills/6a9ce21f439c91b39662c830",
+              "host": ["{{baseUrl}}"],
+              "path": ["skills", "6a9ce21f439c91b39662c830"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /skills/slug/{slug}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/skills/slug/plomeria",
+              "host": ["{{baseUrl}}"],
+              "path": ["skills", "slug", "plomeria"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "event": []
+    },
+    {
+      "name": "Jobs (requieren token)",
+      "description": "Solicitudes autenticadas. El token se agrega automáticamente vía la autorización de la colección.",
+      "item": [
+        {
+          "name": "POST /jobs",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"details\": {\n    \"title\": \"Cambio de batería\",\n    \"description\": \"La batería del carro no da marcha, necesito cambio a domicilio.\",\n    \"categoryId\": \"6a9b68a938f191673bfe1323\",\n    \"skillIds\": [\"6a9ce21f439c91b39662c834\"]\n  },\n  \"location\": {\n    \"coordinates\": [-90.5069, 14.6349],\n    \"address\": \"Zona 10, Ciudad de Guatemala\",\n    \"placeId\": \"ChIJjUCr2UArYI8RDt1gdRpXxlM\"\n  },\n  \"pricing\": {\n    \"proposedPrice\": 250,\n    \"currency\": \"GTQ\",\n    \"priceType\": \"fixed\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/jobs",
+              "host": ["{{baseUrl}}"],
+              "path": ["jobs"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Job creado\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set(\"jobId\", json.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /jobs (lista paginada)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/jobs?status=&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["jobs"],
+              "query": [
+                { "key": "status", "value": "", "disabled": true },
+                { "key": "categoryId", "value": "", "disabled": true },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Listado de jobs\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    if (json.content && json.content.length > 0) {",
+                  "        pm.collectionVariables.set(\"jobId\", json.content[0].id);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "GET /jobs/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/jobs/{{jobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["jobs", "{{jobId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /jobs/my-jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/jobs/my-jobs",
+              "host": ["{{baseUrl}}"],
+              "path": ["jobs", "my-jobs"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /jobs/assigned",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/jobs/assigned",
+              "host": ["{{baseUrl}}"],
+              "path": ["jobs", "assigned"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "event": []
+    }
+  ]
+}
