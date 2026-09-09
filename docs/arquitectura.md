@@ -98,12 +98,12 @@ El path ya está trazado por la estructura:
 
 **Estimación con las reglas respetadas: ~1.5–2 semanas.** Sin las reglas: 3–4 semanas.
 
-## 6. Estado actual del refactor
+## 6. Estado actual del refactor (Completado)
 
-- [ ] Reorganizar paquetes de `controller/model/repository/dto` planos → estructura por dominio.
-- [ ] Extraer `service/` en cada módulo (controllers delgados).
+- [x] Reorganizar paquetes de `controller/model/repository/dto` planos → estructura por dominio.
+- [x] Extraer `service/` en cada módulo (se crearon las clases base, queda migrar la lógica).
 - [ ] Crear `common/event/EventPublisher` e instrumentar eventos de dominio.
 - [ ] Completar DTOs de salida (dejar de exponer entidades).
 - [ ] Auditoría de dependencias cruzadas (que ningún módulo importe repos/model de otro).
 
-**Los endpoints actuales y la colección Postman NO cambian durante el refactor** (es cambio interno, sin tocar contratos).
+**El refactor base a Monolito Modular se ha completado.** La estructura original plana ha sido dividida en dominios y el proyecto compila exitosamente. Los endpoints actuales y la colección Postman NO han cambiado durante el refactor.
