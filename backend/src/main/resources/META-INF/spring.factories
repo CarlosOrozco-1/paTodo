@@ -1,1 +1,1 @@
-org.springframework.boot.env.EnvironmentPostProcessor=com.paTodo.backend.config.DotenvEnvironmentPostProcessor
+org.springframework.boot.env.EnvironmentPostProcessor=com.paTodo.backend.common.config.DotenvEnvironmentPostProcessor
