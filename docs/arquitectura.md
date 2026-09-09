@@ -62,17 +62,43 @@ backend/src/main/java/com/paTodo/backend/
     └── ...
 ```
 
-### Mapa de propiedad (módulo → colección → equipo)
+### Módulos (Dominios) y sus Colecciones
 
-| Módulo | Colecciones propias | Equipo |
-|--------|---------------------|--------|
-| `user` | `users`, `vehicles` | P2 |
-| `catalog` | `categories`, `skills` | P2 |
-| `job` | `jobs`, `offers`, `job_routes`, `location_history` | P2/P3 |
-| `message` | `messages`, `conversations` | P3 |
-| `review` | `reviews` | P2 |
-| `notification` | `notifications` | P3 |
-| `common` | ninguna (seguridad, config, errores) | P1 |
+Para mantener la base de código escalable y permitir una fácil migración a microservicios en el futuro, el código se divide en los siguientes dominios. Cada dominio **encapsula sus propios modelos (schemas de MongoDB), repositorios, servicios y controladores**.
+
+1. **Módulo `job` (Trabajos)** - *El núcleo de la aplicación.*
+   - **Colecciones encapsuladas:** `jobs`, `offers`, `job_routes`, `location_history`.
+   - **Servicios principales:** `JobService` (publicar/buscar trabajos, seguimiento geoespacial), `OfferService` (postular, aceptar/rechazar ofertas).
+   - *Nota:* Todo el ciclo de vida de un servicio (desde que se pide hasta que el trabajador va en camino) pertenece a este dominio.
+
+2. **Módulo `user` (Usuarios)**
+   - **Colecciones encapsuladas:** `users`, `vehicles`.
+   - **Servicios principales:** `UserService`, `AuthService`.
+   - *Nota:* Maneja el perfil del usuario (sea cliente o trabajador) y los vehículos registrados por los trabajadores.
+
+3. **Módulo `catalog` (Catálogos)**
+   - **Colecciones encapsuladas:** `categories`, `skills`.
+   - **Servicios principales:** `CategoryService`, `SkillService`.
+   - *Nota:* Datos maestros de la plataforma. Usado para llenar los menús desplegables.
+
+4. **Módulo `message` (Mensajería)**
+   - **Colecciones encapsuladas:** `conversations`, `messages`.
+   - **Servicios principales:** `MessageService`, `ConversationService`.
+   - *Nota:* Maneja el chat en tiempo real entre cliente y trabajador a través de WebSockets.
+
+5. **Módulo `review` (Reseñas)**
+   - **Colecciones encapsuladas:** `reviews`.
+   - **Servicios principales:** `ReviewService`.
+   - *Nota:* Sistema de calificaciones mutuas al terminar un trabajo.
+
+6. **Módulo `notification` (Notificaciones)**
+   - **Colecciones encapsuladas:** `notifications`.
+   - **Servicios principales:** `NotificationService`.
+   - *Nota:* Historial de alertas enviadas a los usuarios (Push, In-App).
+
+7. **Módulo `common` (Común / Transversal)**
+   - **Colecciones:** *Ninguna*.
+   - **Contenido:** Configuraciones de Seguridad (JWT), Excepciones globales, utilidades compartidas. No contiene lógica de negocio.
 
 ## 4. Reglas de implementación (NO NEGOCIABLES)
 
