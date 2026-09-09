@@ -1,334 +1,1463 @@
 {
-  "info": {
-    "_postman_id": "c19b4f2a-9f31-4c5d-8a6e-2b0c1f3e9a11",
-    "name": "PaTodo API",
-    "description": "Colección de endpoints del backend PaTodo (Spring Boot + MongoDB Atlas).\n\nTODA solicitud autenticada usa el token guardado automáticamente en la variable `accessToken` tras un login exitoso (`POST /auth/login`).\n\nVariables:\n- `baseUrl`: base de la API (incluye el context-path `/api`). Por defecto usa el puerto 8081 porque el 8080 suele estar ocupado en este equipo.\n- `accessToken`: se llena automáticamente en el login.\n- `jobId`: se llena con el primer trabajo del listado para reutilizarlo en los detalles.\n\nRegla en el repo: esta colección se debe actualizar cada vez que un endpoint se agregue, elimine o modifique (ver AGENTS.md).",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8081/api" },
-    { "key": "accessToken", "value": "" },
-    { "key": "jobId", "value": "" }
-  ],
-  "auth": {
-    "type": "bearer",
-    "bearer": [
-      { "key": "token", "value": "{{accessToken}}", "type": "string" }
+    "info": {
+        "_postman_id": "c19b4f2a-9f31-4c5d-8a6e-2b0c1f3e9a11",
+        "name": "PaTodo API",
+        "description": "ColecciÃ³n de endpoints del backend PaTodo (Spring Boot + MongoDB Atlas).\n\nTODA solicitud autenticada usa el token guardado automÃ¡ticamente en la variable `accessToken` tras un login exitoso (`POST /auth/login`).\n\nVariables:\n- `baseUrl`: base de la API (incluye el context-path `/api`). Por defecto usa el puerto 8081 porque el 8080 suele estar ocupado en este equipo.\n- `accessToken`: se llena automÃ¡ticamente en el login.\n- `jobId`: se llena con el primer trabajo del listado para reutilizarlo en los detalles.\n\nRegla en el repo: esta colecciÃ³n se debe actualizar cada vez que un endpoint se agregue, elimine o modifique (ver AGENTS.md).",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8081/api"
+        },
+        {
+            "key": "accessToken",
+            "value": ""
+        },
+        {
+            "key": "jobId",
+            "value": ""
+        },
+        {
+            "key": "offerId",
+            "value": ""
+        },
+        {
+            "key": "otherUserId",
+            "value": ""
+        },
+        {
+            "key": "conversationId",
+            "value": ""
+        },
+        {
+            "key": "notificationId",
+            "value": ""
+        },
+        {
+            "key": "refreshToken",
+            "value": ""
+        }
+    ],
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{accessToken}}",
+                "type": "string"
+            }
+        ]
+    },
+    "item": [
+        {
+            "name": "Auth",
+            "description": "Registro y login. Devuelven access token (Bearer).",
+            "item": [
+                {
+                    "name": "POST /auth/register",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"firstName\": \"Carlos\",\n  \"lastName\": \"Orozco\",\n  \"email\": \"carlos@example.com\",\n  \"password\": \"password123\",\n  \"phone\": \"+50212345678\",\n  \"role\": \"client\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/register",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "register"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test(\"Registro exitoso\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ]
+                            }
+                        }
+                    ],
+                    "response": []
+                },
+                {
+                    "name": "POST /auth/login",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"carlos@example.com\",\n  \"password\": \"password123\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/login",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "login"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test(\"Login exitoso\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    const json = pm.response.json();",
+                                    "    pm.collectionVariables.set(\"accessToken\", json.accessToken);",
+                                    "});",
+                                    "    pm.collectionVariables.set(\"refreshToken\", json.refreshToken);"
+                                ]
+                            }
+                        }
+                    ],
+                    "response": []
+                },
+                {
+                    "request": {
+                        "body": {
+                            "raw": "{\"refreshToken\":\"{{refreshToken}}\"}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/auth/refresh",
+                            "path": [
+                                "auth",
+                                "refresh"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "POST /auth/refresh",
+                    "event": [
+                        {
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Token renovado\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    const json = pm.response.json();",
+                                    "    pm.collectionVariables.set(\"accessToken\", json.accessToken);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            },
+                            "listen": "test"
+                        }
+                    ],
+                    "response": []
+                }
+            ],
+            "event": []
+        },
+        {
+            "name": "CatÃ¡logo (pÃºblico)",
+            "description": "CategorÃ­as y skills. No requieren token.",
+            "item": [
+                {
+                    "name": "GET /categories",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/categories",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "categories"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /categories/root",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/categories/root",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "categories",
+                                "root"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /categories/{id}",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/categories/6a9b68a938f191673bfe1323",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "categories",
+                                "6a9b68a938f191673bfe1323"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /categories/{parentId}/children",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/categories/{{categoryId}}/children",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "categories",
+                                "{{categoryId}}",
+                                "children"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /categories/slug/{slug}",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/categories/slug/mecanica",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "categories",
+                                "slug",
+                                "mecanica"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /skills",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/skills",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "skills"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /skills?categoryId=",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/skills?categoryId=6a9b68a938f191673bfe1323",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "skills"
+                            ],
+                            "query": [
+                                {
+                                    "key": "categoryId",
+                                    "value": "6a9b68a938f191673bfe1323"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /skills/{id}",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/skills/6a9ce21f439c91b39662c830",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "skills",
+                                "6a9ce21f439c91b39662c830"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /skills/slug/{slug}",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/skills/slug/plomeria",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "skills",
+                                "slug",
+                                "plomeria"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ],
+            "event": []
+        },
+        {
+            "name": "Jobs (requieren token)",
+            "description": "Solicitudes autenticadas. El token se agrega automÃ¡ticamente vÃ­a la autorizaciÃ³n de la colecciÃ³n.",
+            "item": [
+                {
+                    "name": "POST /jobs",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"details\": {\n    \"title\": \"Cambio de baterÃ­a\",\n    \"description\": \"La baterÃ­a del carro no da marcha, necesito cambio a domicilio.\",\n    \"categoryId\": \"6a9b68a938f191673bfe1323\",\n    \"skillIds\": [\"6a9ce21f439c91b39662c834\"]\n  },\n  \"location\": {\n    \"coordinates\": [-90.5069, 14.6349],\n    \"address\": \"Zona 10, Ciudad de Guatemala\",\n    \"placeId\": \"ChIJjUCr2UArYI8RDt1gdRpXxlM\"\n  },\n  \"pricing\": {\n    \"proposedPrice\": 250,\n    \"currency\": \"GTQ\",\n    \"priceType\": \"fixed\"\n  }\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs"
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test(\"Job creado\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    const json = pm.response.json();",
+                                    "    pm.collectionVariables.set(\"jobId\", json.id);",
+                                    "});"
+                                ]
+                            }
+                        }
+                    ],
+                    "response": []
+                },
+                {
+                    "name": "GET /jobs (lista paginada)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs?status=&page=0&size=20",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs"
+                            ],
+                            "query": [
+                                {
+                                    "key": "status",
+                                    "value": "",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "categoryId",
+                                    "value": "",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "page",
+                                    "value": "0"
+                                },
+                                {
+                                    "key": "size",
+                                    "value": "20"
+                                }
+                            ]
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test(\"Listado de jobs\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    const json = pm.response.json();",
+                                    "    if (json.content && json.content.length > 0) {",
+                                    "        pm.collectionVariables.set(\"jobId\", json.content[0].id);",
+                                    "    }",
+                                    "});"
+                                ]
+                            }
+                        }
+                    ],
+                    "response": []
+                },
+                {
+                    "name": "GET /jobs/{id}",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /jobs/my-jobs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/my-jobs",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "my-jobs"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /jobs/assigned",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/assigned",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "assigned"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /jobs/nearby",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/nearby?lat=14.6349&lng=-90.5069&radius=10000",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "nearby"
+                            ],
+                            "query": [
+                                {
+                                    "key": "lat",
+                                    "value": "14.6349"
+                                },
+                                {
+                                    "key": "lng",
+                                    "value": "-90.5069"
+                                },
+                                {
+                                    "key": "radius",
+                                    "value": "10000"
+                                },
+                                {
+                                    "key": "category",
+                                    "value": "",
+                                    "disabled": true
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "DELETE /jobs/{id}",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "PUT /jobs/{id}/status",
+                    "request": {
+                        "method": "PUT",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"status\": \"completed\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/status",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "status"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "POST /jobs/{id}/offers",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"price\": 200,\n  \"currency\": \"GTQ\",\n  \"estimatedTime\": 120,\n  \"message\": \"Llego en 30 mins y cobro 200 quetzales.\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/offers",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "offers"
+                            ]
+                        }
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Oferta creada\", function () {",
+                                    "    pm.response.to.have.status(201);",
+                                    "    const json = pm.response.json();",
+                                    "    pm.collectionVariables.set(\"offerId\", json.id);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            },
+                            "listen": "test"
+                        }
+                    ]
+                },
+                {
+                    "name": "GET /jobs/{id}/offers",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/offers",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "offers"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "PUT /offers/{id}/accept",
+                    "request": {
+                        "method": "PUT",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/offers/{{offerId}}/accept",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "offers",
+                                "{{offerId}}",
+                                "accept"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "PUT /offers/{id}/reject",
+                    "request": {
+                        "method": "PUT",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/offers/{{offerId}}/reject",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "offers",
+                                "{{offerId}}",
+                                "reject"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ],
+            "event": []
+        },
+        {
+            "name": "Usuarios (requieren token)",
+            "item": [
+                {
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/users/me",
+                            "path": [
+                                "users",
+                                "me"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "GET /users/me",
+                    "response": []
+                },
+                {
+                    "request": {
+                        "body": {
+                            "raw": "{\"online\":true,\"bio\":\"Cliente frecuente\",\"firstName\":\"Carlos\",\"phone\":\"+50255551234\",\"lastName\":\"Mendoza\"}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "PUT",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/users/me",
+                            "path": [
+                                "users",
+                                "me"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "PUT /users/me",
+                    "response": []
+                },
+                {
+                    "request": {
+                        "body": {
+                            "raw": "{\"coordinates\":[-90.5069,14.6349],\"online\":true}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "PUT",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/users/me/location",
+                            "path": [
+                                "users",
+                                "me",
+                                "location"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "PUT /users/me/location",
+                    "response": []
+                },
+                {
+                    "request": {
+                        "body": {
+                            "raw": "{\"model\":\"Corolla\",\"color\":\"Blanco\",\"features\":[\"aire-acondicionado\"],\"year\":2020,\"type\":\"car\",\"plate\":\"P123ABC\",\"brand\":\"Toyota\",\"status\":\"active\"}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/users/me/vehicles",
+                            "path": [
+                                "users",
+                                "me",
+                                "vehicles"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "POST /users/me/vehicles",
+                    "response": []
+                },
+                {
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/users/me/vehicles",
+                            "path": [
+                                "users",
+                                "me",
+                                "vehicles"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "GET /users/me/vehicles",
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Chat (requieren token)",
+            "item": [
+                {
+                    "request": {
+                        "body": {
+                            "raw": "{\"receiverId\":\"{{otherUserId}}\",\"content\":\"Hola, ¿cuándo podrías venir?\",\"type\":\"text\"}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/messages",
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "messages"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "POST /jobs/{id}/messages",
+                    "event": [
+                        {
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Mensaje enviado\", function () {",
+                                    "    pm.response.to.have.status(201);",
+                                    "    const json = pm.response.json();",
+                                    "    pm.collectionVariables.set(\"conversationId\", json.conversationId);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            },
+                            "listen": "test"
+                        }
+                    ],
+                    "response": []
+                },
+                {
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/messages",
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "messages"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "GET /jobs/{id}/messages",
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Reseñas (requieren token)",
+            "item": [
+                {
+                    "request": {
+                        "body": {
+                            "raw": "{\"aspects\":{\"communication\":5,\"quality\":5,\"punctuality\":5,\"value\":4},\"rating\":5,\"comment\":\"Excelente trabajo\",\"revieweeId\":\"{{otherUserId}}\"}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/review",
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "review"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "POST /jobs/{id}/review",
+                    "response": []
+                },
+                {
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/review",
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "review"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "GET /jobs/{id}/review",
+                    "response": []
+                },
+                {
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/users/{{otherUserId}}/reviews",
+                            "path": [
+                                "users",
+                                "{{otherUserId}}",
+                                "reviews"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "GET /users/{id}/reviews",
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Rutas y ubicación (requieren token)",
+            "item": [
+                {
+                    "request": {
+                        "body": {
+                            "raw": "{\"distance\":5200,\"source\":\"manual\",\"polyline\":\"encoded-polyline\",\"duration\":900,\"type\":\"driving\",\"geometry\":{\"coordinates\":[[-90.51,14.63],[-90.5,14.63]],\"type\":\"LineString\"},\"waypoints\":[{\"coordinates\":[-90.51,14.63],\"name\":\"Origen\"}]}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/route",
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "route"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "POST /jobs/{id}/route",
+                    "response": []
+                },
+                {
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/route",
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "route"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "GET /jobs/{id}/route",
+                    "response": []
+                },
+                {
+                    "request": {
+                        "body": {
+                            "raw": "{\"accuracy\":5,\"source\":\"gps\",\"speed\":12.5,\"coordinates\":[-90.5069,14.6349]}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            },
+                            "mode": "raw"
+                        },
+                        "method": "POST",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/locations",
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "locations"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "POST /jobs/{id}/locations",
+                    "response": []
+                },
+                {
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "0&size"
+                                }
+                            ],
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/locations?page=0&size=50",
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "locations"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "GET /jobs/{id}/locations",
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Notificaciones (requieren token)",
+            "item": [
+                {
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "0&size"
+                                }
+                            ],
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/notifications/me?page=0&size=20",
+                            "path": [
+                                "notifications",
+                                "me"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "GET /notifications/me",
+                    "event": [
+                        {
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Notificaciones\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    const json = pm.response.json();",
+                                    "    if (json.content && json.content.length > 0) { pm.collectionVariables.set(\"notificationId\", json.content[0].id); }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            },
+                            "listen": "test"
+                        }
+                    ],
+                    "response": []
+                },
+                {
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/notifications/me/unread-count",
+                            "path": [
+                                "notifications",
+                                "me",
+                                "unread-count"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "GET /notifications/me/unread-count",
+                    "response": []
+                },
+                {
+                    "request": {
+                        "method": "PUT",
+                        "url": {
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "raw": "{{baseUrl}}/notifications/{{notificationId}}/read",
+                            "path": [
+                                "notifications",
+                                "{{notificationId}}",
+                                "read"
+                            ]
+                        },
+                        "header": []
+                    },
+                    "name": "PUT /notifications/{id}/read",
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Mensajes",
+            "description": "Endpoints de chat de un trabajo.",
+            "item": [
+                {
+                    "name": "POST /jobs/{id}/messages",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/messages",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "messages"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"content\": \"\\u00a1Hola! Estoy en camino.\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /jobs/{id}/messages",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/messages",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "messages"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Reseñas",
+            "description": "Calificaciones de trabajos.",
+            "item": [
+                {
+                    "name": "POST /jobs/{id}/review",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/review",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "review"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Excelente trabajo, muy profesional.\",\n  \"aspects\": {\n    \"puntualidad\": 5,\n    \"calidad\": 5,\n    \"comunicacion\": 5\n  }\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /jobs/{id}/review",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/review",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "review"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /users/{id}/reviews",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/users/{{otherUserId}}/reviews",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "users",
+                                "{{otherUserId}}",
+                                "reviews"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Rutas",
+            "description": "Rutas generadas para un trabajo.",
+            "item": [
+                {
+                    "name": "POST /jobs/{id}/route",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/route",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "route"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"distanceMeters\": 5500,\n  \"durationSeconds\": 1200,\n  \"polyline\": \"encoded_polyline_string_here\",\n  \"waypoints\": [\n    {\n      \"lat\": 14.6349,\n      \"lng\": -90.5069,\n      \"name\": \"Origen\"\n    },\n    {\n      \"lat\": 14.64,\n      \"lng\": -90.51,\n      \"name\": \"Destino\"\n    }\n  ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /jobs/{id}/route",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/route",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "route"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Ubicaciones (Tracking)",
+            "description": "Historial de ubicación del trabajador en camino.",
+            "item": [
+                {
+                    "name": "POST /jobs/{id}/locations",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/locations",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "locations"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"latitude\": 14.6355,\n  \"longitude\": -90.5072,\n  \"accuracy\": 15.0,\n  \"speed\": 5.2,\n  \"heading\": 90.0,\n  \"batteryLevel\": 85\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /jobs/{id}/locations",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/jobs/{{jobId}}/locations",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "jobs",
+                                "{{jobId}}",
+                                "locations"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "0"
+                                },
+                                {
+                                    "key": "size",
+                                    "value": "50"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Notificaciones",
+            "description": "Notificaciones del usuario autenticado.",
+            "item": [
+                {
+                    "name": "GET /notifications/me",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/notifications/me",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "notifications",
+                                "me"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "0"
+                                },
+                                {
+                                    "key": "size",
+                                    "value": "20"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "GET /notifications/me/unread-count",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/notifications/me/unread-count",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "notifications",
+                                "me",
+                                "unread-count"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "PUT /notifications/{id}/read",
+                    "request": {
+                        "method": "PUT",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/notifications/{{notificationId}}/read",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "notifications",
+                                "{{notificationId}}",
+                                "read"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        }
     ]
-  },
-  "item": [
-    {
-      "name": "Auth",
-      "description": "Registro y login. Devuelven access token (Bearer).",
-      "item": [
-        {
-          "name": "POST /auth/register",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Carlos\",\n  \"lastName\": \"Orozco\",\n  \"email\": \"carlos@example.com\",\n  \"password\": \"password123\",\n  \"phone\": \"+50212345678\",\n  \"role\": \"client\"\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "register"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Registro exitoso\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "response": []
-        },
-        {
-          "name": "POST /auth/login",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"carlos@example.com\",\n  \"password\": \"password123\"\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "login"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Login exitoso\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "    const json = pm.response.json();",
-                  "    pm.collectionVariables.set(\"accessToken\", json.accessToken);",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "response": []
-        }
-      ],
-      "event": []
-    },
-    {
-      "name": "Catálogo (público)",
-      "description": "Categorías y skills. No requieren token.",
-      "item": [
-        {
-          "name": "GET /categories",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/categories",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "GET /categories/root",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/categories/root",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories", "root"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "GET /categories/{id}",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/categories/6a9b68a938f191673bfe1323",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories", "6a9b68a938f191673bfe1323"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "GET /categories/{parentId}/children",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/categories/{{categoryId}}/children",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories", "{{categoryId}}", "children"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "GET /categories/slug/{slug}",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/categories/slug/mecanica",
-              "host": ["{{baseUrl}}"],
-              "path": ["categories", "slug", "mecanica"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "GET /skills",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/skills",
-              "host": ["{{baseUrl}}"],
-              "path": ["skills"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "GET /skills?categoryId=",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/skills?categoryId=6a9b68a938f191673bfe1323",
-              "host": ["{{baseUrl}}"],
-              "path": ["skills"],
-              "query": [
-                { "key": "categoryId", "value": "6a9b68a938f191673bfe1323" }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "GET /skills/{id}",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/skills/6a9ce21f439c91b39662c830",
-              "host": ["{{baseUrl}}"],
-              "path": ["skills", "6a9ce21f439c91b39662c830"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "GET /skills/slug/{slug}",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/skills/slug/plomeria",
-              "host": ["{{baseUrl}}"],
-              "path": ["skills", "slug", "plomeria"]
-            }
-          },
-          "response": []
-        }
-      ],
-      "event": []
-    },
-    {
-      "name": "Jobs (requieren token)",
-      "description": "Solicitudes autenticadas. El token se agrega automáticamente vía la autorización de la colección.",
-      "item": [
-        {
-          "name": "POST /jobs",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"details\": {\n    \"title\": \"Cambio de batería\",\n    \"description\": \"La batería del carro no da marcha, necesito cambio a domicilio.\",\n    \"categoryId\": \"6a9b68a938f191673bfe1323\",\n    \"skillIds\": [\"6a9ce21f439c91b39662c834\"]\n  },\n  \"location\": {\n    \"coordinates\": [-90.5069, 14.6349],\n    \"address\": \"Zona 10, Ciudad de Guatemala\",\n    \"placeId\": \"ChIJjUCr2UArYI8RDt1gdRpXxlM\"\n  },\n  \"pricing\": {\n    \"proposedPrice\": 250,\n    \"currency\": \"GTQ\",\n    \"priceType\": \"fixed\"\n  }\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/jobs",
-              "host": ["{{baseUrl}}"],
-              "path": ["jobs"]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Job creado\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "    const json = pm.response.json();",
-                  "    pm.collectionVariables.set(\"jobId\", json.id);",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "response": []
-        },
-        {
-          "name": "GET /jobs (lista paginada)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/jobs?status=&page=0&size=20",
-              "host": ["{{baseUrl}}"],
-              "path": ["jobs"],
-              "query": [
-                { "key": "status", "value": "", "disabled": true },
-                { "key": "categoryId", "value": "", "disabled": true },
-                { "key": "page", "value": "0" },
-                { "key": "size", "value": "20" }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Listado de jobs\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "    const json = pm.response.json();",
-                  "    if (json.content && json.content.length > 0) {",
-                  "        pm.collectionVariables.set(\"jobId\", json.content[0].id);",
-                  "    }",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "response": []
-        },
-        {
-          "name": "GET /jobs/{id}",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/jobs/{{jobId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["jobs", "{{jobId}}"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "GET /jobs/my-jobs",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/jobs/my-jobs",
-              "host": ["{{baseUrl}}"],
-              "path": ["jobs", "my-jobs"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "GET /jobs/assigned",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/jobs/assigned",
-              "host": ["{{baseUrl}}"],
-              "path": ["jobs", "assigned"]
-            }
-          },
-          "response": []
-        }
-      ],
-      "event": []
-    }
-  ]
 }

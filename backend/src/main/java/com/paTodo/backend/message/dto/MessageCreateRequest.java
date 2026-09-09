@@ -6,10 +6,8 @@ import jakarta.validation.constraints.Size;
 
 public class MessageCreateRequest {
 
-    @NotBlank
     private String jobId;
 
-    @NotBlank
     private String conversationId;
 
     @NotBlank

@@ -1,5 +1,6 @@
 package com.paTodo.backend.job.service;
 
+import com.paTodo.backend.common.exception.BadRequestException;
 import com.paTodo.backend.common.exception.ResourceNotFoundException;
 import com.paTodo.backend.job.dto.OfferCreateRequest;
 import com.paTodo.backend.job.dto.OfferResponse;
@@ -7,11 +8,17 @@ import com.paTodo.backend.job.model.Job;
 import com.paTodo.backend.job.model.Offer;
 import com.paTodo.backend.job.repository.JobRepository;
 import com.paTodo.backend.job.repository.OfferRepository;
+import com.paTodo.backend.notification.service.NotificationService;
+import com.paTodo.backend.user.dto.PublicUserDto;
+import com.paTodo.backend.user.service.UserService;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -19,18 +26,33 @@ public class OfferService {
 
     private final OfferRepository offerRepository;
     private final JobRepository jobRepository;
+    private final UserService userService;
+    private final NotificationService notificationService;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public OfferService(OfferRepository offerRepository, JobRepository jobRepository) {
+    public OfferService(OfferRepository offerRepository,
+                        JobRepository jobRepository,
+                        UserService userService,
+                        NotificationService notificationService,
+                        SimpMessagingTemplate messagingTemplate) {
         this.offerRepository = offerRepository;
         this.jobRepository = jobRepository;
+        this.userService = userService;
+        this.notificationService = notificationService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     public OfferResponse createOffer(String workerId, String jobId, OfferCreateRequest request) {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Trabajo no encontrado con id: " + jobId));
 
-        // TODO: Validar que el job esté en estado 'pending'
-        
+        if (!"pending".equals(job.getStatus())) {
+            throw new BadRequestException("Solo se puede ofertar en trabajos pendientes");
+        }
+        if (workerId.equals(job.getClientId())) {
+            throw new BadRequestException("No puedes ofertar en tu propio trabajo");
+        }
+
         Offer offer = new Offer();
         offer.setJobId(jobId);
         offer.setWorkerId(workerId);
@@ -43,19 +65,30 @@ public class OfferService {
         offer.setUpdatedAt(Instant.now());
         offer.setExpiresAt(Instant.now().plus(24, ChronoUnit.HOURS)); // Expira en 24h por defecto
 
-        // Snapshot del trabajador (Datos simulados hasta integrar con UserService)
+        PublicUserDto worker = userService.getPublicProfile(workerId);
         Offer.WorkerSnapshot snapshot = new Offer.WorkerSnapshot();
-        snapshot.setName("Trabajador " + workerId.substring(0, 4));
-        snapshot.setRating(5.0);
-        snapshot.setCompletedJobs(10);
-        snapshot.setAvatarUrl("https://ui-avatars.com/api/?name=Worker");
+        snapshot.setName(worker.getName());
+        snapshot.setRating(worker.getRating());
+        snapshot.setCompletedJobs(worker.getCompletedJobs());
+        snapshot.setAvatarUrl(worker.getAvatarUrl());
         offer.setWorkerSnapshot(snapshot);
 
         Offer savedOffer = offerRepository.save(offer);
-        return mapToResponse(savedOffer);
+        OfferResponse response = mapToResponse(savedOffer);
+        messagingTemplate.convertAndSend("/topic/offers." + jobId, response);
+        notificationService.notify(job.getClientId(), "new_offer",
+                "Nueva oferta recibida",
+                worker.getName() + " ofertó " + request.getPrice() + " " + request.getCurrency(),
+                Map.of("jobId", jobId, "offerId", savedOffer.getId()));
+        return response;
     }
 
-    public List<OfferResponse> getOffersForJob(String jobId) {
+    public List<OfferResponse> getOffersForJob(String jobId, String clientId) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Trabajo no encontrado con id: " + jobId));
+        if (!clientId.equals(job.getClientId())) {
+            throw new AccessDeniedException("Solo el cliente dueño puede ver las ofertas");
+        }
         return offerRepository.findByJobId(jobId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -68,7 +101,9 @@ public class OfferService {
         Job job = jobRepository.findById(offer.getJobId())
                 .orElseThrow(() -> new ResourceNotFoundException("Trabajo no encontrado"));
 
-        // TODO: Validar que el clientId coincide con el del job
+        if (!clientId.equals(job.getClientId())) {
+            throw new AccessDeniedException("Solo el cliente dueño puede aceptar ofertas");
+        }
 
         // Actualizar estado de la oferta
         offer.setStatus("accepted");
@@ -92,16 +127,30 @@ public class OfferService {
         job.setUpdatedAt(Instant.now());
         jobRepository.save(job);
 
-        return mapToResponse(offer);
+        OfferResponse response = mapToResponse(offer);
+        messagingTemplate.convertAndSend("/topic/offers." + job.getId(), response);
+        notificationService.notify(offer.getWorkerId(), "offer_accepted",
+                "¡Oferta aceptada!",
+                "Tu oferta para el trabajo fue aceptada",
+                Map.of("jobId", job.getId(), "offerId", offer.getId()));
+        return response;
     }
 
     public OfferResponse rejectOffer(String offerId, String clientId) {
         Offer offer = offerRepository.findById(offerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Oferta no encontrada con id: " + offerId));
 
+        Job job = jobRepository.findById(offer.getJobId())
+                .orElseThrow(() -> new ResourceNotFoundException("Trabajo no encontrado"));
+        if (!clientId.equals(job.getClientId())) {
+            throw new AccessDeniedException("Solo el cliente dueño puede rechazar ofertas");
+        }
+
         offer.setStatus("rejected");
         offer.setUpdatedAt(Instant.now());
-        return mapToResponse(offerRepository.save(offer));
+        OfferResponse response = mapToResponse(offerRepository.save(offer));
+        messagingTemplate.convertAndSend("/topic/offers." + job.getId(), response);
+        return response;
     }
 
     private OfferResponse mapToResponse(Offer offer) {

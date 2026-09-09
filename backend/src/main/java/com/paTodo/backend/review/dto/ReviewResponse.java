@@ -1,46 +1,36 @@
 package com.paTodo.backend.review.dto;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import java.time.Instant;
 
-public class ReviewCreateRequest {
+public class ReviewResponse {
 
+    private String id;
     private String jobId;
-
-    @NotBlank
+    private String reviewerId;
     private String revieweeId;
-
-    @NotNull
-    @Min(1)
-    @Max(5)
-    private Integer rating;
-
-    @Size(max = 1000)
+    private int rating;
     private String comment;
-
     private Aspects aspects;
+    private boolean isPublic;
+    private Instant createdAt;
+    private Instant updatedAt;
 
-    public ReviewCreateRequest() {}
+    public ReviewResponse() {}
 
-    public ReviewCreateRequest(String jobId, String revieweeId, Integer rating, String comment, Aspects aspects) {
-        this.jobId = jobId;
-        this.revieweeId = revieweeId;
-        this.rating = rating;
-        this.comment = comment;
-        this.aspects = aspects;
-    }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
     public String getJobId() { return jobId; }
     public void setJobId(String jobId) { this.jobId = jobId; }
 
+    public String getReviewerId() { return reviewerId; }
+    public void setReviewerId(String reviewerId) { this.reviewerId = reviewerId; }
+
     public String getRevieweeId() { return revieweeId; }
     public void setRevieweeId(String revieweeId) { this.revieweeId = revieweeId; }
 
-    public Integer getRating() { return rating; }
-    public void setRating(Integer rating) { this.rating = rating; }
+    public int getRating() { return rating; }
+    public void setRating(int rating) { this.rating = rating; }
 
     public String getComment() { return comment; }
     public void setComment(String comment) { this.comment = comment; }
@@ -48,31 +38,22 @@ public class ReviewCreateRequest {
     public Aspects getAspects() { return aspects; }
     public void setAspects(Aspects aspects) { this.aspects = aspects; }
 
+    public boolean isPublic() { return isPublic; }
+    public void setPublic(boolean aPublic) { isPublic = aPublic; }
+
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    public Instant getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
     public static class Aspects {
-        @Min(1)
-        @Max(5)
         private Integer quality;
-
-        @Min(1)
-        @Max(5)
         private Integer punctuality;
-
-        @Min(1)
-        @Max(5)
         private Integer communication;
-
-        @Min(1)
-        @Max(5)
         private Integer value;
 
         public Aspects() {}
-
-        public Aspects(Integer quality, Integer punctuality, Integer communication, Integer value) {
-            this.quality = quality;
-            this.punctuality = punctuality;
-            this.communication = communication;
-            this.value = value;
-        }
 
         public Integer getQuality() { return quality; }
         public void setQuality(Integer quality) { this.quality = quality; }

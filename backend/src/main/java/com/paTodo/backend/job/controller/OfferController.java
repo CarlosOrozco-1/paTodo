@@ -35,9 +35,9 @@ public class OfferController {
     public ResponseEntity<List<OfferResponse>> getJobOffers(
             @PathVariable String jobId,
             Authentication authentication) {
-        
-        // TODO: En el servicio validar que solo el cliente dueño del trabajo pueda ver las ofertas
-        List<OfferResponse> offers = offerService.getOffersForJob(jobId);
+
+        String clientId = authentication.getName();
+        List<OfferResponse> offers = offerService.getOffersForJob(jobId, clientId);
         return ResponseEntity.ok(offers);
     }
 

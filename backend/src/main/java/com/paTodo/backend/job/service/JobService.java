@@ -11,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.Metrics;
 import org.springframework.data.geo.Point;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -21,9 +23,11 @@ import java.util.stream.Collectors;
 public class JobService {
 
     private final JobRepository jobRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public JobService(JobRepository jobRepository) {
+    public JobService(JobRepository jobRepository, SimpMessagingTemplate messagingTemplate) {
         this.jobRepository = jobRepository;
+        this.messagingTemplate = messagingTemplate;
     }
 
     public JobResponse createJob(String clientId, JobCreateRequest request) {
@@ -54,7 +58,9 @@ public class JobService {
         job.setUpdatedAt(Instant.now());
 
         Job savedJob = jobRepository.save(job);
-        return mapToResponse(savedJob);
+        JobResponse response = mapToResponse(savedJob);
+        messagingTemplate.convertAndSend("/topic/jobs", response);
+        return response;
     }
 
     public PageResponse<JobResponse> getJobs(String status, String categoryId, Pageable pageable) {
@@ -119,14 +125,18 @@ public class JobService {
         Job job = jobRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Trabajo no encontrado"));
 
-        // TODO: Agregar validación de que el usuario es el dueño (clientId)
+        if (!userId.equals(job.getClientId())) {
+            throw new AccessDeniedException("Solo el cliente dueño puede cancelar este trabajo");
+        }
 
         job.setStatus("cancelled");
         job.setCancelledAt(Instant.now());
         job.setCancellationReason("Cancelado por el usuario");
         job.setUpdatedAt(Instant.now());
 
-        return mapToResponse(jobRepository.save(job));
+        JobResponse response = mapToResponse(jobRepository.save(job));
+        messagingTemplate.convertAndSend("/topic/jobs." + id, response);
+        return response;
     }
 
     public JobResponse updateJobStatus(String id, String status) {
@@ -139,7 +149,9 @@ public class JobService {
             job.setCompletedAt(Instant.now());
         }
 
-        return mapToResponse(jobRepository.save(job));
+        JobResponse response = mapToResponse(jobRepository.save(job));
+        messagingTemplate.convertAndSend("/topic/jobs." + id, response);
+        return response;
     }
 
     // Método utilitario para convertir la Entidad (Job) al DTO (JobResponse)
