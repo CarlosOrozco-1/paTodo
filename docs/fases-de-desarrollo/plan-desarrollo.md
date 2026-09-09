@@ -119,13 +119,13 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 
 ---
 
-### Fase 6: Tiempo Real (Spring WebSocket + STOMP)
-- [ ] Configurar `WebSocketMessageBrokerConfigurer` (SimpleBroker + ApplicationDestinationPrefixes)
-- [ ] Definir destinos: `/topic/jobs.{jobId}`, `/topic/offers.{jobId}`, `/user/{userId}/notifications`, `/topic/chat.{jobId}`, `/topic/location.{jobId}`
-- [ ] Autenticar handshake WebSocket con JWT (HandshakeInterceptor)
-- [ ] Crear `@MessageMapping` handlers para: chat, location updates, job status
-- [ ] Integrar con servicios para emitir eventos via `SimpMessagingTemplate`
-- [ ] Manejar suscripciones por `jobId` y `userId`
+### Fase 6: Tiempo Real (Spring WebSocket + STOMP) ✅
+- [x] Configurar `WebSocketMessageBrokerConfigurer` (SimpleBroker + ApplicationDestinationPrefixes)
+- [x] Definir destinos: `/topic/jobs.{jobId}`, `/topic/offers.{jobId}`, `/user/{userId}/notifications`, `/topic/chat.{jobId}`, `/topic/location.{jobId}`
+- [x] Autenticar handshake WebSocket con JWT (HandshakeInterceptor)
+- [x] Crear `@MessageMapping` handlers para: chat, location updates, job status
+- [x] Integrar con servicios para emitir eventos via `SimpMessagingTemplate`
+- [x] Manejar suscripciones por `jobId` y `userId`
 
 **Entregable:** Comunicación en tiempo real operativa (STOMP over WebSocket).
 
@@ -232,7 +232,7 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 | 1-2    | Fase 0-2 (estructura, schemas, OpenAPI) ✅ |
 | 3      | Fase 3-4 (Atlas, backend base Spring Boot, auth) 🔄 |
 | 4-5    | Fase 5 (endpoints REST) |
-| 6      | Fase 6 (WebSocket STOMP) |
+| 6      | Fase 6 (WebSocket STOMP) ✅ |
 | 7-8    | Fase 7 (React Web) |
 | 9-10   | Fase 8 (Flutter Mobile) |
 | 11     | Fase 9 (Geolocalización + Mapas) |
