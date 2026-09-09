@@ -16,4 +16,6 @@ public interface JobRepository extends MongoRepository<Job, String> {
     Page<Job> findByDetailsCategoryId(String categoryId, Pageable pageable);
     Page<Job> findByStatusAndDetailsCategoryId(String status, String categoryId, Pageable pageable);
     List<Job> findByStatusInAndDetailsCategoryIdIn(List<String> statuses, List<String> categoryIds);
+    List<Job> findByLocationCoordinatesNearAndStatus(org.springframework.data.geo.Point location, org.springframework.data.geo.Distance distance, String status);
+    List<Job> findByLocationCoordinatesNearAndStatusAndDetailsCategoryId(org.springframework.data.geo.Point location, org.springframework.data.geo.Distance distance, String status, String categoryId);
 }
