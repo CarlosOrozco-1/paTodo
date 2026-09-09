@@ -32,6 +32,9 @@ dependencies {
 	// Password encoding
 	implementation("org.springframework.security:spring-security-crypto")
 
+	// Carga del archivo .env al Environment de Spring Boot
+	implementation("io.github.cdimascio:dotenv-java:3.2.0")
+
 	
 
 	// Testing
