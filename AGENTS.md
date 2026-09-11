@@ -14,7 +14,7 @@ Plataforma de servicios bajo demanda (cliente ↔ trabajador) estilo InDrive per
 
 ## 2. Reglas de trabajo (obligatorias)
 
-1. **NO hacer commits** a menos que el usuario lo pida explícitamente.
+1. **NO hacer commits** a menos que el usuario lo pida explícitamente. Cuando se hagan, **siempre en español** (mensaje y descripción, siguiendo Conventional Commits en la descripción).
 2. **NO dar comandos de terminal** al usuario para que los ejecute, salvo que lo solicite. Ejecútalos tú mismo.
 3. **Responder en español**, salvo que el usuario hable otro idioma.
 4. **Explicar cada bloque antes/de mientras se implementa** (el usuario aprende con los cambios).
