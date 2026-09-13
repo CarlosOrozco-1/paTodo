@@ -12,5 +12,25 @@ Piensa en nosotros como un "InDrive" pero para servicios generales, del hogar y 
 4. **Chat y seguimiento:** Una vez que aceptas a un trabajador, se abre un chat privado para coordinar. Además, puedes ver su ubicación en tiempo real mientras va en camino.
 5. **Califica:** Al terminar el trabajo, ambos pueden dejarse una reseña para mantener alta la calidad y confianza de la comunidad.
 
----
-*Este proyecto está compuesto por un backend en Java (Spring Boot) con MongoDB, una app móvil en Flutter y una interfaz web en React.*
+## 🛠 Stack tecnológico
+
+- **Backend:** Firebase (Firestore, Auth, Cloud Functions) — sin servidor propio
+- **Web:** React + Vite + TypeScript
+- **Móvil:** Flutter (Android & iOS)
+
+## 🗂️ Estructura del proyecto
+
+```
+.
+├── docs/                    # Documentación (arquitectura, plan de desarrollo)
+├── spec/                    # OpenAPI + JSON Schemas (fuente de verdad de datos)
+├── functions/               # Cloud Functions (Node.js)
+├── frontend-web/            # App web React (Vite + TypeScript)
+├── frontend-mobile/         # App móvil Flutter
+├── firestore.rules          # Reglas de seguridad de Firestore
+├── firestore.indexes.json   # Índices de Firestore
+├── firebase.json            # Configuración de Firebase
+└── .firebaserc              # Proyecto Firebase asociado
+```
+
+Consulta `docs/` para más detalles sobre la arquitectura y el plan de desarrollo.
