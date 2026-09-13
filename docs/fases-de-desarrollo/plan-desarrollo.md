@@ -106,13 +106,13 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 
 ---
 
-### Fase 5: Implementación de Endpoints REST
-- [ ] Implementar cada endpoint definido en el YAML usando controladores Spring MVC
-- [ ] Usar DTOs (Request/Response) mapeados desde/hacia entidades
-- [ ] Validación con `@Valid` + Bean Validation (JSR-380)
-- [ ] Asegurar que las respuestas coincidan con los schemas OpenAPI
-- [ ] Manejar errores y códigos de estado consistentes (`ProblemDetail` RFC 7807)
-- [ ] Endpoints: Auth, Users, Categories/Skills, Jobs, Offers, Messages, Reviews, Routes, Locations, Notifications
+### Fase 5: Implementación de Endpoints REST ✅
+- [x] Implementar cada endpoint definido en el YAML usando controladores Spring MVC
+- [x] Usar DTOs (Request/Response) mapeados desde/hacia entidades
+- [x] Validación con `@Valid` + Bean Validation (JSR-380)
+- [x] Asegurar que las respuestas coincidan con los schemas OpenAPI
+- [x] Manejar errores y códigos de estado consistentes (`ProblemDetail` RFC 7807)
+- [x] Endpoints: Auth, Users, Categories/Skills, Jobs, Offers, Messages, Reviews, Routes, Locations, Notifications
 - [ ] Paginación con `Pageable` + `PagedModel` (Spring HATEOAS)
 
 **Entregable:** API REST completa y funcional.

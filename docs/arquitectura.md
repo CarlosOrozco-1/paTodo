@@ -29,26 +29,26 @@ Los módulos se agrupan por dominio. Cada módulo es autocontenido:
 backend/src/main/java/com/paTodo/backend/
 ├── BackendApplication.java
 ├── common/                      # cross-cutting, sin lógica de negocio
-│   ├── security/                # JwtTokenProvider, JwtAuthenticationFilter,
-│   │                            # MongoUserDetailsService, UserPrincipal
+│   ├── security/                # JwtTokenProvider, JwtAuthenticationFilter
 │   ├── config/                  # SecurityConfig, CorsConfig, MongoConfig, WebSocketConfig
-│   ├── exception/               # GlobalExceptionHandler, excepciones base
-│   └── util/                    # helpers genéricos (si hacen falta)
+│   └── exception/               # GlobalExceptionHandler, excepciones base
 ├── user/                        # Módulo USER (dueño de users, vehicles)
 │   ├── controller/AuthController, UserController, VehicleController
 │   ├── dto/
 │   ├── model/User, Vehicle
 │   ├── repository/UserRepository, VehicleRepository
 │   ├── service/                 # lógica de negocio (mover de controller aquí)
+│   ├── security/                # MongoUserDetailsService, UserPrincipal
 │   └── mapper/
 ├── job/                         # Módulo JOB (core: jobs, offers, routes, location)
-│   ├── controller/JobController, OfferController
+│   ├── controller/JobController, OfferController, JobRouteController,
+│   │               LocationController, LocationSocketController
 │   ├── dto/JobCreateRequest, OfferCreateRequest, ...
 │   ├── model/Job, Offer, JobRoute, LocationHistory
 │   ├── repository/...
-│   └── service/JobService, OfferService
+│   └── service/JobService, OfferService, JobRouteService, LocationService
 ├── message/                     # Módulo MESSAGING (chat + WebSocket)
-│   ├── controller/MessageController, ConversationController
+│   ├── controller/MessageController, ChatSocketController
 │   ├── model/Message, Conversation
 │   └── ...
 ├── review/                      # Módulo REVIEW
@@ -83,8 +83,8 @@ Para mantener la base de código escalable y permitir una fácil migración a mi
 
 4. **Módulo `message` (Mensajería)**
    - **Colecciones encapsuladas:** `conversations`, `messages`.
-   - **Servicios principales:** `MessageService`, `ConversationService`.
-   - *Nota:* Maneja el chat en tiempo real entre cliente y trabajador a través de WebSockets.
+   - **Servicios principales:** `MessageService` (envío/lectura de mensajes y gestión de conversaciones).
+   - *Nota:* Maneja el chat en tiempo real entre cliente y trabajador a través de WebSockets (`ChatSocketController` con STOMP).
 
 5. **Módulo `review` (Reseñas)**
    - **Colecciones encapsuladas:** `reviews`.
@@ -98,7 +98,7 @@ Para mantener la base de código escalable y permitir una fácil migración a mi
 
 7. **Módulo `common` (Común / Transversal)**
    - **Colecciones:** *Ninguna*.
-   - **Contenido:** Configuraciones de Seguridad (JWT), Excepciones globales, utilidades compartidas. No contiene lógica de negocio.
+   - **Contenido:** Configuraciones de Seguridad (JWT), Excepciones globales, utilidades compartidas. No contiene lógica de negocio (la autenticación con el usuario — `MongoUserDetailsService`, `UserPrincipal` — vive en el módulo `user/security`).
 
 ## 4. Reglas de implementación (NO NEGOCIABLES)
 
@@ -128,8 +128,8 @@ El path ya está trazado por la estructura:
 
 - [x] Reorganizar paquetes de `controller/model/repository/dto` planos → estructura por dominio.
 - [x] Extraer `service/` en cada módulo (se crearon las clases base, queda migrar la lógica).
-- [ ] Crear `common/event/EventPublisher` e instrumentar eventos de dominio.
-- [ ] Completar DTOs de salida (dejar de exponer entidades).
-- [ ] Auditoría de dependencias cruzadas (que ningún módulo importe repos/model de otro).
+- [x] Crear `common/event/EventPublisher` (interfaz + `InProcessEventPublisher`). Primer evento instrumentado: `JobCreatedEvent` en `JobService`.
+- [x] Completar DTOs de salida (dejar de exponer entidades). DTOs creados en `job`, `message`, `review`, `catalog` (`CategoryResponse`, `SkillResponse`).
+- [x] Auditoría de dependencias cruzadas (que ningún módulo importe repos/model de otro). Auditoría automática verificada: 0 cruces ilegales.
 
-**El refactor base a Monolito Modular se ha completado.** La estructura original plana ha sido dividida en dominios y el proyecto compila exitosamente. Los endpoints actuales y la colección Postman NO han cambiado durante el refactor.
+**El backend está listo.** La estructura modular está completa, con aislamiento por dominio, DTOs de salida, eventos de dominio y path claro a microservicios (la migración estimada sigue siendo ~1.5–2 semanas).
