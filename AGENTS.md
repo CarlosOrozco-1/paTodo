@@ -50,7 +50,7 @@ Plataforma de servicios bajo demanda (cliente ↔ trabajador) estilo InDrive per
 - Coincidir SIEMPRE con los JSON Schemas de `spec/schemas/*.json` (fuente de verdad).
 
 ### Seguridad
-- JWT: `JwtTokenProvider` en `common/security`. Filtro `JwtAuthenticationFilter`. Login vía `DaoAuthenticationProvider` + `MongoUserDetailsService`.
+- JWT: `JwtTokenProvider` en `common/security`. Filtro `JwtAuthenticationFilter`. Login vía `DaoAuthenticationProvider` + `MongoUserDetailsService` (este último y `UserPrincipal` viven en `user/security`, el módulo dueño del usuario). `JwtTokenProvider` y `JwtAuthenticationFilter` son agnósticos al dominio: `common` no importa `user`.
 - Passwords con `BCryptPasswordEncoder(12)`.
 - Autorización con `@PreAuthorize` (+ roles) donde aplique; verificar ownership (el usuario solo accede a sus recursos).
 - Endpoints públicos en `SecurityConfig` (`permitAll`); el resto exige Bearer token.

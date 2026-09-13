@@ -1,9 +1,11 @@
 package com.paTodo.backend.job.service;
 
 import com.paTodo.backend.common.dto.PageResponse;
+import com.paTodo.backend.common.event.EventPublisher;
 import com.paTodo.backend.common.exception.ResourceNotFoundException;
 import com.paTodo.backend.job.dto.JobCreateRequest;
 import com.paTodo.backend.job.dto.JobResponse;
+import com.paTodo.backend.job.event.JobCreatedEvent;
 import com.paTodo.backend.job.model.Job;
 import com.paTodo.backend.job.repository.JobRepository;
 import org.springframework.data.domain.Page;
@@ -24,10 +26,13 @@ public class JobService {
 
     private final JobRepository jobRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final EventPublisher eventPublisher;
 
-    public JobService(JobRepository jobRepository, SimpMessagingTemplate messagingTemplate) {
+    public JobService(JobRepository jobRepository, SimpMessagingTemplate messagingTemplate,
+                      EventPublisher eventPublisher) {
         this.jobRepository = jobRepository;
         this.messagingTemplate = messagingTemplate;
+        this.eventPublisher = eventPublisher;
     }
 
     public JobResponse createJob(String clientId, JobCreateRequest request) {
@@ -58,6 +63,7 @@ public class JobService {
         job.setUpdatedAt(Instant.now());
 
         Job savedJob = jobRepository.save(job);
+        eventPublisher.publish(new JobCreatedEvent(savedJob.getId(), clientId, request.getDetails().getCategoryId(), savedJob.getCreatedAt()));
         JobResponse response = mapToResponse(savedJob);
         messagingTemplate.convertAndSend("/topic/jobs", response);
         return response;
@@ -154,7 +160,6 @@ public class JobService {
         return response;
     }
 
-    // Método utilitario para convertir la Entidad (Job) al DTO (JobResponse)
     private JobResponse mapToResponse(Job job) {
         JobResponse response = new JobResponse();
         response.setId(job.getId());

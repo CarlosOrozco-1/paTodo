@@ -1,4 +1,4 @@
-package com.paTodo.backend.common.security;
+package com.paTodo.backend.user.security;
 
 import com.paTodo.backend.user.model.User;
 import org.springframework.security.core.GrantedAuthority;

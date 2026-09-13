@@ -1,11 +1,13 @@
 package com.paTodo.backend.catalog.service;
 
+import com.paTodo.backend.catalog.dto.CategoryResponse;
 import com.paTodo.backend.catalog.model.Category;
 import com.paTodo.backend.catalog.repository.CategoryRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class CategoryService {
@@ -16,23 +18,48 @@ public class CategoryService {
         this.categoryRepository = categoryRepository;
     }
 
-    public List<Category> getAll() {
-        return categoryRepository.findByIsActiveTrue();
+    public List<CategoryResponse> getAll() {
+        return categoryRepository.findByIsActiveTrue().stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
     }
 
-    public Optional<Category> getById(String id) {
-        return categoryRepository.findById(id);
+    public Optional<CategoryResponse> getById(String id) {
+        return categoryRepository.findById(id).map(this::toDto);
     }
 
-    public Category getBySlug(String slug) {
-        return categoryRepository.findBySlug(slug);
+    public CategoryResponse getBySlug(String slug) {
+        Category category = categoryRepository.findBySlug(slug);
+        return category != null ? toDto(category) : null;
     }
 
-    public List<Category> getRootCategories() {
-        return categoryRepository.findByParentIdIsNull();
+    public List<CategoryResponse> getRootCategories() {
+        return categoryRepository.findByParentIdIsNull().stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
     }
 
-    public List<Category> getChildren(String parentId) {
-        return categoryRepository.findByParentId(parentId);
+    public List<CategoryResponse> getChildren(String parentId) {
+        return categoryRepository.findByParentId(parentId).stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    private CategoryResponse toDto(Category category) {
+        CategoryResponse dto = new CategoryResponse();
+        dto.setId(category.getId());
+        dto.setName(category.getName());
+        dto.setSlug(category.getSlug());
+        dto.setDescription(category.getDescription());
+        dto.setIcon(category.getIcon());
+        dto.setColor(category.getColor());
+        dto.setImageUrl(category.getImageUrl());
+        dto.setParentId(category.getParentId());
+        dto.setSkillIds(category.getSkillIds());
+        dto.setActive(category.isActive());
+        dto.setSortOrder(category.getSortOrder());
+        dto.setCreatedAt(category.getCreatedAt());
+        dto.setUpdatedAt(category.getUpdatedAt());
+        return dto;
     }
 }

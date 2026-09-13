@@ -1,6 +1,6 @@
 package com.paTodo.backend.catalog.controller;
 
-import com.paTodo.backend.catalog.model.Skill;
+import com.paTodo.backend.catalog.dto.SkillResponse;
 import com.paTodo.backend.catalog.service.SkillService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,20 +18,20 @@ public class SkillController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Skill>> getAll(@RequestParam(required = false) String categoryId) {
+    public ResponseEntity<List<SkillResponse>> getAll(@RequestParam(required = false) String categoryId) {
         return ResponseEntity.ok(skillService.getAll(categoryId));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Skill> getById(@PathVariable String id) {
+    public ResponseEntity<SkillResponse> getById(@PathVariable String id) {
         return skillService.getById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/slug/{slug}")
-    public ResponseEntity<Skill> getBySlug(@PathVariable String slug) {
-        Skill skill = skillService.getBySlug(slug);
+    public ResponseEntity<SkillResponse> getBySlug(@PathVariable String slug) {
+        SkillResponse skill = skillService.getBySlug(slug);
         if (skill == null) {
             return ResponseEntity.notFound().build();
         }
