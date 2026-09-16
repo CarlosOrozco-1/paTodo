@@ -1,0 +1,212 @@
+{
+  "info": {
+    "name": "PaTodo - Emulador local",
+    "description": "Flujos de prueba contra los emuladores de Firebase (auth 9099, functions 5001, firestore 8081).\n\nRequisitos: emuladores corriendo (firebase emulators:start) y datos sembrados (npm run seed).\n\n1. 'Crear usuario' registra un nuevo usuario (crea Auth + doc en users).\n2. 'Iniciar sesión' guarda el idToken y el uid en variables.\n3. 'Publicar trabajo' escribe directo en Firestore REST (las reglas validan que clientId == tu uid).\n4. Las Cloud Functions requieren el header Authorization: Bearer {{idToken}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "authURL", "value": "http://127.0.0.1:9099" },
+    { "key": "fsURL", "value": "http://127.0.0.1:8081/v1/projects/pa-todo/databases/(default)/documents" },
+    { "key": "fnURL", "value": "http://127.0.0.1:5001/pa-todo/us-central1" },
+    { "key": "idToken", "value": "" },
+    { "key": "uid", "value": "" },
+    { "key": "jobId", "value": "" },
+    { "key": "offerId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Usuarios",
+      "item": [
+        {
+          "name": "Crear usuario (createUser)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.collectionVariables.set('uid', res.uid);",
+                  "console.log('uid guardado:', res.uid);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@test.com\",\n  \"password\": \"test1234\",\n  \"displayName\": \"Usuario de Prueba\",\n  \"role\": \"client\"\n}"
+            },
+            "url": { "raw": "{{fnURL}}/createUser", "host": ["{{fnURL}}"], "path": ["createUser"] }
+          }
+        },
+        {
+          "name": "Iniciar sesión (obtener idToken)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.collectionVariables.set('idToken', res.idToken);",
+                  "const payload = JSON.parse(atob(res.idToken.split('.')[1]));",
+                  "pm.collectionVariables.set('uid', payload.user_id || res.localId);",
+                  "console.log('idToken y uid guardados');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@test.com\",\n  \"password\": \"test1234\",\n  \"returnSecureToken\": true\n}"
+            },
+            "url": {
+              "raw": "{{authURL}}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake",
+              "host": ["{{authURL}}"],
+              "path": ["identitytoolkit.googleapis.com", "v1", "accounts:signInWithPassword"],
+              "query": [{ "key": "key", "value": "fake" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Publicar trabajo (Firestore REST)",
+      "item": [
+        {
+          "name": "Publicar trabajo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.name) {",
+                  "  pm.collectionVariables.set('jobId', res.name.split('/').pop());",
+                  "  console.log('jobId guardado:', res.name.split('/').pop());",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": {\n    \"clientId\": { \"stringValue\": \"{{uid}}\" },\n    \"details\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"title\": { \"stringValue\": \"Cambio de llanta\" },\n          \"description\": { \"stringValue\": \"Llanta ponchada en la zona\" },\n          \"categoryId\": { \"stringValue\": \"cat-mecanica\" },\n          \"skillIds\": { \"arrayValue\": { \"values\": [ { \"stringValue\": \"sk-cambio-llantas\" } ] } }\n        }\n      }\n    },\n    \"location\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"geopoint\": {\n            \"mapValue\": {\n              \"fields\": {\n                \"latitude\": { \"doubleValue\": 14.6349 },\n                \"longitude\": { \"doubleValue\": -90.5069 }\n              }\n            }\n          },\n          \"geohash\": { \"stringValue\": \"9fvg4\" },\n          \"address\": { \"stringValue\": \"Zona 10, Guatemala\" }\n        }\n      }\n    },\n    \"pricing\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"proposedPrice\": { \"doubleValue\": 50 },\n          \"currency\": { \"stringValue\": \"GTQ\" },\n          \"priceType\": { \"stringValue\": \"negotiable\" }\n        }\n      }\n    },\n    \"status\": { \"stringValue\": \"pending\" }\n  }\n}"
+            },
+            "url": { "raw": "{{fsURL}}/jobs", "host": ["{{fsURL}}"], "path": ["jobs"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Cloud Functions",
+      "item": [
+        {
+          "name": "acceptOffer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"offerId\": \"{{offerId}}\"\n}"
+            },
+            "url": { "raw": "{{fnURL}}/acceptOffer", "host": ["{{fnURL}}"], "path": ["acceptOffer"] }
+          }
+        },
+        {
+          "name": "computeRoute",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\"\n}" },
+            "url": { "raw": "{{fnURL}}/computeRoute", "host": ["{{fnURL}}"], "path": ["computeRoute"] }
+          }
+        },
+        {
+          "name": "completeJob",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\"\n}" },
+            "url": { "raw": "{{fnURL}}/completeJob", "host": ["{{fnURL}}"], "path": ["completeJob"] }
+          }
+        },
+        {
+          "name": "cancelJob",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"reason\": \"Ya no lo necesito\"\n}" },
+            "url": { "raw": "{{fnURL}}/cancelJob", "host": ["{{fnURL}}"], "path": ["cancelJob"] }
+          }
+        },
+        {
+          "name": "createReview",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"rating\": 5,\n  \"comment\": \"Excelente servicio\"\n}" },
+            "url": { "raw": "{{fnURL}}/createReview", "host": ["{{fnURL}}"], "path": ["createReview"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Consultar datos (Firestore REST)",
+      "item": [
+        {
+          "name": "Leer un trabajo",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{idToken}}" }],
+            "url": { "raw": "{{fsURL}}/jobs/{{jobId}}", "host": ["{{fsURL}}"], "path": ["jobs", "{{jobId}}"] }
+          }
+        },
+        {
+          "name": "Listar mis trabajos",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{idToken}}" }],
+            "url": {
+              "raw": "{{fsURL}}:runQuery",
+              "host": ["{{fsURL}}"],
+              "path": [":runQuery"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"structuredQuery\": {\n    \"from\": [ { \"collectionId\": \"jobs\" } ],\n    \"where\": {\n      \"fieldFilter\": {\n        \"field\": { \"fieldPath\": \"clientId\" },\n        \"op\": \"EQUAL\",\n        \"value\": { \"stringValue\": \"{{uid}}\" }\n      }\n    }\n  }\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

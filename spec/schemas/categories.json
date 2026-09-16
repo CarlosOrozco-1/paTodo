@@ -1,71 +1,69 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Category",
+  "description": "Documento del catálogo de categorías de servicios en Firestore. Las categorías agrupan trabajos por tipo (mecánica, plomería, jardinería, etc.). El ID del documento es generado por Firestore.",
   "type": "object",
   "properties": {
-    "_id": {
-      "type": "string",
-      "description": "Identificador único (ObjectId en MongoDB)",
-      "readOnly": true
-    },
     "name": {
       "type": "string",
-      "description": "Nombre de la categoría (ej: Mecánica, Plomería)"
+      "title": "Nombre de la categoría",
+      "description": "Nombre legible para el usuario (por ejemplo, 'Mecánica', 'Plomería')."
     },
     "slug": {
       "type": "string",
-      "pattern": "^[a-z0-9-]+$",
-      "description": "Identificador único para la categoría (ej: mecanica, plomeria)"
+      "title": "Identificador único",
+      "description": "Cadena única en minúsculas y sin acentos, usada para URLs y referencias internas (por ejemplo, 'mecanica', 'plomeria')."
     },
     "description": {
       "type": "string",
-      "description": "Descripción detallada de la categoría"
+      "title": "Descripción",
+      "description": "Texto explicativo sobre qué tipo de trabajos incluye esta categoría."
     },
     "icon": {
       "type": "string",
-      "description": "Nombre del icono (ej: lucide:car, material:plumbing) o URL"
+      "title": "Ícono",
+      "description": "Nombre o URL del ícono representativo para mostrar en la interfaz."
     },
     "color": {
       "type": "string",
-      "pattern": "^#[0-9A-Fa-f]{6}$",
-      "description": "Color hex para UI (ej: #3B82F6)"
-    },
-    "imageUrl": {
-      "type": "string",
-      "format": "uri",
-      "description": "URL de imagen/banner representativa"
+      "title": "Color",
+      "description": "Código hexadecimal para mostrar la categoría con un color distintivo en el frontend (por ejemplo, '#FF5733')."
     },
     "parentId": {
       "type": ["string", "null"],
-      "description": "Referencia a categoría padre (ObjectId), null si es raíz"
-    },
-    "skillIds": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Referencias a skills (ObjectId de skills)"
+      "title": "Categoría padre",
+      "description": "ID de la categoría padre para jerarquías (por ejemplo, 'mecanica' → 'cambio_llantas'). Null si es categoría raíz."
     },
     "isActive": {
       "type": "boolean",
-      "default": true,
-      "description": "Si la categoría está disponible para uso"
+      "title": "Activo",
+      "description": "Indica si la categoría está disponible para ser usada. Permite desactivarla sin eliminarla."
     },
     "sortOrder": {
       "type": "integer",
       "minimum": 0,
-      "default": 0,
-      "description": "Orden de visualización en listados"
+      "title": "Orden",
+      "description": "Número para ordenar las categorías en los listados del frontend. Menor número aparece primero."
+    },
+    "imageUrl": {
+      "type": "string",
+      "format": "uri",
+      "title": "Imagen",
+      "description": "URL de una imagen representativa de la categoría (opcional)."
     },
     "createdAt": {
       "type": "string",
       "format": "date-time",
-      "description": "Fecha de creación"
+      "title": "Fecha de creación",
+      "description": "Momento en que se agregó la categoría al catálogo."
     },
     "updatedAt": {
       "type": "string",
       "format": "date-time",
-      "description": "Fecha de última actualización"
+      "title": "Última actualización",
+      "description": "Momento del último cambio realizado en el documento de la categoría."
     }
   },
-  "required": ["name", "slug"],
+  "required": ["name", "slug", "isActive"],
   "additionalProperties": true
 }

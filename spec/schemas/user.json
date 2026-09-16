@@ -1,165 +1,259 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "User",
+  "description": "Documento de usuario en Firestore. El ID del documento es el UID de Firebase Auth.",
   "type": "object",
   "properties": {
-    "_id": {
+    "uid": {
       "type": "string",
-      "description": "Identificador único (ObjectId en MongoDB)",
-      "readOnly": true
+      "title": "Identificador de usuario",
+      "description": "UID de Firebase Auth. Coincide con el ID del documento en Firestore."
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "title": "Correo electrónico",
+      "description": "Correo del usuario. También es gestionado por Firebase Auth."
     },
     "role": {
       "type": "string",
       "enum": ["client", "worker", "both"],
-      "description": "Rol del usuario en la plataforma"
-    },
-    "skillIds": {
-      "type": "array",
-      "items": { "type": "string", "pattern": "^[0-9a-fA-F]{24}$" },
-      "description": "Referencias a skills del trabajador (ObjectId de skills)"
-    },
-    "account": {
-      "type": "object",
-      "description": "Datos de cuenta y autenticación (INTERNO - no exponer en API pública)",
-      "properties": {
-        "email": { "type": "string", "format": "email" },
-        "passwordHash": { "type": "string" },
-        "verified": { "type": "boolean", "default": false },
-        "lastLogin": { "type": "string", "format": "date-time" },
-        "loginAttempts": { "type": "integer", "default": 0 },
-        "lockUntil": { "type": ["string", "null"], "format": "date-time" }
-      },
-      "required": ["email", "passwordHash"]
+      "title": "Rol del usuario",
+      "description": "Define el comportamiento del usuario: client (publica trabajos), worker (envía ofertas), both (puede actuar como ambos)."
     },
     "profile": {
       "type": "object",
-      "description": "Información personal pública",
+      "title": "Perfil personal",
+      "description": "Información pública del usuario, visible para otros usuarios de la plataforma.",
       "properties": {
-        "firstName": { "type": "string" },
-        "lastName": { "type": "string" },
-        "avatarUrl": { "type": "string", "format": "uri" },
-        "bio": { "type": "string" },
-        "gender": { "type": "string", "enum": ["male", "female", "other", "prefer_not_to_say"] },
-        "birthdate": { "type": "string", "format": "date" }
+        "firstName": {
+          "type": "string",
+          "title": "Nombre",
+          "description": "Primer nombre del usuario."
+        },
+        "lastName": {
+          "type": "string",
+          "title": "Apellido",
+          "description": "Apellido del usuario."
+        },
+        "avatarUrl": {
+          "type": "string",
+          "format": "uri",
+          "title": "Foto de perfil",
+          "description": "URL de la imagen de perfil del usuario."
+        },
+        "bio": {
+          "type": "string",
+          "title": "Biografía",
+          "description": "Descripción breve del usuario, útil para trabajadores que ofrecen servicios."
+        },
+        "gender": {
+          "type": "string",
+          "title": "Género",
+          "description": "Género del usuario (opcional)."
+        },
+        "birthdate": {
+          "type": "string",
+          "format": "date",
+          "title": "Fecha de nacimiento",
+          "description": "Fecha de nacimiento del usuario (opcional)."
+        }
       },
       "required": ["firstName", "lastName"]
     },
     "contact": {
       "type": "object",
-      "description": "Datos de contacto",
+      "title": "Datos de contacto",
+      "description": "Información de contacto del usuario para coordinación de trabajos.",
       "properties": {
-        "phone": { "type": "string" },
-        "alternatePhone": { "type": "string" },
+        "phone": {
+          "type": "string",
+          "title": "Teléfono principal",
+          "description": "Número de teléfono principal del usuario."
+        },
+        "alternatePhone": {
+          "type": "string",
+          "title": "Teléfono alternativo",
+          "description": "Número de teléfono secundario (opcional)."
+        },
         "address": {
           "type": "object",
+          "title": "Dirección",
+          "description": "Dirección física del usuario.",
           "properties": {
-            "street": { "type": "string" },
-            "city": { "type": "string" },
-            "state": { "type": "string" },
-            "zip": { "type": "string" },
-            "country": { "type": "string", "default": "GT" }
+            "street": {
+              "type": "string",
+              "title": "Calle",
+              "description": "Calle y número de la dirección."
+            },
+            "city": {
+              "type": "string",
+              "title": "Ciudad",
+              "description": "Ciudad de residencia."
+            },
+            "zip": {
+              "type": "string",
+              "title": "Código postal",
+              "description": "Código postal de la dirección."
+            }
           }
         }
       },
       "required": ["phone"]
     },
     "location": {
-      "type": ["object", "null"],
-      "description": "Ubicación actual (GeoJSON Point) - opcional",
+      "type": "object",
+      "title": "Ubicación actual",
+      "description": "Coordenadas actuales del trabajador y su geohash. Solo aplica a roles worker o both. Se usa para búsquedas por proximidad.",
       "properties": {
-        "type": { "type": "string", "enum": ["Point"] },
-        "coordinates": {
-          "type": "array",
-          "items": { "type": "number" },
-          "minItems": 2,
-          "maxItems": 2,
-          "description": "[longitud, latitud]"
+        "geopoint": {
+          "type": "object",
+          "title": "Coordenadas geográficas",
+          "description": "Latitud y longitud actuales del trabajador.",
+          "properties": {
+            "latitude": {
+              "type": "number",
+              "title": "Latitud",
+              "description": "Coordenada de latitud."
+            },
+            "longitude": {
+              "type": "number",
+              "title": "Longitud",
+              "description": "Coordenada de longitud."
+            }
+          },
+          "required": ["latitude", "longitude"]
+        },
+        "geohash": {
+          "type": "string",
+          "title": "Geohash",
+          "description": "Código geohash calculado a partir de las coordenadas. Permite búsquedas eficientes por proximidad en Firestore."
         }
       },
-      "required": ["type", "coordinates"]
+      "required": ["geopoint", "geohash"]
+    },
+    "fcmTokens": {
+      "type": "array",
+      "items": { "type": "string" },
+      "title": "Tokens FCM",
+      "description": "Tokens de registro FCM de los dispositivos del usuario para notificaciones push. Se limpian automáticamente cuando dejan de ser válidos."
+    },
+    "skills": {
+      "type": "array",
+      "items": { "type": "string" },
+      "title": "Habilidades",
+      "description": "Lista de IDs que referencian documentos de la colección skills. Solo aplica a roles worker o both."
+    },
+    "vehicleIds": {
+      "type": "array",
+      "items": { "type": "string" },
+      "title": "Vehículos",
+      "description": "Lista de IDs que referencian documentos de la colección vehicles. Solo aplica a roles worker o both que tengan vehículo."
     },
     "stats": {
       "type": "object",
-      "description": "Métricas y reputación",
+      "title": "Estadísticas del trabajador",
+      "description": "Métricas acumuladas de reputación y desempeño. Se actualizan automáticamente con cada trabajo completado, cancelado o calificado. Permite a los clientes evaluar la confiabilidad del trabajador antes de aceptar una oferta. Solo aplica a roles worker o both.",
       "properties": {
-        "rating": { "type": "number", "minimum": 0, "maximum": 5, "default": 0 },
-        "ratingCount": { "type": "integer", "minimum": 0, "default": 0 },
-        "completedJobs": { "type": "integer", "minimum": 0, "default": 0 },
-        "cancelledJobs": { "type": "integer", "minimum": 0, "default": 0 },
-        "responseTimeMin": { "type": "integer", "minimum": 0, "default": 0 }
+        "rating": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5,
+          "title": "Calificación promedio",
+          "description": "Promedio de todas las reseñas recibidas (0 a 5 estrellas)."
+        },
+        "ratingCount": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Total de calificaciones",
+          "description": "Cantidad de reseñas que ha recibido el trabajador."
+        },
+        "completedJobs": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Trabajos completados",
+          "description": "Número total de trabajos que el trabajador ha finalizado exitosamente."
+        },
+        "cancelledJobs": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Trabajos cancelados",
+          "description": "Número total de trabajos que el trabajador canceló o abandonó."
+        },
+        "responseTimeMin": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Tiempo de respuesta",
+          "description": "Promedio en minutos que tarda el trabajador en responder a una nueva solicitud."
+        }
       }
     },
     "availability": {
       "type": "object",
-      "description": "Disponibilidad y horario",
+      "title": "Disponibilidad",
+      "description": "Estado de disponibilidad del trabajador, su horario semanal y el área de cobertura. Solo aplica a roles worker o both.",
       "properties": {
-        "isOnline": { "type": "boolean", "default": false },
+        "isOnline": {
+          "type": "boolean",
+          "title": "En línea",
+          "description": "Indica si el trabajador está disponible actualmente para recibir solicitudes."
+        },
         "workingHours": {
           "type": "array",
+          "title": "Horario semanal",
+          "description": "Lista de días con hora de inicio y fin en que el trabajador está disponible.",
           "items": {
             "type": "object",
             "properties": {
-              "day": { "type": "string", "enum": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] },
-              "start": { "type": "string", "pattern": "^([01]?[0-9]|2[0-3]):[0-5][0-9]$" },
-              "end": { "type": "string", "pattern": "^([01]?[0-9]|2[0-3]):[0-5][0-9]$" }
+              "day": {
+                "type": "string",
+                "title": "Día",
+                "description": "Día de la semana (por ejemplo, lunes, martes)."
+              },
+              "start": {
+                "type": "string",
+                "pattern": "^([01]?[0-9]|2[0-3]):[0-5][0-9]$",
+                "title": "Hora de inicio",
+                "description": "Hora en que comienza la disponibilidad (formato HH:MM)."
+              },
+              "end": {
+                "type": "string",
+                "pattern": "^([01]?[0-9]|2[0-3]):[0-5][0-9]$",
+                "title": "Hora de fin",
+                "description": "Hora en que termina la disponibilidad (formato HH:MM)."
+              }
             },
             "required": ["day", "start", "end"]
           }
         },
         "serviceArea": {
           "type": "object",
-          "description": "Área de servicio centrada en location del usuario",
+          "title": "Área de servicio",
+          "description": "Define el alcance geográfico que el trabajador está dispuesto a cubrir.",
           "properties": {
-            "center": {
-              "type": "object",
-              "properties": {
-                "type": { "type": "string", "enum": ["Point"] },
-                "coordinates": {
-                  "type": "array",
-                  "items": { "type": "number" },
-                  "minItems": 2,
-                  "maxItems": 2
-                }
-              },
-              "required": ["type", "coordinates"]
-            },
-            "radiusKm": { "type": "number", "minimum": 0, "default": 10 }
-          },
-          "required": ["radiusKm"]
-        }
-      }
-    },
-    "vehicleIds": {
-      "type": "array",
-      "items": { "type": "string", "pattern": "^[0-9a-fA-F]{24}$" },
-      "description": "Referencias a la colección vehicles (ObjectId)"
-    },
-    "notificationSettings": {
-      "type": "object",
-      "description": "Preferencias de notificación por canal y tipo",
-      "properties": {
-        "push": { "type": "boolean", "default": true },
-        "email": { "type": "boolean", "default": true },
-        "sms": { "type": "boolean", "default": false },
-        "inApp": { "type": "boolean", "default": true },
-        "types": {
-          "type": "object",
-          "description": "Configuración granular por tipo de notificación",
-          "additionalProperties": {
-            "type": "object",
-            "properties": {
-              "push": { "type": "boolean" },
-              "email": { "type": "boolean" },
-              "sms": { "type": "boolean" },
-              "inApp": { "type": "boolean" }
+            "radiusKm": {
+              "type": "number",
+              "minimum": 0,
+              "title": "Radio en kilómetros",
+              "description": "Distancia máxima en kilómetros que el trabajador está dispuesto a recorrer para atender un trabajo."
             }
           }
         }
       }
     },
-    "createdAt": { "type": "string", "format": "date-time" },
-    "updatedAt": { "type": "string", "format": "date-time" }
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Fecha de creación",
+      "description": "Momento en que se registró el usuario en la plataforma."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Última actualización",
+      "description": "Momento del último cambio realizado en el documento del usuario."
+    }
   },
-  "required": ["role", "account", "profile", "contact"],
+  "required": ["uid", "email", "role", "profile", "contact"],
   "additionalProperties": true
 }

@@ -1,65 +1,47 @@
 openapi: 3.0.0
 info:
-  title: API de Servicios bajo Demanda
+  title: PaTodo - Cloud Functions HTTP
   description: |
-    Plataforma que conecta clientes con trabajadores cercanos,
-    permitiendo publicar trabajos, recibir ofertas y negociar precios.
-  version: 0.1.0
+    Documentación de las Cloud Functions HTTP de PaTodo.
+
+    La mayoría de operaciones (lectura, escritura simple, autenticación) se realizan
+    directamente desde los clientes React y Flutter usando los SDKs de Firebase
+    (Firebase Auth, Cloud Firestore). Este documento solo describe las operaciones
+    críticas expuestas como Cloud Functions HTTP, que requieren lógica de servidor
+    (transacciones, notificaciones, cálculos externos).
+
+    Autenticación: Firebase Auth gestiona los tokens. Las Cloud Functions verifican
+    el ID token enviado en el header Authorization: Bearer <idToken>.
+  version: 0.2.0
 servers:
-  - url: http://localhost:3000/api
-    description: Servidor local (desarrollo)
-  - url: https://tu-dominio.com/api
-    description: Servidor de producción (Oracle)
+  - url: https://us-central1-pa-todo.cloudfunctions.net
+    description: Cloud Functions en producción
+  - url: http://localhost:5001/pa-todo/us-central1
+    description: Emulador local de Cloud Functions
 tags:
-  - name: auth
-    description: Autenticación de usuarios
   - name: users
-    description: Gestión de usuarios
-  - name: categories
-    description: Categorías y habilidades
+    description: Registro y gestión de usuarios
   - name: jobs
-    description: Publicación y gestión de trabajos
+    description: Operaciones críticas sobre trabajos
   - name: offers
-    description: Ofertas de los trabajadores
-  - name: messages
-    description: Chat entre cliente y trabajador
+    description: Aceptación y rechazo de ofertas
   - name: reviews
-    description: Calificaciones mutuas
+    description: Creación de reseñas y actualización de reputación
   - name: routes
-    description: Rutas almacenadas
-  - name: locations
-    description: Historial de ubicaciones
+    description: Cálculo y almacenamiento de rutas
   - name: notifications
-    description: Notificaciones del usuario
+    description: Envío de notificaciones push
 
 paths:
-  # ===================== AUTENTICACIÓN =====================
-  /auth/register:
+  # ===================== USUARIOS =====================
+  /createUser:
     post:
-      tags: [auth]
+      tags: [users]
       summary: Registrar un nuevo usuario
-      description: Crea un usuario con rol client, worker o both.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: './schemas/user.json'
-      responses:
-        '201':
-          description: Usuario creado exitosamente
-          content:
-            application/json:
-              schema:
-                $ref: './schemas/user.json'
-        '400':
-          description: Datos inválidos
-
-  /auth/login:
-    post:
-      tags: [auth]
-      summary: Iniciar sesión
-      description: Autentica al usuario y devuelve token JWT.
+      description: |
+        Crea el usuario en Firebase Auth, asigna el rol inicial como Custom Claim
+        y crea su documento en la colección `users`.
+        El rol por defecto es `client`. No requiere autenticación.
       requestBody:
         required: true
         content:
@@ -72,63 +54,44 @@ paths:
                   format: email
                 password:
                   type: string
+                  minLength: 6
+                displayName:
+                  type: string
+                role:
+                  type: string
+                  enum: [client, worker, both]
+                  default: client
               required: [email, password]
       responses:
-        '200':
-          description: Login exitoso
+        '201':
+          description: Usuario creado
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  token:
+                  uid:
                     type: string
-                  user:
-                    $ref: './schemas/user.json'
-        '401':
-          description: Credenciales incorrectas
+                  email:
+                    type: string
+                  role:
+                    type: string
+        '400':
+          description: Datos inválidos (falta email/password, password corto)
+        '409':
+          description: El correo ya está registrado
 
-  /auth/refresh:
+  # ===================== TRABAJOS =====================
+  /acceptOffer:
     post:
-      tags: [auth]
-      summary: Renovar token JWT
-      description: Obtiene un nuevo token a partir de uno vigente.
-      responses:
-        '200':
-          description: Token renovado
-
-  # ===================== USUARIOS =====================
-  /users/me:
-    get:
-      tags: [users]
-      summary: Obtener perfil del usuario autenticado
-      description: Devuelve los datos del usuario dueño del token.
-      responses:
-        '200':
-          description: Perfil del usuario
-          content:
-            application/json:
-              schema:
-                $ref: './schemas/user.json'
-    put:
-      tags: [users]
-      summary: Actualizar perfil
-      description: Modifica campos del perfil propio.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: './schemas/user.json'
-      responses:
-        '200':
-          description: Perfil actualizado
-
-  /users/me/location:
-    put:
-      tags: [users]
-      summary: Actualizar ubicación actual (trabajadores)
-      description: Guarda la coordenada actual del usuario.
+      tags: [offers]
+      summary: Aceptar una oferta (Cloud Function transaccional)
+      description: |
+        Acepta una oferta específica para un trabajo. En una sola transacción:
+        - Actualiza el trabajo a estado accepted y asigna workerId y acceptedOfferId.
+        - Marca la oferta aceptada como accepted y las demás como rejected.
+        - Crea la conversación entre cliente y trabajador.
+        - Envía notificaciones push al trabajador y a los demás oferentes.
       requestBody:
         required: true
         content:
@@ -136,160 +99,55 @@ paths:
             schema:
               type: object
               properties:
-                location:
-                  $ref: './schemas/user.json#/properties/location'
+                jobId:
+                  type: string
+                offerId:
+                  type: string
+              required: [jobId, offerId]
       responses:
         '200':
-          description: Ubicación actualizada
-
-  /users/me/vehicles:
-    post:
-      tags: [users]
-      summary: Agregar vehículo (solo trabajadores)
-      description: Crea un registro de vehículo asociado al usuario.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: './schemas/vehicle.json'
-      responses:
-        '201':
-          description: Vehículo agregado
-    get:
-      tags: [users]
-      summary: Listar vehículos propios
-      description: Devuelve los vehículos asociados al usuario.
-      responses:
-        '200':
-          description: Lista de vehículos
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: './schemas/vehicle.json'
-
-  # ===================== CATEGORÍAS =====================
-  /categories:
-    get:
-      tags: [categories]
-      summary: Listar categorías y habilidades
-      description: Devuelve todas las categorías disponibles.
-      responses:
-        '200':
-          description: Lista de categorías
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: './schemas/categories.json'
-    post:
-      tags: [categories]
-      summary: Crear categoría (solo administrador)
-      description: Agrega una nueva categoría con habilidades.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: './schemas/categories.json'
-      responses:
-        '201':
-          description: Categoría creada
-
-  # ===================== TRABAJOS =====================
-  /jobs:
-    post:
-      tags: [jobs]
-      summary: Publicar un trabajo
-      description: Crea un nuevo trabajo con estado pending.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: './schemas/job.json'
-      responses:
-        '201':
-          description: Trabajo publicado
-
-  /jobs/nearby:
-    get:
-      tags: [jobs]
-      summary: Listar trabajos cercanos
-      description: Devuelve trabajos pendientes dentro de un radio, filtrados por categoría/habilidades.
-      parameters:
-        - in: query
-          name: lat
-          schema:
-            type: number
-          required: true
-        - in: query
-          name: lng
-          schema:
-            type: number
-          required: true
-        - in: query
-          name: radius
-          schema:
-            type: integer
-          description: Radio en metros
-        - in: query
-          name: category
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Lista de trabajos
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: './schemas/job.json'
-
-  /jobs/{id}:
-    get:
-      tags: [jobs]
-      summary: Detalle de un trabajo
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Datos del trabajo
+          description: Oferta aceptada, trabajo actualizado
           content:
             application/json:
               schema:
                 $ref: './schemas/job.json'
-    delete:
+        '403':
+          description: El usuario no es el cliente dueño del trabajo
+        '404':
+          description: Trabajo u oferta no encontrados
+        '409':
+          description: El trabajo ya no está en estado pending
+
+  /cancelJob:
+    post:
       tags: [jobs]
-      summary: Cancelar trabajo (solo cliente)
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+      summary: Cancelar un trabajo
+      description: |
+        Cancela un trabajo y todas sus ofertas pendientes. Notifica a los
+        trabajadores que habían ofertado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jobId:
+                  type: string
+                reason:
+                  type: string
+              required: [jobId]
       responses:
         '200':
           description: Trabajo cancelado
 
-  /jobs/{id}/status:
-    put:
+  /completeJob:
+    post:
       tags: [jobs]
-      summary: Cambiar estado del trabajo
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+      summary: Marcar un trabajo como completado
+      description: |
+        El trabajador o cliente marca el trabajo como completado. Actualiza el
+        estado, cierra la conversación y habilita las reseñas.
       requestBody:
         required: true
         content:
@@ -297,133 +155,22 @@ paths:
             schema:
               type: object
               properties:
-                status:
+                jobId:
                   type: string
-                  enum: [accepted, in_progress, completed, cancelled]
+              required: [jobId]
       responses:
         '200':
-          description: Estado actualizado
-
-  # ===================== OFERTAS =====================
-  /jobs/{id}/offers:
-    post:
-      tags: [offers]
-      summary: Enviar oferta a un trabajo
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: './schemas/offer.json'
-      responses:
-        '201':
-          description: Oferta enviada
-    get:
-      tags: [offers]
-      summary: Listar ofertas recibidas (cliente)
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Lista de ofertas
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: './schemas/offer.json'
-
-  /offers/{id}/accept:
-    put:
-      tags: [offers]
-      summary: Aceptar una oferta
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Oferta aceptada, trabajo asignado
-
-  /offers/{id}/reject:
-    put:
-      tags: [offers]
-      summary: Rechazar una oferta
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Oferta rechazada
-
-  # ===================== MENSAJES =====================
-  /jobs/{id}/messages:
-    post:
-      tags: [messages]
-      summary: Enviar mensaje en el chat
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                content:
-                  type: string
-      responses:
-        '201':
-          description: Mensaje enviado
-    get:
-      tags: [messages]
-      summary: Obtener historial de mensajes del trabajo
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Lista de mensajes
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: './schemas/message.json'
+          description: Trabajo completado
 
   # ===================== RESEÑAS =====================
-  /jobs/{id}/review:
+  /createReview:
     post:
       tags: [reviews]
-      summary: Calificar al otro usuario al finalizar
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+      summary: Crear una reseña y actualizar reputación
+      description: |
+        Crea una reseña y actualiza en una transacción:
+        - El documento de reviews.
+        - El promedio de rating y ratingCount del usuario calificado.
       requestBody:
         required: true
         content:
@@ -432,172 +179,44 @@ paths:
               $ref: './schemas/review.json'
       responses:
         '201':
-          description: Reseña creada
-
-  /users/{id}/reviews:
-    get:
-      tags: [reviews]
-      summary: Obtener reseñas de un usuario
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Lista de reseñas
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: './schemas/review.json'
+          description: Reseña creada y reputación actualizada
+        '403':
+          description: No autorizado para calificar este trabajo
+        '409':
+          description: Ya existe una reseña para este trabajo por este usuario
 
   # ===================== RUTAS =====================
-  /jobs/{id}/route:
-    get:
-      tags: [routes]
-      summary: Obtener ruta almacenada
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Ruta encontrada
-          content:
-            application/json:
-              schema:
-                $ref: './schemas/job_route.json'
+  /computeRoute:
     post:
       tags: [routes]
-      summary: Guardar/calcular ruta
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+      summary: Calcular y almacenar la ruta de un trabajo
+      description: |
+        Calcula la ruta entre el trabajador y el lugar del trabajo usando OSRM,
+        y guarda la geometría como campo `route` dentro del documento del job.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: './schemas/job_route.json'
-      responses:
-        '201':
-          description: Ruta almacenada
-
-  # ===================== UBICACIONES =====================
-  /jobs/{id}/locations:
-    get:
-      tags: [locations]
-      summary: Obtener historial de ubicaciones del trabajo
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
+              type: object
+              properties:
+                jobId:
+                  type: string
+              required: [jobId]
       responses:
         '200':
-          description: Lista de ubicaciones
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: './schemas/location_history.json'
-    post:
-      tags: [locations]
-      summary: Registrar una ubicación durante el seguimiento
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: './schemas/location_history.json'
-      responses:
-        '201':
-          description: Ubicación registrada
-
-  # ===================== NOTIFICACIONES =====================
-  /notifications/me:
-    get:
-      tags: [notifications]
-      summary: Obtener mis notificaciones
-      description: Devuelve las notificaciones paginadas del usuario autenticado.
-      parameters:
-        - in: query
-          name: page
-          schema:
-            type: integer
-            default: 0
-        - in: query
-          name: size
-          schema:
-            type: integer
-            default: 20
-      responses:
-        '200':
-          description: Lista de notificaciones
+          description: Ruta calculada y almacenada
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  content:
-                    type: array
-                    items:
-                      $ref: './schemas/notification.json'
-                  totalElements:
-                    type: integer
-                  totalPages:
-                    type: integer
-                  size:
-                    type: integer
-                  number:
-                    type: integer
-
-  /notifications/me/unread-count:
-    get:
-      tags: [notifications]
-      summary: Contar notificaciones no leídas
-      responses:
-        '200':
-          description: Cantidad de notificaciones no leídas
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  unread:
-                    type: integer
-
-  /notifications/{id}/read:
-    put:
-      tags: [notifications]
-      summary: Marcar notificación como leída
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Notificación actualizada
-          content:
-            application/json:
-              schema:
-                $ref: './schemas/notification.json'
-
+                  distance:
+                    type: number
+                    description: Distancia en metros
+                  duration:
+                    type: number
+                    description: Duración en segundos
+                  geometry:
+                    type: object
+                    description: GeoJSON LineString con las coordenadas

@@ -1,48 +1,91 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Conversation",
+  "description": "Documento de conversación en Firestore. Agrupa los mensajes entre un cliente y un trabajador para un trabajo específico. Los mensajes viven en la subcolección conversations/{conversationId}/messages. El ID del documento es generado por Firestore.",
   "type": "object",
   "properties": {
-    "_id": {
-      "type": "string",
-      "description": "Identificador único (ObjectId en MongoDB)",
-      "readOnly": true
-    },
     "jobId": {
       "type": "string",
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Trabajo asociado (ObjectId de jobs)"
+      "title": "Trabajo",
+      "description": "ID del trabajo al que pertenece esta conversación (referencia a la colección jobs)."
     },
-    "participantIds": {
+    "participants": {
       "type": "array",
-      "items": { "type": "string", "pattern": "^[0-9a-fA-F]{24}$" },
-      "minItems": 2,
-      "maxItems": 2,
-      "description": "Dos participantes: client y worker (ObjectId de users)"
+      "items": { "type": "string" },
+      "title": "Participantes",
+      "description": "Lista de UIDs de los usuarios que participan en la conversación (normalmente el cliente y el trabajador asignado al trabajo). Las reglas de Firestore validan que solo estos usuarios puedan leer y escribir."
+    },
+    "participantsSnapshot": {
+      "type": "object",
+      "title": "Resumen de participantes",
+      "description": "Copia de los datos básicos de los participantes para mostrar en la lista de conversaciones sin consultar la colección users.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Nombre",
+            "description": "Nombre del participante."
+          },
+          "avatarUrl": {
+            "type": ["string", "null"],
+            "title": "Foto de perfil",
+            "description": "URL de la imagen de perfil del participante. Null si no tiene foto."
+          }
+        }
+      }
     },
     "lastMessage": {
       "type": ["object", "null"],
-      "description": "Último mensaje para preview en lista",
+      "title": "Último mensaje",
+      "description": "Resumen del último mensaje enviado en la conversación. Null si aún no se envió ningún mensaje. Permite mostrar una vista previa en la lista de conversaciones.",
       "properties": {
-        "content": { "type": "string" },
-        "senderId": { "type": "string" },
-        "type": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "content": {
+          "type": "string",
+          "title": "Contenido",
+          "description": "Texto del último mensaje."
+        },
+        "senderId": {
+          "type": "string",
+          "title": "Emisor",
+          "description": "UID del usuario que envió el último mensaje."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Fecha de envío",
+          "description": "Momento en que se envió el último mensaje."
+        }
       }
     },
-    "unreadCount": {
+    "lastReadAt": {
       "type": "object",
-      "description": "Contador de no leídos por participante",
-      "additionalProperties": { "type": "integer", "minimum": 0 }
+      "title": "Última lectura por participante",
+      "description": "Mapa de UID a timestamp que indica cuándo cada participante leyó por última vez la conversación. Sirve para mostrar el contador de mensajes no leídos.",
+      "additionalProperties": {
+        "type": "string",
+        "format": "date-time"
+      }
     },
-    "isActive": {
-      "type": "boolean",
-      "default": true,
-      "description": "Si la conversación está activa (job no completed/cancelled)"
+    "status": {
+      "type": "string",
+      "enum": ["active", "archived", "closed"],
+      "title": "Estado de la conversación",
+      "description": "Estado actual: active (chat habilitado), archived (oculta pero recuperable), closed (trabajo finalizado, chat de solo lectura)."
     },
-    "createdAt": { "type": "string", "format": "date-time" },
-    "updatedAt": { "type": "string", "format": "date-time" }
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Fecha de creación",
+      "description": "Momento en que se creó la conversación. Normalmente ocurre al aceptar una oferta."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Última actualización",
+      "description": "Momento del último cambio realizado en la conversación (por ejemplo, al recibir un mensaje nuevo)."
+    }
   },
-  "required": ["jobId", "participantIds"],
+  "required": ["jobId", "participants", "status"],
   "additionalProperties": true
 }

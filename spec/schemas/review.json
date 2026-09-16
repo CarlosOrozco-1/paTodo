@@ -1,63 +1,42 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Review",
+  "description": "Documento de reseña en Firestore. Representa una calificación que un usuario deja a otro después de completar un trabajo. El ID del documento es generado por Firestore.",
   "type": "object",
   "properties": {
-    "_id": {
-      "type": "string",
-      "description": "Identificador único (ObjectId en MongoDB)",
-      "readOnly": true
-    },
     "jobId": {
       "type": "string",
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Trabajo al que pertenece la reseña (ObjectId de jobs con status completed)"
+      "title": "Trabajo",
+      "description": "ID del trabajo al que corresponde la reseña (referencia a la colección jobs)."
     },
     "reviewerId": {
       "type": "string",
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Usuario que califica (ObjectId de users)"
+      "title": "Calificador",
+      "description": "UID del usuario que emite la reseña (referencia al documento en la colección users)."
     },
     "revieweeId": {
       "type": "string",
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Usuario que es calificado (ObjectId de users)"
+      "title": "Calificado",
+      "description": "UID del usuario que recibe la reseña (referencia al documento en la colección users)."
     },
     "rating": {
       "type": "integer",
       "minimum": 1,
       "maximum": 5,
-      "description": "Puntuación de 1 a 5 estrellas"
+      "title": "Puntuación",
+      "description": "Calificación otorgada, en una escala de 1 a 5 estrellas."
     },
     "comment": {
       "type": "string",
-      "description": "Comentario opcional sobre el servicio"
+      "title": "Comentario",
+      "description": "Comentario opcional que acompaña la calificación (por ejemplo, sobre la puntualidad, calidad del servicio, trato)."
     },
-    "aspects": {
-      "type": "object",
-      "description": "Calificaciones por aspecto (opcional)",
-      "properties": {
-        "quality": { "type": "integer", "minimum": 1, "maximum": 5 },
-        "punctuality": { "type": "integer", "minimum": 1, "maximum": 5 },
-        "communication": { "type": "integer", "minimum": 1, "maximum": 5 },
-        "value": { "type": "integer", "minimum": 1, "maximum": 5 }
-      }
-    },
-    "isPublic": {
-      "type": "boolean",
-      "default": true,
-      "description": "Si la reseña es visible públicamente"
-    },
-    "response": {
-      "type": ["object", "null"],
-      "description": "Respuesta del reviewee a la reseña",
-      "properties": {
-        "comment": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "createdAt": { "type": "string", "format": "date-time" },
-    "updatedAt": { "type": "string", "format": "date-time" }
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Fecha de creación",
+      "description": "Momento en que se emitió la reseña."
+    }
   },
   "required": ["jobId", "reviewerId", "revieweeId", "rating"],
   "additionalProperties": true

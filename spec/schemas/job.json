@@ -1,105 +1,218 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Job",
+  "description": "Documento de trabajo en Firestore. Representa una solicitud publicada por un cliente para un servicio (cambio de llanta, plomería, jardinería, etc.). El ID del documento es generado por Firestore.",
   "type": "object",
   "properties": {
-    "_id": {
-      "type": "string",
-      "description": "Identificador único (ObjectId en MongoDB)",
-      "readOnly": true
-    },
     "clientId": {
       "type": "string",
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Referencia al usuario cliente que publica el trabajo (ObjectId de users)"
+      "title": "Cliente",
+      "description": "UID del usuario que publica el trabajo (referencia al documento en la colección users)."
     },
     "details": {
       "type": "object",
-      "description": "Detalles del trabajo",
+      "title": "Detalles del trabajo",
+      "description": "Información descriptiva del servicio solicitado.",
       "properties": {
-        "title": { "type": "string", "description": "Título breve del trabajo" },
-        "description": { "type": "string", "description": "Descripción detallada del problema" },
+        "title": {
+          "type": "string",
+          "title": "Título",
+          "description": "Título breve del trabajo (por ejemplo, 'Cambio de llanta urgente')."
+        },
+        "description": {
+          "type": "string",
+          "title": "Descripción",
+          "description": "Descripción detallada del problema o servicio requerido."
+        },
         "categoryId": {
           "type": "string",
-          "pattern": "^[0-9a-fA-F]{24}$",
-          "description": "Referencia a categoría (ObjectId de categories)"
+          "title": "Categoría",
+          "description": "ID de la categoría del trabajo (referencia a la colección categories)."
         },
         "skillIds": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^[0-9a-fA-F]{24}$" },
-          "description": "Habilidades requeridas (ObjectId de skills)"
+          "items": { "type": "string" },
+          "title": "Habilidades requeridas",
+          "description": "Lista de IDs de habilidades necesarias para realizar el trabajo (referencia a la colección skills)."
         }
       },
       "required": ["title", "description", "categoryId"]
     },
     "location": {
       "type": "object",
-      "description": "Ubicación del trabajo",
+      "title": "Ubicación del trabajo",
+      "description": "Dónde se debe realizar el servicio. Incluye coordenadas exactas, geohash para búsquedas por proximidad y dirección legible.",
       "properties": {
-        "type": { "type": "string", "enum": ["Point"] },
-        "coordinates": {
-          "type": "array",
-          "items": { "type": "number" },
-          "minItems": 2,
-          "maxItems": 2,
-          "description": "[longitud, latitud]"
+        "geopoint": {
+          "type": "object",
+          "title": "Coordenadas geográficas",
+          "description": "Latitud y longitud del lugar del trabajo.",
+          "properties": {
+            "latitude": {
+              "type": "number",
+              "title": "Latitud",
+              "description": "Coordenada de latitud."
+            },
+            "longitude": {
+              "type": "number",
+              "title": "Longitud",
+              "description": "Coordenada de longitud."
+            }
+          },
+          "required": ["latitude", "longitude"]
         },
-        "address": { "type": "string", "description": "Dirección legible" },
-        "placeId": { "type": ["string", "null"], "description": "Google Places ID opcional" }
+        "geohash": {
+          "type": "string",
+          "title": "Geohash",
+          "description": "Código geohash calculado a partir de las coordenadas. Permite búsquedas eficientes por proximidad en Firestore."
+        },
+        "address": {
+          "type": "string",
+          "title": "Dirección",
+          "description": "Dirección legible del lugar del trabajo."
+        },
+        "placeId": {
+          "type": "string",
+          "title": "ID del lugar",
+          "description": "Identificador opcional de Google Places para la ubicación."
+        }
       },
-      "required": ["type", "coordinates", "address"]
+      "required": ["geopoint", "geohash", "address"]
     },
     "pricing": {
       "type": "object",
-      "description": "Información de precio",
+      "title": "Precio",
+      "description": "Información sobre el precio propuesto por el cliente.",
       "properties": {
-        "proposedPrice": { "type": "number", "minimum": 0 },
-        "currency": { "type": "string", "pattern": "^[A-Z]{3}$", "default": "GTQ" },
-        "priceType": { "type": "string", "enum": ["fixed", "hourly", "estimate"], "default": "fixed" }
+        "proposedPrice": {
+          "type": "number",
+          "minimum": 0,
+          "title": "Precio propuesto",
+          "description": "Monto que el cliente está dispuesto a pagar por el servicio."
+        },
+        "currency": {
+          "type": "string",
+          "default": "GTQ",
+          "title": "Moneda",
+          "description": "Moneda del precio (por defecto, quetzales guatemaltecos)."
+        },
+        "priceType": {
+          "type": "string",
+          "enum": ["fixed", "negotiable"],
+          "title": "Tipo de precio",
+          "description": "Indica si el precio es fijo (no negociable) o negociable (los trabajadores pueden contraofertar)."
+        }
       },
       "required": ["proposedPrice", "currency"]
     },
     "status": {
       "type": "string",
-      "enum": ["pending", "accepted", "in_progress", "completed", "cancelled", "disputed"],
-      "description": "Estado del trabajo"
+      "enum": ["pending", "accepted", "in_progress", "completed", "cancelled"],
+      "title": "Estado del trabajo",
+      "description": "Estado actual del trabajo en su ciclo de vida."
     },
     "workerId": {
       "type": ["string", "null"],
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Trabajador asignado (ObjectId de users), null si no hay"
+      "title": "Trabajador asignado",
+      "description": "UID del trabajador que aceptó el trabajo (referencia a users). Null mientras no se asigne."
     },
     "acceptedOfferId": {
       "type": ["string", "null"],
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Oferta aceptada (ObjectId de offers), null si no hay"
+      "title": "Oferta aceptada",
+      "description": "ID de la oferta aceptada (referencia a offers). Null mientras no se acepte ninguna."
     },
-    "scheduledFor": {
+    "cancelReason": {
       "type": ["string", "null"],
-      "format": "date-time",
-      "description": "Fecha programada para el trabajo, opcional"
-    },
-    "startedAt": {
-      "type": ["string", "null"],
-      "format": "date-time",
-      "description": "Fecha real de inicio (cuando worker marca in_progress)"
+      "title": "Razón de cancelación",
+      "description": "Motivo opcional indicado por el cliente al cancelar el trabajo. Null si no se especificó."
     },
     "completedAt": {
       "type": ["string", "null"],
       "format": "date-time",
-      "description": "Fecha real de finalización"
+      "title": "Fecha de completado",
+      "description": "Momento en que el trabajo fue marcado como completado. Null mientras el trabajo no esté completado."
     },
-    "cancelledAt": {
+    "route": {
+      "type": ["object", "null"],
+      "title": "Ruta calculada",
+      "description": "Ruta entre el trabajador y el trabajo calculada por OSRM. Null si aún no se calculó.",
+      "properties": {
+        "geometry": {
+          "type": "object",
+          "title": "Geometría",
+          "description": "Geometría de la ruta en formato GeoJSON.",
+          "properties": {
+            "type": {
+              "type": "string",
+              "title": "Tipo"
+            },
+            "coordinates": {
+              "type": "array",
+              "title": "Coordenadas",
+              "description": "Puntos de la ruta como objetos con longitud y latitud. Se usa una lista de objetos porque Firestore no admite arrays anidados.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "longitude": {
+                    "type": "number",
+                    "title": "Longitud"
+                  },
+                  "latitude": {
+                    "type": "number",
+                    "title": "Latitud"
+                  }
+                },
+                "required": ["longitude", "latitude"]
+              }
+            }
+          },
+          "required": ["type", "coordinates"]
+        },
+        "distance": {
+          "type": "number",
+          "minimum": 0,
+          "title": "Distancia",
+          "description": "Distancia total de la ruta en metros."
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0,
+          "title": "Duración",
+          "description": "Duración estimada de la ruta en segundos."
+        },
+        "source": {
+          "type": "string",
+          "enum": ["osrm"],
+          "title": "Proveedor",
+          "description": "Motor de rutas que generó el resultado."
+        },
+        "computedAt": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Fecha de cálculo",
+          "description": "Momento en que se calculó la ruta."
+        }
+      },
+      "required": ["geometry", "distance", "duration", "source", "computedAt"]
+    },
+    "scheduledFor": {
       "type": ["string", "null"],
       "format": "date-time",
-      "description": "Fecha de cancelación si aplica"
+      "title": "Programado para",
+      "description": "Fecha y hora programada para realizar el trabajo. Null si es inmediato."
     },
-    "cancellationReason": {
-      "type": ["string", "null"],
-      "description": "Motivo de cancelación"
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Fecha de creación",
+      "description": "Momento en que se publicó el trabajo."
     },
-    "createdAt": { "type": "string", "format": "date-time" },
-    "updatedAt": { "type": "string", "format": "date-time" }
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Última actualización",
+      "description": "Momento del último cambio realizado en el documento del trabajo."
+    }
   },
   "required": ["clientId", "details", "location", "pricing", "status"],
   "additionalProperties": true

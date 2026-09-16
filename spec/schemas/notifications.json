@@ -1,79 +1,79 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Notification",
+  "description": "Documento de notificación en Firestore. Representa un aviso dirigido a un usuario específico sobre eventos relevantes (nueva oferta, oferta aceptada, mensaje nuevo, trabajo completado, etc.). El ID del documento es generado por Firestore.",
   "type": "object",
   "properties": {
-    "_id": {
-      "type": "string",
-      "description": "Identificador único (ObjectId en MongoDB)",
-      "readOnly": true
-    },
     "userId": {
       "type": "string",
-      "description": "Usuario destinatario (ObjectId de users)"
+      "title": "Destinatario",
+      "description": "UID del usuario que recibe la notificación (referencia al documento en la colección users)."
     },
     "type": {
       "type": "string",
       "enum": [
-        "job_created",
-        "job_assigned",
-        "job_updated",
-        "job_completed",
-        "job_cancelled",
-        "offer_received",
+        "new_offer",
         "offer_accepted",
         "offer_rejected",
-        "offer_withdrawn",
-        "message_received",
-        "payment_received",
-        "payment_failed",
-        "review_request",
-        "review_received",
-        "system_alert",
-        "promotion"
+        "new_message",
+        "job_started",
+        "job_completed",
+        "job_cancelled",
+        "new_review"
       ],
-      "description": "Tipo de notificación para routing y preferencias"
+      "title": "Tipo de notificación",
+      "description": "Clasifica el evento que originó la notificación."
     },
     "title": {
       "type": "string",
-      "description": "Título corto para mostrar en lista/banner"
+      "title": "Título",
+      "description": "Título breve mostrado al usuario (por ejemplo, 'Nueva oferta recibida')."
     },
     "body": {
       "type": "string",
-      "description": "Cuerpo del mensaje"
+      "title": "Cuerpo",
+      "description": "Texto descriptivo de la notificación con más detalle del evento."
     },
     "data": {
       "type": "object",
-      "description": "Datos adicionales para deep linking y contexto",
+      "title": "Datos adicionales",
+      "description": "Información contextual que permite al frontend navegar al recurso relacionado (por ejemplo, jobId, offerId, conversationId).",
       "properties": {
-        "jobId": { "type": "string" },
-        "offerId": { "type": "string" },
-        "messageId": { "type": "string" },
-        "reviewId": { "type": "string" },
-        "actionUrl": { "type": "string", "format": "uri", "description": "Deep link para navegar al tocar (ej: /jobs/123)" }
+        "jobId": {
+          "type": ["string", "null"],
+          "title": "Trabajo relacionado",
+          "description": "ID del trabajo asociado a la notificación, si aplica."
+        },
+        "offerId": {
+          "type": ["string", "null"],
+          "title": "Oferta relacionada",
+          "description": "ID de la oferta asociada a la notificación, si aplica."
+        },
+        "conversationId": {
+          "type": ["string", "null"],
+          "title": "Conversación relacionada",
+          "description": "ID de la conversación asociada, si la notificación proviene de un mensaje."
+        }
       }
     },
-    "channels": {
-      "type": "array",
-      "items": { "type": "string", "enum": ["push", "in_app", "email", "sms"] },
-      "description": "Canales por los que se envió/intenta enviar"
+    "isRead": {
+      "type": "boolean",
+      "title": "Leída",
+      "description": "Indica si el usuario ya leyó la notificación. Se marca como true cuando el usuario la abre."
     },
     "readAt": {
       "type": ["string", "null"],
       "format": "date-time",
-      "description": "Fecha de lectura, null si no leída"
-    },
-    "sentAt": {
-      "type": ["string", "null"],
-      "format": "date-time",
-      "description": "Fecha de envío real, null si pendiente"
+      "title": "Leída en",
+      "description": "Momento en que el usuario marcó la notificación como leída. Null si aún no se ha leído."
     },
     "createdAt": {
       "type": "string",
       "format": "date-time",
-      "description": "Fecha de creación del registro"
+      "title": "Fecha de creación",
+      "description": "Momento en que se generó la notificación."
     }
   },
-  "required": ["userId", "type", "title", "body"],
+  "required": ["userId", "type", "title", "body", "isRead"],
   "additionalProperties": true
 }

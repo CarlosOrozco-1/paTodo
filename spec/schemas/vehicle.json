@@ -1,76 +1,114 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Vehicle",
+  "description": "Documento de vehículo en Firestore. Representa un vehículo asociado a un trabajador. El ID del documento es generado por Firestore.",
   "type": "object",
   "properties": {
-    "_id": {
-      "type": "string",
-      "description": "Identificador único (ObjectId en MongoDB)",
-      "readOnly": true
-    },
     "ownerId": {
       "type": "string",
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Referencia al usuario trabajador propietario (ObjectId de users con role worker/both)"
+      "title": "Propietario",
+      "description": "UID del usuario trabajador propietario del vehículo (referencia al documento en la colección users)."
     },
     "type": {
       "type": "string",
       "enum": ["auto", "moto", "bicicleta", "camioneta", "otro"],
-      "description": "Tipo de vehículo"
+      "title": "Tipo de vehículo",
+      "description": "Categoría del vehículo según su naturaleza."
     },
-    "brand": { "type": "string", "description": "Marca del vehículo" },
-    "model": { "type": "string", "description": "Modelo del vehículo" },
+    "brand": {
+      "type": "string",
+      "title": "Marca",
+      "description": "Marca del vehículo (por ejemplo, Toyota, Honda)."
+    },
+    "model": {
+      "type": "string",
+      "title": "Modelo",
+      "description": "Modelo específico del vehículo (por ejemplo, Corolla, Civic)."
+    },
     "year": {
       "type": "integer",
       "minimum": 1980,
       "maximum": 2030,
-      "description": "Año de fabricación"
+      "title": "Año",
+      "description": "Año de fabricación del vehículo."
     },
-    "color": { "type": "string", "description": "Color" },
+    "color": {
+      "type": "string",
+      "title": "Color",
+      "description": "Color del vehículo."
+    },
     "plate": {
       "type": "string",
-      "pattern": "^[A-Z0-9]{6,8}$",
-      "description": "Número de placa (único, alfanumérico 6-8 chars)"
-    },
-    "vin": {
-      "type": ["string", "null"],
-      "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
-      "description": "VIN opcional (17 chars estándar)"
+      "title": "Placa",
+      "description": "Número de placa del vehículo. Debe ser único en la plataforma."
     },
     "capacity": {
       "type": "object",
-      "description": "Capacidad de carga o pasajeros",
+      "title": "Capacidad",
+      "description": "Capacidad de carga o de pasajeros del vehículo. Útil para determinar qué tipo de trabajos puede realizar el trabajador.",
       "properties": {
-        "passengers": { "type": "integer", "minimum": 0, "default": 0 },
-        "cargoKg": { "type": "number", "minimum": 0, "default": 0 },
-        "cargoVolume": { "type": "number", "minimum": 0, "description": "Volumen en m³" }
+        "passengers": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Pasajeros",
+          "description": "Número máximo de pasajeros que puede transportar."
+        },
+        "cargoKg": {
+          "type": "number",
+          "minimum": 0,
+          "title": "Carga en kilogramos",
+          "description": "Peso máximo de carga que puede transportar en kilogramos."
+        },
+        "cargoVolume": {
+          "type": "number",
+          "minimum": 0,
+          "title": "Volumen de carga",
+          "description": "Volumen máximo de carga que puede transportar en metros cúbicos."
+        }
       },
       "required": ["passengers"]
     },
     "documents": {
       "type": "object",
-      "description": "Documentos legales del vehículo",
+      "title": "Documentos del vehículo",
+      "description": "Documentos legales y de seguro del vehículo. Pueden ser verificados por la plataforma antes de permitir que el trabajador acepte ciertos trabajos.",
       "properties": {
-        "registration": { "type": "string", "description": "URL o referencia a tarjeta de circulación" },
-        "insurance": { "type": "string", "description": "URL o referencia a póliza de seguro" },
-        "insuranceExpiry": { "type": "string", "format": "date", "description": "Fecha de vencimiento del seguro (debe ser futura)" },
-        "technicalInspection": { "type": "string", "description": "URL o referencia a revisión técnica" },
-        "technicalInspectionExpiry": { "type": "string", "format": "date" }
+        "registration": {
+          "type": "string",
+          "title": "Registro",
+          "description": "Número de registro del vehículo."
+        },
+        "insurance": {
+          "type": "string",
+          "title": "Seguro",
+          "description": "Número de póliza de seguro del vehículo."
+        },
+        "insuranceExpiry": {
+          "type": "string",
+          "format": "date",
+          "title": "Vencimiento del seguro",
+          "description": "Fecha de vencimiento de la póliza de seguro."
+        }
       }
     },
     "status": {
       "type": "string",
       "enum": ["active", "inactive", "maintenance"],
-      "default": "active",
-      "description": "Estado del vehículo"
+      "title": "Estado del vehículo",
+      "description": "Indica si el vehículo está disponible para trabajar (active), fuera de servicio (inactive) o en mantenimiento (maintenance)."
     },
-    "features": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Características extras (ej: aire_acondicionado, gps, rastreo_satelital)"
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Fecha de creación",
+      "description": "Momento en que se registró el vehículo en la plataforma."
     },
-    "createdAt": { "type": "string", "format": "date-time" },
-    "updatedAt": { "type": "string", "format": "date-time" }
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Última actualización",
+      "description": "Momento del último cambio realizado en el documento del vehículo."
+    }
   },
   "required": ["ownerId", "type", "brand", "model", "plate", "status"],
   "additionalProperties": true

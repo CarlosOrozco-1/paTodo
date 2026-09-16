@@ -1,51 +1,47 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Skill",
+  "description": "Documento del catálogo maestro de habilidades en Firestore. Las habilidades son referenciadas por usuarios (trabajadores), categorías y trabajos. El ID del documento es generado por Firestore.",
   "type": "object",
   "properties": {
-    "_id": {
-      "type": "string",
-      "description": "Identificador único (ObjectId en MongoDB)",
-      "readOnly": true
-    },
     "name": {
       "type": "string",
-      "description": "Nombre legible de la habilidad (ej: Cambio de llantas)"
+      "title": "Nombre de la habilidad",
+      "description": "Nombre legible de la habilidad (por ejemplo, 'Cambio de llantas', 'Reparación de tuberías')."
     },
     "slug": {
       "type": "string",
-      "pattern": "^[a-z0-9_]+$",
-      "description": "Identificador único para la habilidad (ej: cambio_llantas)"
+      "title": "Identificador único",
+      "description": "Cadena única en minúsculas y sin espacios usada para referencias internas y URLs (por ejemplo, 'cambio_llantas')."
     },
     "description": {
       "type": "string",
-      "description": "Descripción detallada de la habilidad"
+      "title": "Descripción",
+      "description": "Texto explicativo sobre qué implica esta habilidad."
     },
     "icon": {
       "type": "string",
-      "description": "Nombre del icono (ej: lucide:wrench, material:build) o URL"
-    },
-    "categoryIds": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Categorías donde aplica esta habilidad (ObjectId de categories)"
+      "title": "Ícono",
+      "description": "Nombre o URL del ícono representativo para mostrar en la interfaz."
     },
     "isActive": {
       "type": "boolean",
-      "default": true,
-      "description": "Si la habilidad está disponible para selección"
+      "title": "Activo",
+      "description": "Indica si la habilidad está disponible para ser usada. Permite desactivarla sin eliminarla del catálogo."
     },
     "createdAt": {
       "type": "string",
       "format": "date-time",
-      "description": "Fecha de creación"
+      "title": "Fecha de creación",
+      "description": "Momento en que se agregó la habilidad al catálogo."
     },
     "updatedAt": {
       "type": "string",
       "format": "date-time",
-      "description": "Fecha de última actualización"
+      "title": "Última actualización",
+      "description": "Momento del último cambio realizado en el documento de la habilidad."
     }
   },
-  "required": ["name", "slug"],
+  "required": ["name", "slug", "isActive"],
   "additionalProperties": true
 }

@@ -1,77 +1,43 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Message",
+  "description": "Documento de mensaje en Firestore. Vive como subcolección dentro de una conversación: conversations/{conversationId}/messages/{messageId}. El ID del documento es generado por Firestore.",
   "type": "object",
   "properties": {
-    "_id": {
-      "type": "string",
-      "description": "Identificador único (ObjectId en MongoDB)",
-      "readOnly": true
-    },
-    "jobId": {
-      "type": "string",
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Trabajo al que pertenece el mensaje (ObjectId de jobs)"
-    },
-    "conversationId": {
-      "type": "string",
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Referencia a conversación (ObjectId de conversations)"
-    },
     "senderId": {
       "type": "string",
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Usuario que envía el mensaje (ObjectId de users)"
-    },
-    "receiverId": {
-      "type": "string",
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Usuario que recibe el mensaje (ObjectId de users)"
-    },
-    "type": {
-      "type": "string",
-      "enum": ["text", "image", "location", "system", "file", "voice"],
-      "default": "text",
-      "description": "Tipo de contenido del mensaje"
+      "title": "Emisor",
+      "description": "UID del usuario que envía el mensaje (referencia al documento en la colección users)."
     },
     "content": {
       "type": "string",
-      "description": "Contenido del mensaje (texto, URL de imagen/archivo, JSON de ubicación)"
+      "title": "Contenido",
+      "description": "Texto del mensaje enviado."
     },
-    "metadata": {
-      "type": "object",
-      "description": "Metadatos según tipo",
-      "properties": {
-        "fileName": { "type": "string" },
-        "fileSize": { "type": "integer" },
-        "mimeType": { "type": "string" },
-        "duration": { "type": "integer", "description": "Duración en segundos para voice" },
-        "location": {
-          "type": "object",
-          "properties": {
-            "type": { "type": "string", "enum": ["Point"] },
-            "coordinates": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }
-          }
-        }
-      }
+    "type": {
+      "type": "string",
+      "enum": ["text", "system", "offer", "location"],
+      "title": "Tipo de mensaje",
+      "description": "Clasifica el mensaje: text (mensaje normal del usuario), system (aviso automático del sistema), offer (referencia a una oferta enviada), location (ubicación compartida)."
     },
     "replyTo": {
       "type": ["string", "null"],
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Mensaje al que responde (ObjectId de messages)"
+      "title": "Responde a",
+      "description": "ID del mensaje al que se responde, si aplica. Null si no es una respuesta."
     },
     "readAt": {
       "type": ["string", "null"],
       "format": "date-time",
-      "description": "Fecha de lectura por el receptor"
+      "title": "Leído en",
+      "description": "Momento en que el destinatario leyó el mensaje. Null si aún no ha sido leído."
     },
-    "deliveredAt": {
-      "type": ["string", "null"],
+    "createdAt": {
+      "type": "string",
       "format": "date-time",
-      "description": "Fecha de entrega al dispositivo del receptor"
-    },
-    "createdAt": { "type": "string", "format": "date-time" }
+      "title": "Fecha de envío",
+      "description": "Momento exacto en que se envió el mensaje."
+    }
   },
-  "required": ["jobId", "conversationId", "senderId", "receiverId", "content"],
+  "required": ["senderId", "content", "type"],
   "additionalProperties": true
 }

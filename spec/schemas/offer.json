@@ -1,66 +1,91 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Offer",
+  "description": "Documento de oferta en Firestore. Representa una propuesta enviada por un trabajador para un trabajo publicado. El ID del documento es generado por Firestore.",
   "type": "object",
   "properties": {
-    "_id": {
-      "type": "string",
-      "description": "Identificador único (ObjectId en MongoDB)",
-      "readOnly": true
-    },
     "jobId": {
       "type": "string",
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Referencia al trabajo (ObjectId de jobs)"
+      "title": "Trabajo",
+      "description": "ID del trabajo al que corresponde esta oferta (referencia a la colección jobs)."
     },
     "workerId": {
       "type": "string",
-      "pattern": "^[0-9a-fA-F]{24}$",
-      "description": "Referencia al trabajador que oferta (ObjectId de users)"
+      "title": "Trabajador",
+      "description": "UID del trabajador que envía la oferta (referencia al documento en la colección users)."
     },
     "workerSnapshot": {
       "type": "object",
-      "description": "Resumen del trabajador en el momento de la oferta (denormalizado)",
+      "title": "Resumen del trabajador",
+      "description": "Datos del trabajador al momento de enviar la oferta. Se guardan aquí para evitar consultas adicionales al mostrar las ofertas al cliente.",
       "properties": {
-        "name": { "type": "string", "description": "Nombre completo del trabajador" },
-        "rating": { "type": "number", "minimum": 0, "maximum": 5 },
-        "completedJobs": { "type": "integer", "minimum": 0 },
-        "avatarUrl": { "type": "string", "format": "uri" }
+        "name": {
+          "type": "string",
+          "title": "Nombre",
+          "description": "Nombre completo del trabajador."
+        },
+        "avatarUrl": {
+          "type": ["string", "null"],
+          "title": "Foto de perfil",
+          "description": "URL de la imagen de perfil del trabajador. Null si el trabajador no tiene foto."
+        },
+        "rating": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5,
+          "title": "Calificación",
+          "description": "Calificación promedio del trabajador al momento de la oferta."
+        },
+        "completedJobs": {
+          "type": "integer",
+          "minimum": 0,
+          "title": "Trabajos completados",
+          "description": "Cantidad de trabajos completados por el trabajador al momento de la oferta."
+        }
       },
       "required": ["name", "rating"]
     },
     "price": {
       "type": "number",
       "minimum": 0,
-      "description": "Precio ofertado por el trabajador"
+      "title": "Precio ofertado",
+      "description": "Monto que el trabajador propone cobrar por el servicio."
     },
     "currency": {
       "type": "string",
-      "pattern": "^[A-Z]{3}$",
       "default": "GTQ",
-      "description": "Moneda ISO 4217"
+      "title": "Moneda",
+      "description": "Moneda del precio ofertado (por defecto, quetzales guatemaltecos)."
     },
     "estimatedTime": {
       "type": "integer",
       "minimum": 0,
-      "description": "Tiempo estimado en minutos"
+      "title": "Tiempo estimado",
+      "description": "Tiempo estimado en minutos que el trabajador tardará en realizar el trabajo o en llegar al lugar."
     },
     "message": {
       "type": "string",
-      "description": "Nota opcional del trabajador"
+      "title": "Mensaje",
+      "description": "Nota opcional del trabajador para el cliente (por ejemplo, aclaraciones sobre el precio o el servicio)."
     },
     "status": {
       "type": "string",
-      "enum": ["pending", "accepted", "rejected", "withdrawn", "expired"],
-      "description": "Estado de la oferta"
+      "enum": ["pending", "accepted", "rejected", "withdrawn"],
+      "title": "Estado de la oferta",
+      "description": "Estado actual de la oferta: pending (esperando decisión del cliente), accepted (elegida por el cliente), rejected (descartada por el cliente) o withdrawn (retirada por el trabajador)."
     },
-    "expiresAt": {
-      "type": ["string", "null"],
+    "createdAt": {
+      "type": "string",
       "format": "date-time",
-      "description": "Fecha de expiración automática de la oferta"
+      "title": "Fecha de creación",
+      "description": "Momento en que el trabajador envió la oferta."
     },
-    "createdAt": { "type": "string", "format": "date-time" },
-    "updatedAt": { "type": "string", "format": "date-time" }
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Última actualización",
+      "description": "Momento del último cambio realizado en la oferta (por ejemplo, al cambiar su estado)."
+    }
   },
   "required": ["jobId", "workerId", "price", "estimatedTime", "status"],
   "additionalProperties": true

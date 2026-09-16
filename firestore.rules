@@ -1,10 +1,145 @@
 rules_version = '2';
-
-// Placeholder - las reglas de seguridad se definirán en la Fase A de la migración.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+
+    // Colección users
+    match /users/{userId} {
+      // Solo el propio usuario autenticado puede leer su documento.
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Solo el propio usuario puede actualizar su documento.
+      allow update: if request.auth != null && request.auth.uid == userId;
+
+      // La creación y eliminación se manejan desde Cloud Functions.
+      allow create, delete: if false;
+    }
+
+    // Colección jobs
+    match /jobs/{jobId} {
+      // Cualquier usuario autenticado puede leer los trabajos.
+      allow read: if request.auth != null;
+
+      // Solo un cliente autenticado puede crear un trabajo, asignándose como dueño.
+      allow create: if request.auth != null
+                    && request.resource.data.clientId == request.auth.uid;
+
+      // Solo el cliente dueño puede actualizar o eliminar su trabajo.
+      allow update, delete: if request.auth != null
+                            && resource.data.clientId == request.auth.uid;
+    }
+
+    // Colección offers
+    match /offers/{offerId} {
+      // El trabajador que creó la oferta puede leerla.
+      // El cliente dueño del trabajo también puede leer las ofertas de ese trabajo.
+      allow read: if request.auth != null
+                  && (resource.data.workerId == request.auth.uid
+                      || get(/databases/$(database)/documents/jobs/$(resource.data.jobId)).data.clientId == request.auth.uid);
+
+      // Un trabajador autenticado puede crear una oferta, asignándose como dueño.
+      allow create: if request.auth != null
+                    && request.resource.data.workerId == request.auth.uid;
+
+      // Solo el trabajador que creó la oferta puede actualizarla (por ejemplo, retirarla).
+      allow update: if request.auth != null
+                    && resource.data.workerId == request.auth.uid;
+
+      // Eliminar ofertas solo desde Cloud Functions.
+      allow delete: if false;
+    }
+
+    // Colección skills
+    match /skills/{skillId} {
+      // Cualquiera puede leer el catálogo de habilidades.
+      allow read: if true;
+
+      // La escritura se maneja desde Cloud Functions.
+      allow write: if false;
+    }
+
+    // Colección categories
+    match /categories/{categoryId} {
+      // Cualquiera puede leer el catálogo de categorías.
+      allow read: if true;
+
+      // La escritura se maneja desde Cloud Functions.
+      allow write: if false;
+    }
+
+    // Colección vehicles
+    match /vehicles/{vehicleId} {
+      // Cualquier usuario autenticado puede leer los vehículos.
+      allow read: if request.auth != null;
+
+      // Solo el trabajador dueño puede crear un vehículo, asignándose como ownerId.
+      allow create: if request.auth != null
+                    && request.resource.data.ownerId == request.auth.uid;
+
+      // Solo el dueño puede actualizar o eliminar su vehículo.
+      allow update, delete: if request.auth != null
+                            && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Colección reviews
+    match /reviews/{reviewId} {
+      // Cualquier usuario autenticado puede leer las reseñas.
+      allow read: if request.auth != null;
+
+      // Solo el autor autenticado puede crear una reseña, asignándose como reviewerId.
+      allow create: if request.auth != null
+                    && request.resource.data.reviewerId == request.auth.uid;
+
+      // Las reseñas no se modifican ni eliminan desde el cliente.
+      allow update, delete: if false;
+    }
+
+    // Colección notifications
+    match /notifications/{notificationId} {
+      // Solo el usuario destinatario puede leer sus notificaciones.
+      allow read: if request.auth != null
+                  && resource.data.userId == request.auth.uid;
+
+      // Las notificaciones se crean desde Cloud Functions.
+      allow create: if false;
+
+      // Solo el destinatario puede marcarlas como leídas (actualizar).
+      allow update: if request.auth != null
+                    && resource.data.userId == request.auth.uid;
+
+      // No se eliminan desde el cliente.
+      allow delete: if false;
+    }
+
+    // Colección conversations
+    match /conversations/{conversationId} {
+      // Solo los participantes de la conversación pueden leerla.
+      allow read: if request.auth != null
+                  && request.auth.uid in resource.data.participants;
+
+      // La conversación se crea desde Cloud Functions al aceptar una oferta.
+      allow create: if false;
+
+      // Solo los participantes pueden actualizar (por ejemplo, lastMessage, lastReadAt).
+      allow update: if request.auth != null
+                    && request.auth.uid in resource.data.participants;
+
+      // No se eliminan desde el cliente.
+      allow delete: if false;
+
+      // Subcolección messages
+      match /messages/{messageId} {
+        // Solo los participantes de la conversación pueden leer los mensajes.
+        allow read: if request.auth != null
+                    && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+
+        // Solo los participantes pueden crear mensajes, asignándose como senderId.
+        allow create: if request.auth != null
+                      && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
+                      && request.resource.data.senderId == request.auth.uid;
+
+        // Los mensajes no se editan ni se eliminan.
+        allow update, delete: if false;
+      }
     }
   }
 }
