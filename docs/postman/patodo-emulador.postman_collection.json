@@ -1,13 +1,13 @@
 {
   "info": {
-    "name": "PaTodo - Emulador local",
-    "description": "Flujos de prueba contra los emuladores de Firebase (auth 9099, functions 5001, firestore 8081).\n\nRequisitos: emuladores corriendo (firebase emulators:start) y datos sembrados (npm run seed).\n\n1. 'Crear usuario' registra un nuevo usuario (crea Auth + doc en users).\n2. 'Iniciar sesión' guarda el idToken y el uid en variables.\n3. 'Publicar trabajo' escribe directo en Firestore REST (las reglas validan que clientId == tu uid).\n4. Las Cloud Functions requieren el header Authorization: Bearer {{idToken}}.",
+    "name": "PaTodo - Emulador local (API Express)",
+    "description": "Flujos de prueba contra la API REST local (Express, puerto 3000) usando los emuladores de Firebase (auth 9099, firestore 8081).\n\nRequisitos: emuladores corriendo (npx firebase emulators:start --only auth,firestore) y la API en api/ (npm start con CORS_ORIGINS y puerto 3000).\n\nOrden recomendado:\n1. 'Registrar usuario (signUp)' crea la cuenta en Auth (emulador).\n2. 'Crear perfil (POST /createUser)' guarda uid en la variable {{uid}}.\n3. 'Publicar trabajo' con el token del cliente.\n4. 'Crear oferta' con el token del trabajador.\n5. 'acceptOffer' → completa el job y crea la reseña (completeJob, createReview).\n\nLa API valida el header Authorization: Bearer {{idToken}}. Los endpoints /createUser, /acceptOffer, /completeJob, /cancelJob, /createReview y /computeRoute son exclusivos de la API (antes Cloud Functions); jobs y offers se escriben directo a Firestore REST porque las reglas validan la propiedad (clientId/workerId == tu uid).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "authURL", "value": "http://127.0.0.1:9099" },
     { "key": "fsURL", "value": "http://127.0.0.1:8081/v1/projects/pa-todo/databases/(default)/documents" },
-    { "key": "fnURL", "value": "http://127.0.0.1:5001/pa-todo/us-central1" },
+    { "key": "apiURL", "value": "http://127.0.0.1:3000" },
     { "key": "idToken", "value": "" },
     { "key": "uid", "value": "" },
     { "key": "jobId", "value": "" },
@@ -18,7 +18,7 @@
       "name": "1. Usuarios",
       "item": [
         {
-          "name": "Crear usuario (createUser)",
+          "name": "Registrar usuario (signUp Auth)",
           "event": [
             {
               "listen": "test",
@@ -26,8 +26,9 @@
                 "type": "text/javascript",
                 "exec": [
                   "const res = pm.response.json();",
-                  "pm.collectionVariables.set('uid', res.uid);",
-                  "console.log('uid guardado:', res.uid);"
+                  "pm.collectionVariables.set('idToken', res.idToken);",
+                  "pm.collectionVariables.set('uid', res.localId);",
+                  "console.log('idToken y uid guardados:', res.localId);"
                 ]
               }
             }
@@ -37,9 +38,42 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"usuario@test.com\",\n  \"password\": \"test1234\",\n  \"displayName\": \"Usuario de Prueba\",\n  \"role\": \"client\"\n}"
+              "raw": "{\n  \"email\": \"cliente@test.com\",\n  \"password\": \"test1234\",\n  \"returnSecureToken\": true\n}"
             },
-            "url": { "raw": "{{fnURL}}/createUser", "host": ["{{fnURL}}"], "path": ["createUser"] }
+            "url": {
+              "raw": "{{authURL}}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake",
+              "host": ["{{authURL}}"],
+              "path": ["identitytoolkit.googleapis.com", "v1", "accounts:signUp"],
+              "query": [{ "key": "key", "value": "fake" }]
+            }
+          }
+        },
+        {
+          "name": "Crear perfil (POST /createUser)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.collectionVariables.set('uid', res.uid || pm.collectionVariables.get('uid'));",
+                  "console.log('Perfil creado para uid:', res.uid);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"uid\": \"{{uid}}\",\n  \"email\": \"cliente@test.com\",\n  \"role\": \"client\",\n  \"profile\": {\n    \"firstName\": \"Carlos\",\n    \"lastName\": \"Cliente\"\n  },\n  \"contact\": {\n    \"phone\": \"+502 5555-0001\"\n  }\n}"
+            },
+            "url": { "raw": "{{apiURL}}/createUser", "host": ["{{apiURL}}"], "path": ["createUser"] }
           }
         },
         {
@@ -64,7 +98,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"usuario@test.com\",\n  \"password\": \"test1234\",\n  \"returnSecureToken\": true\n}"
+              "raw": "{\n  \"email\": \"cliente@test.com\",\n  \"password\": \"test1234\",\n  \"returnSecureToken\": true\n}"
             },
             "url": {
               "raw": "{{authURL}}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake",
@@ -80,7 +114,7 @@
       "name": "2. Publicar trabajo (Firestore REST)",
       "item": [
         {
-          "name": "Publicar trabajo",
+          "name": "Publicar trabajo (token cliente)",
           "event": [
             {
               "listen": "test",
@@ -112,7 +146,42 @@
       ]
     },
     {
-      "name": "3. Cloud Functions",
+      "name": "3. Crear oferta (Firestore REST)",
+      "item": [
+        {
+          "name": "Crear oferta (token trabajador)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.name) {",
+                  "  pm.collectionVariables.set('offerId', res.name.split('/').pop());",
+                  "  console.log('offerId guardado:', res.name.split('/').pop());",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": {\n    \"jobId\": { \"stringValue\": \"{{jobId}}\" },\n    \"workerId\": { \"stringValue\": \"{{uid}}\" },\n    \"workerSnapshot\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"name\": { \"stringValue\": \"Juan Worker\" },\n          \"rating\": { \"doubleValue\": 4.5 },\n          \"completedJobs\": { \"integerValue\": \"8\" }\n        }\n      }\n    },\n    \"price\": { \"integerValue\": \"45\" },\n    \"currency\": { \"stringValue\": \"GTQ\" },\n    \"estimatedTime\": { \"integerValue\": \"30\" },\n    \"message\": { \"stringValue\": \"Incluyo materiales\" },\n    \"status\": { \"stringValue\": \"pending\" }\n  }\n}"
+            },
+            "url": { "raw": "{{fsURL}}/offers", "host": ["{{fsURL}}"], "path": ["offers"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. API REST (transacciones)",
       "item": [
         {
           "name": "acceptOffer",
@@ -126,7 +195,7 @@
               "mode": "raw",
               "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"offerId\": \"{{offerId}}\"\n}"
             },
-            "url": { "raw": "{{fnURL}}/acceptOffer", "host": ["{{fnURL}}"], "path": ["acceptOffer"] }
+            "url": { "raw": "{{apiURL}}/acceptOffer", "host": ["{{apiURL}}"], "path": ["acceptOffer"] }
           }
         },
         {
@@ -138,7 +207,7 @@
               { "key": "Authorization", "value": "Bearer {{idToken}}" }
             ],
             "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\"\n}" },
-            "url": { "raw": "{{fnURL}}/computeRoute", "host": ["{{fnURL}}"], "path": ["computeRoute"] }
+            "url": { "raw": "{{apiURL}}/computeRoute", "host": ["{{apiURL}}"], "path": ["computeRoute"] }
           }
         },
         {
@@ -150,7 +219,7 @@
               { "key": "Authorization", "value": "Bearer {{idToken}}" }
             ],
             "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\"\n}" },
-            "url": { "raw": "{{fnURL}}/completeJob", "host": ["{{fnURL}}"], "path": ["completeJob"] }
+            "url": { "raw": "{{apiURL}}/completeJob", "host": ["{{apiURL}}"], "path": ["completeJob"] }
           }
         },
         {
@@ -162,7 +231,7 @@
               { "key": "Authorization", "value": "Bearer {{idToken}}" }
             ],
             "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"reason\": \"Ya no lo necesito\"\n}" },
-            "url": { "raw": "{{fnURL}}/cancelJob", "host": ["{{fnURL}}"], "path": ["cancelJob"] }
+            "url": { "raw": "{{apiURL}}/cancelJob", "host": ["{{apiURL}}"], "path": ["cancelJob"] }
           }
         },
         {
@@ -174,13 +243,13 @@
               { "key": "Authorization", "value": "Bearer {{idToken}}" }
             ],
             "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"rating\": 5,\n  \"comment\": \"Excelente servicio\"\n}" },
-            "url": { "raw": "{{fnURL}}/createReview", "host": ["{{fnURL}}"], "path": ["createReview"] }
+            "url": { "raw": "{{apiURL}}/createReview", "host": ["{{apiURL}}"], "path": ["createReview"] }
           }
         }
       ]
     },
     {
-      "name": "4. Consultar datos (Firestore REST)",
+      "name": "5. Consultar datos (Firestore REST)",
       "item": [
         {
           "name": "Leer un trabajo",
@@ -191,19 +260,11 @@
           }
         },
         {
-          "name": "Listar mis trabajos",
+          "name": "Leer un usuario",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{idToken}}" }],
-            "url": {
-              "raw": "{{fsURL}}:runQuery",
-              "host": ["{{fsURL}}"],
-              "path": [":runQuery"]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"structuredQuery\": {\n    \"from\": [ { \"collectionId\": \"jobs\" } ],\n    \"where\": {\n      \"fieldFilter\": {\n        \"field\": { \"fieldPath\": \"clientId\" },\n        \"op\": \"EQUAL\",\n        \"value\": { \"stringValue\": \"{{uid}}\" }\n      }\n    }\n  }\n}"
-            }
+            "url": { "raw": "{{fsURL}}/users/{{uid}}", "host": ["{{fsURL}}"], "path": ["users", "{{uid}}"] }
           }
         }
       ]
