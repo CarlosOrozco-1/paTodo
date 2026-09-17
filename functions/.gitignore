@@ -8,3 +8,8 @@ typings/
 # Node.js dependency directory
 node_modules/
 *.local
+
+# exclusiones de api express
+api/.env
+api/dist/
+api/node_modules/
