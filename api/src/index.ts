@@ -9,7 +9,27 @@ import userRouter from "./routes/user";
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    // Política de CORS por allowlist.
+    // - Sin header Origin (curl, Postman, BFF) -> se permite.
+    // - Origin en la lista -> se permite y se devuelve Access-Control-Allow-Origin.
+    // - Origin fuera de la lista -> callback(null, false): NO es un error del
+    //   servidor, es una política de seguridad. El middleware simplemente no
+    //   agrega headers CORS y el navegador bloquea la respuesta del origen no permitido.
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      return callback(null, allowedOrigins.includes(origin));
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 // Health check.
