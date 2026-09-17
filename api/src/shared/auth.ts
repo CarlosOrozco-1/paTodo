@@ -1,5 +1,6 @@
 import { Request } from "express";
 import { auth } from "./admin";
+import { httpError } from "./errors";
 
 /**
  * Verifica el ID token enviado en el header Authorization: Bearer <token>.
@@ -10,21 +11,18 @@ export async function requireAuth(request: Request): Promise<string> {
   const authHeader = request.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    const error: any = new Error("Falta el token de autenticación.");
-    error.status = 401;
-    error.code = "unauthenticated";
-    throw error;
+    throw httpError(401, "unauthenticated", "Falta el token de autenticación.");
   }
 
   const idToken = authHeader.split("Bearer ")[1];
+  if (!idToken) {
+    throw httpError(401, "unauthenticated", "Falta el token de autenticación.");
+  }
 
   try {
     const decoded = await auth.verifyIdToken(idToken);
     return decoded.uid;
-  } catch (err) {
-    const error: any = new Error("Token inválido o expirado.");
-    error.status = 401;
-    error.code = "unauthenticated";
-    throw error;
+  } catch (error) {
+    throw httpError(401, "unauthenticated", "Token inválido o expirado.");
   }
 }
