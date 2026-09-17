@@ -3,7 +3,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue, GeoPoint } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 
-initializeApp({ projectId: "pa-todo" });
+initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID ?? "pa-todo" });
 
 const db = getFirestore();
 const auth = getAuth();
@@ -49,6 +49,10 @@ async function main(): Promise<void> {
 
   const clientUid = clientRecord.uid;
   const workerUid = workerRecord.uid;
+
+  console.log("🔑 Asignando Custom Claims de rol...");
+  await auth.setCustomUserClaims(clientUid, { role: "client" });
+  await auth.setCustomUserClaims(workerUid, { role: "worker" });
 
   console.log("📚 Creando catálogos...");
   const skillRef = db.collection("skills").doc();
@@ -105,7 +109,7 @@ async function main(): Promise<void> {
       cancelledJobs: 1,
       responseTimeMin: 15,
     },
-    availability: { isOnline: true },
+    availability: { isOnline: true, workingHours: [], serviceArea: null },
     vehicleIds: [],
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),

@@ -1,24 +1,32 @@
 openapi: 3.0.0
 info:
-  title: PaTodo - Cloud Functions HTTP
+  title: PaTodo API REST
   description: |
-    Documentación de las Cloud Functions HTTP de PaTodo.
+    API REST transaccional de PaTodo (Express + TypeScript, desplegada en Render).
 
-    La mayoría de operaciones (lectura, escritura simple, autenticación) se realizan
-    directamente desde los clientes React y Flutter usando los SDKs de Firebase
-    (Firebase Auth, Cloud Firestore). Este documento solo describe las operaciones
-    críticas expuestas como Cloud Functions HTTP, que requieren lógica de servidor
-    (transacciones, notificaciones, cálculos externos).
+    La mayoría de operaciones (lecturas, escrituras simples, autenticación) se
+    realizan directamente desde los clientes React y Flutter con los SDKs de
+    Firebase (Firebase Auth y Cloud Firestore). Este documento describe
+    únicamente las operaciones **críticas** expuestas por la API, que requieren
+    lógica de servidor (transacciones, notificaciones, cálculos externos).
 
-    Autenticación: Firebase Auth gestiona los tokens. Las Cloud Functions verifican
-    el ID token enviado en el header Authorization: Bearer <idToken>.
-  version: 0.2.0
+    Autenticación: Firebase Auth emite el ID token. Todos los endpoints, salvo
+    `GET /` (health check), exigen el header
+    `Authorization: Bearer <idToken>`; la API lo verifica con el Admin SDK.
+
+    Roles: cada usuario tiene un rol (`client`, `worker` o `both`) que se guarda
+    en su documento de `users` y como **Custom Claim** `role` en Firebase Auth.
+    Las reglas de seguridad de Firestore (`firestore.rules`) usan ese claim para
+    autorizar las escrituras directas del cliente.
+  version: 0.3.0
 servers:
-  - url: https://us-central1-pa-todo.cloudfunctions.net
-    description: Cloud Functions en producción
-  - url: http://localhost:5001/pa-todo/us-central1
-    description: Emulador local de Cloud Functions
+  - url: https://patodo.onrender.com
+    description: Producción (Render)
+  - url: http://127.0.0.1:3000
+    description: Desarrollo local
 tags:
+  - name: system
+    description: Estado del servicio
   - name: users
     description: Registro y gestión de usuarios
   - name: jobs
@@ -29,19 +37,117 @@ tags:
     description: Creación de reseñas y actualización de reputación
   - name: routes
     description: Cálculo y almacenamiento de rutas
-  - name: notifications
-    description: Envío de notificaciones push
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Firebase ID token
+  schemas:
+    Error:
+      type: object
+      description: Formato uniforme de error de la API.
+      properties:
+        error:
+          type: string
+          description: Mensaje legible del error.
+        code:
+          type: string
+          description: Código estable para que el cliente lo trate programáticamente.
+          enum:
+            - invalid-argument
+            - unauthenticated
+            - permission-denied
+            - not-found
+            - already-exists
+            - failed-precondition
+            - resource-exhausted
+            - unavailable
+            - internal
+      required: [error, code]
+  responses:
+    Unauthenticated:
+      description: Falta el token o es inválido/expirado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    PermissionDenied:
+      description: El usuario autenticado no tiene permisos sobre el recurso.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: El recurso no existe.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InvalidArgument:
+      description: Datos inválidos o faltantes en la solicitud.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    FailedPrecondition:
+      description: El recurso no está en el estado requerido para la operación.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ResourceExhausted:
+      description: Se superó el límite de solicitudes (rate limit).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+security:
+  - bearerAuth: []
 
 paths:
+  # ===================== SISTEMA =====================
+  /:
+    get:
+      tags: [system]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: El servicio está arriba.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: patodo-api
+
   # ===================== USUARIOS =====================
   /createUser:
     post:
       tags: [users]
-      summary: Registrar un nuevo usuario
+      summary: Crear el perfil del usuario
       description: |
-        Crea el usuario en Firebase Auth, asigna el rol inicial como Custom Claim
-        y crea su documento en la colección `users`.
-        El rol por defecto es `client`. No requiere autenticación.
+        Crea el documento del usuario en la colección `users` y asigna su rol
+        como Custom Claim.
+
+        El flujo es: el cliente registra la cuenta con Firebase Auth (SDK o
+        REST), obtiene el `idToken` y luego llama a este endpoint con su `uid`.
+
+        Reglas:
+        - `uid` y `email` del body deben coincidir con los del token.
+        - El documento no debe existir previamente.
+
+        **Importante:** el Custom Claim viaja en el token, así que el cliente
+        debe refrescar su sesión (`getIdToken(true)` o volver a iniciar sesión)
+        antes de escribir en Firestore, porque las reglas exigen el claim `role`.
       requestBody:
         required: true
         content:
@@ -49,49 +155,93 @@ paths:
             schema:
               type: object
               properties:
+                uid:
+                  type: string
+                  description: UID de Firebase Auth del usuario autenticado.
                 email:
                   type: string
                   format: email
-                password:
-                  type: string
-                  minLength: 6
-                displayName:
-                  type: string
+                  description: Debe coincidir con el correo de la cuenta de Auth.
                 role:
                   type: string
                   enum: [client, worker, both]
-                  default: client
-              required: [email, password]
+                profile:
+                  type: object
+                  properties:
+                    firstName:
+                      type: string
+                    lastName:
+                      type: string
+                    avatarUrl:
+                      type: string
+                      nullable: true
+                    bio:
+                      type: string
+                    gender:
+                      type: string
+                      nullable: true
+                    birthdate:
+                      type: string
+                      nullable: true
+                  required: [firstName, lastName]
+                contact:
+                  type: object
+                  properties:
+                    phone:
+                      type: string
+                    alternatePhone:
+                      type: string
+                      nullable: true
+                    address:
+                      type: object
+                      nullable: true
+                      properties:
+                        street:
+                          type: string
+                        city:
+                          type: string
+                        zip:
+                          type: string
+                  required: [phone]
+              required: [uid, email, role, profile, contact]
       responses:
         '201':
-          description: Usuario creado
+          description: Perfil creado (incluye el `id`, que es el uid).
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  uid:
-                    type: string
-                  email:
-                    type: string
-                  role:
-                    type: string
+                allOf:
+                  - $ref: './schemas/user.json'
+                  - type: object
+                    properties:
+                      id:
+                        type: string
         '400':
-          description: Datos inválidos (falta email/password, password corto)
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
         '409':
-          description: El correo ya está registrado
+          description: El usuario ya tiene un perfil creado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
-  # ===================== TRABAJOS =====================
+  # ===================== OFERTAS =====================
   /acceptOffer:
     post:
       tags: [offers]
-      summary: Aceptar una oferta (Cloud Function transaccional)
+      summary: Aceptar una oferta (transaccional)
       description: |
         Acepta una oferta específica para un trabajo. En una sola transacción:
-        - Actualiza el trabajo a estado accepted y asigna workerId y acceptedOfferId.
-        - Marca la oferta aceptada como accepted y las demás como rejected.
+        - Actualiza el trabajo a estado `accepted` y asigna `workerId` y `acceptedOfferId`.
+        - Marca la oferta aceptada como `accepted` y las demás como `rejected`.
         - Crea la conversación entre cliente y trabajador.
         - Envía notificaciones push al trabajador y a los demás oferentes.
+
+        Solo el cliente dueño del trabajo puede aceptar ofertas.
       requestBody:
         required: true
         content:
@@ -106,25 +256,32 @@ paths:
               required: [jobId, offerId]
       responses:
         '200':
-          description: Oferta aceptada, trabajo actualizado
+          description: Oferta aceptada, trabajo actualizado.
           content:
             application/json:
               schema:
                 $ref: './schemas/job.json'
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
         '403':
-          description: El usuario no es el cliente dueño del trabajo
+          $ref: '#/components/responses/PermissionDenied'
         '404':
-          description: Trabajo u oferta no encontrados
-        '409':
-          description: El trabajo ya no está en estado pending
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/FailedPrecondition'
 
+  # ===================== TRABAJOS =====================
   /cancelJob:
     post:
       tags: [jobs]
       summary: Cancelar un trabajo
       description: |
-        Cancela un trabajo y todas sus ofertas pendientes. Notifica a los
-        trabajadores que habían ofertado.
+        Cancela un trabajo y rechaza todas sus ofertas pendientes, cierra la
+        conversación activa (si la hay) y notifica a los trabajadores
+        involucrados. Solo el cliente dueño puede cancelar y el trabajo no puede
+        estar `completed` ni `in_progress`.
       requestBody:
         required: true
         content:
@@ -139,15 +296,31 @@ paths:
               required: [jobId]
       responses:
         '200':
-          description: Trabajo cancelado
+          description: Trabajo cancelado.
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/job.json'
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/FailedPrecondition'
 
   /completeJob:
     post:
       tags: [jobs]
       summary: Marcar un trabajo como completado
       description: |
-        El trabajador o cliente marca el trabajo como completado. Actualiza el
-        estado, cierra la conversación y habilita las reseñas.
+        El cliente o el trabajador asignado marca el trabajo como `completed`.
+        Actualiza la fecha de completado, cierra la conversación, incrementa
+        `stats.completedJobs` del trabajador, apaga su `availability.isOnline` y
+        notifica a la otra parte. Habilita las reseñas.
       requestBody:
         required: true
         content:
@@ -160,7 +333,21 @@ paths:
               required: [jobId]
       responses:
         '200':
-          description: Trabajo completado
+          description: Trabajo completado.
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/job.json'
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/FailedPrecondition'
 
   # ===================== RESEÑAS =====================
   /createReview:
@@ -168,22 +355,49 @@ paths:
       tags: [reviews]
       summary: Crear una reseña y actualizar reputación
       description: |
-        Crea una reseña y actualiza en una transacción:
-        - El documento de reviews.
-        - El promedio de rating y ratingCount del usuario calificado.
+        Crea una reseña (una por trabajo y por autor) y actualiza el promedio de
+        reputación del usuario calificado en una sola transacción. El trabajo
+        debe estar `completed` y el autor debe ser el cliente o el trabajador del
+        trabajo. Notifica al usuario calificado.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: './schemas/review.json'
+              type: object
+              properties:
+                jobId:
+                  type: string
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                comment:
+                  type: string
+              required: [jobId, rating]
       responses:
         '201':
-          description: Reseña creada y reputación actualizada
+          description: Reseña creada y reputación actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/review.json'
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
         '403':
-          description: No autorizado para calificar este trabajo
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '409':
-          description: Ya existe una reseña para este trabajo por este usuario
+          description: Ya existe una reseña de este usuario para este trabajo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '412':
+          $ref: '#/components/responses/FailedPrecondition'
 
   # ===================== RUTAS =====================
   /computeRoute:
@@ -191,8 +405,10 @@ paths:
       tags: [routes]
       summary: Calcular y almacenar la ruta de un trabajo
       description: |
-        Calcula la ruta entre el trabajador y el lugar del trabajo usando OSRM,
-        y guarda la geometría como campo `route` dentro del documento del job.
+        Calcula la ruta entre la ubicación del trabajador asignado y el lugar del
+        trabajo usando OSRM, y la guarda como campo `route` dentro del documento
+        del job. Solo el cliente o el trabajador del trabajo pueden solicitarla,
+        y el trabajo ya debe tener trabajador y ubicaciones registradas.
       requestBody:
         required: true
         content:
@@ -205,18 +421,40 @@ paths:
               required: [jobId]
       responses:
         '200':
-          description: Ruta calculada y almacenada
+          description: Ruta calculada y almacenada.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  distance:
-                    type: number
-                    description: Distancia en metros
-                  duration:
-                    type: number
-                    description: Duración en segundos
                   geometry:
                     type: object
-                    description: GeoJSON LineString con las coordenadas
+                    description: GeoJSON LineString con las coordenadas.
+                  distance:
+                    type: number
+                    description: Distancia en metros.
+                  duration:
+                    type: number
+                    description: Duración en segundos.
+                  source:
+                    type: string
+                    example: osrm
+                  computedAt:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/FailedPrecondition'
+        '503':
+          description: El servicio de rutas (OSRM) no está disponible o está saturado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

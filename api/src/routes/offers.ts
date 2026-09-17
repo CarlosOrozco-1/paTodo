@@ -3,7 +3,7 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { db } from "../shared/admin";
 import { requireAuth } from "../shared/auth";
 import { httpError, handleError } from "../shared/errors";
-import { createAndSendNotification } from "../shared/notifications";
+import { sendNotificationSafely } from "../shared/notifications";
 
 export const offersRouter = Router();
 
@@ -155,8 +155,9 @@ offersRouter.post("/acceptOffer", async (request, response) => {
       });
     });
 
-    // Notificaciones fuera de la transacción.
-    await createAndSendNotification({
+    // Notificaciones fuera de la transacción (tolerantes a fallos: el estado
+    // del job y de las ofertas ya quedó confirmado).
+    await sendNotificationSafely({
       userId: workerId,
       type: "offer_accepted",
       title: "¡Tu oferta fue aceptada!",
@@ -165,7 +166,7 @@ offersRouter.post("/acceptOffer", async (request, response) => {
     });
 
     const rejectionPromises = otherOffersData.map((offer) =>
-      createAndSendNotification({
+      sendNotificationSafely({
         userId: offer.workerId,
         type: "offer_rejected",
         title: "Oferta no seleccionada",

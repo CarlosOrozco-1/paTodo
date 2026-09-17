@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../shared/admin";
 import { requireAuth } from "../shared/auth";
 import { httpError, handleError } from "../shared/errors";
-import { createAndSendNotification } from "../shared/notifications";
+import { sendNotificationSafely } from "../shared/notifications";
 
 export const reviewsRouter = Router();
 
@@ -36,6 +36,7 @@ reviewsRouter.post("/createReview", async (request, response) => {
 
     let revieweeId = "";
     let jobTitle = "";
+    let reviewId = "";
 
     await db.runTransaction(async (transaction) => {
       // ============ LECTURAS ============
@@ -95,6 +96,7 @@ reviewsRouter.post("/createReview", async (request, response) => {
 
       // ============ ESCRITURAS ============
       const reviewRef = reviewsRef.doc();
+      reviewId = reviewRef.id;
       transaction.set(reviewRef, {
         jobId: body.jobId,
         reviewerId: uid,
@@ -111,7 +113,7 @@ reviewsRouter.post("/createReview", async (request, response) => {
       });
     });
 
-    await createAndSendNotification({
+    await sendNotificationSafely({
       userId: revieweeId,
       type: "new_review",
       title: "Nueva reseña recibida",
@@ -119,18 +121,10 @@ reviewsRouter.post("/createReview", async (request, response) => {
       data: { jobId: body.jobId },
     });
 
-    const reviewsSnapshot = await reviewsRef
-      .where("jobId", "==", body.jobId)
-      .where("reviewerId", "==", uid)
-      .limit(1)
-      .get();
-
-if (reviewsSnapshot.empty) {
-    throw httpError(500, "internal", "La reseña no se pudo recuperar.");
-  }
-
-  const createdReview = reviewsSnapshot.docs[0]!;
-  response.status(201).json({ id: createdReview.id, ...createdReview.data() });
+    // La reseña ya existe: se lee por id (no por query) para incluir el
+    // createdAt resuelto por el servidor.
+    const createdReview = await reviewsRef.doc(reviewId).get();
+    response.status(201).json({ id: createdReview.id, ...createdReview.data() });
   } catch (error) {
     handleError(error, response);
   }

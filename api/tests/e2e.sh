@@ -21,9 +21,14 @@ signup_or_signin() {
   if echo "$R" | grep -q '"idToken"'; then
     echo "$R" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['idToken'],d['localId'])"
   else
-    R=$(curl -s -X POST "$AUTH/accounts:signInWithPassword?key=fake" -H "Content-Type: application/json" --data "{\"email\":\"$1\",\"password\":\"$PASS\",\"returnSecureToken\":true}")
-    echo "$R" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['idToken'],d['localId'])"
+    signin "$1"
   fi
+}
+
+# Vuelve a iniciar sesión para obtener un idToken con los Custom Claims al día.
+signin() {
+  R=$(curl -s -X POST "$AUTH/accounts:signInWithPassword?key=fake" -H "Content-Type: application/json" --data "{\"email\":\"$1\",\"password\":\"$PASS\",\"returnSecureToken\":true}")
+  echo "$R" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['idToken'],d['localId'])"
 }
 
 echo "=== 1/9 REGISTRO DE USUARIOS (Auth + POST /createUser) ==="
@@ -36,6 +41,12 @@ CODE=$(curl -s -o /tmp/r1.json -w "%{http_code}" -X POST "$API/createUser" -H "C
 if [ "$CODE" = "201" ]; then echo "  PASS createUser cliente (201)"; else echo "  FAIL createUser cliente: $CODE $(cat /tmp/r1.json)"; FAIL=1; fi
 CODE=$(curl -s -o /tmp/r1.json -w "%{http_code}" -X POST "$API/createUser" -H "Content-Type: application/json" -H "Authorization: Bearer $WT" --data @/tmp/bw.json)
 if [ "$CODE" = "201" ]; then echo "  PASS createUser trabajador (201)"; else echo "  FAIL createUser trabajador: $CODE $(cat /tmp/r1.json)"; FAIL=1; fi
+
+# /createUser asigna el rol como Custom Claim, pero viaja en el token: hay que
+# refrescar la sesión para que las reglas de Firestore lo vean.
+echo "  Refrescando tokens (Custom Claim role)..."
+read CT CU <<<"$(signin "$EMAIL_C")"
+read WT WU <<<"$(signin "$EMAIL_W")"
 
 echo "=== 2/9 CREAR JOB (Firestore REST, token cliente) ==="
 python3 - "$CU" > /tmp/job.json <<'PY'

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { FieldValue } from "firebase-admin/firestore";
-import { db } from "../shared/admin";
-import { requireAuth } from "../shared/auth";
+import { auth, db } from "../shared/admin";
+import { getAuthenticatedUser } from "../shared/auth";
 import { httpError, handleError } from "../shared/errors";
 
 const router = Router();
@@ -37,13 +37,18 @@ interface CreateUserBody {
  *
  * Reglas:
  * - El UID del body debe coincidir con el UID del token (no se puede crear perfil a nombre de otro).
+ * - El correo del body debe coincidir con el de la cuenta autenticada.
  * - El documento no debe existir previamente.
  * - Solo se crea una vez por usuario.
+ *
+ * Además asigna el rol como Custom Claim (`role`), que es lo que consultan las
+ * reglas de Firestore. El cliente debe refrescar su ID token (getIdToken(true))
+ * después de esta llamada para que el claim llegue al nuevo token.
  */
 router.post("/createUser", async (req, res) => {
   try {
     // 1. Autenticación: el token debe pertenecer al usuario que crea su perfil.
-    const authenticatedUid = await requireAuth(req);
+    const authenticated = await getAuthenticatedUser(req);
 
     const body = req.body as CreateUserBody;
 
@@ -52,8 +57,18 @@ router.post("/createUser", async (req, res) => {
       throw httpError(400, "invalid-argument", "Faltan campos obligatorios: uid, email, role, profile, contact.");
     }
 
-    if (body.uid !== authenticatedUid) {
+    if (body.uid !== authenticated.uid) {
       throw httpError(403, "permission-denied", "El UID enviado no coincide con el usuario autenticado.");
+    }
+
+    // El correo es el de la cuenta de Auth, no uno arbitrario del body.
+    // Auth normaliza los correos a minúsculas, así que se compara sin distinguir mayúsculas.
+    const tokenEmail = authenticated.email?.trim();
+    if (
+      !tokenEmail ||
+      body.email.trim().toLowerCase() !== tokenEmail.toLowerCase()
+    ) {
+      throw httpError(400, "invalid-argument", "El correo enviado no coincide con el de la cuenta autenticada.");
     }
 
     if (!["client", "worker", "both"].includes(body.role)) {
@@ -79,7 +94,7 @@ router.post("/createUser", async (req, res) => {
     // 4. Construir el documento.
     const userDoc: Record<string, unknown> = {
       uid: body.uid,
-      email: body.email,
+      email: tokenEmail,
       role: body.role,
       profile: {
         firstName: body.profile.firstName,
@@ -118,6 +133,9 @@ router.post("/createUser", async (req, res) => {
 
     // 6. Crear el documento.
     await userRef.set(userDoc);
+
+    // 7. Publicar el rol como Custom Claim (lo usan firestore.rules y el cliente).
+    await auth.setCustomUserClaims(body.uid, { role: body.role });
 
     const created = await userRef.get();
     res.status(201).json({

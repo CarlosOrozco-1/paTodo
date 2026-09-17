@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../shared/admin";
 import { requireAuth } from "../shared/auth";
 import { httpError, handleError } from "../shared/errors";
-import { createAndSendNotification } from "../shared/notifications";
+import { sendNotificationSafely } from "../shared/notifications";
 
 export const jobsRouter = Router();
 
@@ -99,7 +99,7 @@ jobsRouter.post("/cancelJob", async (request, response) => {
 
     await Promise.all(
       rejectedOffers.map((offer) =>
-        createAndSendNotification({
+        sendNotificationSafely({
           userId: offer.workerId,
           type: "offer_rejected",
           title: "Trabajo cancelado",
@@ -116,7 +116,7 @@ jobsRouter.post("/cancelJob", async (request, response) => {
       if (conversationIdToClose) {
         data.conversationId = conversationIdToClose;
       }
-      await createAndSendNotification({
+      await sendNotificationSafely({
         userId: assignedWorkerId,
         type: "job_cancelled",
         title: "Trabajo cancelado",
@@ -210,7 +210,7 @@ jobsRouter.post("/completeJob", async (request, response) => {
       otherPartyId = uid === clientId ? workerId : clientId;
     });
 
-    await createAndSendNotification({
+    await sendNotificationSafely({
       userId: otherPartyId,
       type: "job_completed",
       title: "Trabajo completado",

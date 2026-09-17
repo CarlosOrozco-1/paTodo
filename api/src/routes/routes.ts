@@ -6,7 +6,8 @@ import { httpError, handleError } from "../shared/errors";
 
 export const routesRouter = Router();
 
-const OSRM_BASE_URL = "http://router.project-osrm.org/route/v1/driving";
+const OSRM_BASE_URL =
+  process.env.OSRM_BASE_URL ?? "https://router.project-osrm.org/route/v1/driving";
 
 interface OsrmResponse {
   code: string;
@@ -73,22 +74,30 @@ routesRouter.post("/computeRoute", async (request, response) => {
     const coordinates = `${workerLocation.longitude},${workerLocation.latitude};${jobLocation.longitude},${jobLocation.latitude}`;
     const osrmUrl = `${OSRM_BASE_URL}/${coordinates}?overview=full&geometries=geojson`;
 
-    const osrmResponse = await fetch(osrmUrl);
+    const osrmResponse = await fetch(osrmUrl).catch(() => null);
+
+    if (!osrmResponse) {
+      throw httpError(503, "unavailable", "No se pudo contactar al servicio de rutas (OSRM).");
+    }
+
+    if (osrmResponse.status === 429) {
+      throw httpError(503, "unavailable", "El servicio de rutas está saturado. Intenta de nuevo más tarde.");
+    }
 
     if (!osrmResponse.ok) {
-      throw httpError(500, "internal", `Error al consultar OSRM (${osrmResponse.status}).`);
+      throw httpError(502, "unavailable", `Error al consultar OSRM (${osrmResponse.status}).`);
     }
 
     const osrmData = (await osrmResponse.json()) as OsrmResponse;
 
     if (osrmData.code !== "Ok" || osrmData.routes.length === 0) {
-      throw httpError(500, "internal", "OSRM no pudo calcular la ruta.");
+      throw httpError(502, "unavailable", "OSRM no pudo calcular la ruta.");
     }
 
     const route = osrmData.routes[0];
 
     if (!route) {
-      throw httpError(500, "internal", "OSRM no pudo calcular la ruta.");
+      throw httpError(502, "unavailable", "OSRM no pudo calcular la ruta.");
     }
 
     // Firestore no admite arrays anidados. Convertimos pares [lng, lat]

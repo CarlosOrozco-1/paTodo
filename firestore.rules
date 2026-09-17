@@ -2,126 +2,184 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Colección users
+    // ===================== Helpers =====================
+
+    // Usuario autenticado.
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // El usuario tiene uno de los roles indicados.
+    // El rol vive en el Custom Claim `role` del ID token (lo asigna POST /createUser).
+    // Se usa get() con valor por defecto para denegar limpiamente cuando el token
+    // aún no trae el claim (en vez de fallar al leer una propiedad inexistente).
+    function hasRole(roles) {
+      return signedIn() && request.auth.token.get('role', '') in roles;
+    }
+
+    // El documento de entrada no excede 128 KiB (protección DoS).
+    function smallEnough() {
+      return request.resource.data.size() <= 131072;
+    }
+
+    // ===================== users =====================
     match /users/{userId} {
       // Solo el propio usuario autenticado puede leer su documento.
-      allow read: if request.auth != null && request.auth.uid == userId;
+      allow read: if signedIn() && request.auth.uid == userId;
 
-      // Solo el propio usuario puede actualizar su documento.
-      allow update: if request.auth != null && request.auth.uid == userId;
+      // El usuario puede editar su perfil/contacto/ubicación/dispositivos, pero
+      // nunca campos que controla la API: uid, email, role, stats, createdAt.
+      allow update: if signedIn()
+                    && request.auth.uid == userId
+                    && smallEnough()
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['profile', 'contact', 'location', 'fcmTokens',
+                                  'skills', 'vehicleIds', 'availability', 'updatedAt']);
 
-      // La creación y eliminación se manejan desde Cloud Functions.
+      // La creación y eliminación se manejan desde la API.
       allow create, delete: if false;
     }
 
-    // Colección jobs
+    // ===================== jobs =====================
     match /jobs/{jobId} {
       // Cualquier usuario autenticado puede leer los trabajos.
-      allow read: if request.auth != null;
+      allow read: if signedIn();
 
-      // Solo un cliente autenticado puede crear un trabajo, asignándose como dueño.
-      allow create: if request.auth != null
-                    && request.resource.data.clientId == request.auth.uid;
+      // Solo un cliente (role client/both) puede publicar un trabajo,
+      // asignándose como dueño. Nace siempre en estado pending.
+      allow create: if hasRole(['client', 'both'])
+                    && smallEnough()
+                    && request.resource.data.clientId == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.keys().hasAll(['clientId', 'details', 'location', 'pricing', 'status']);
 
-      // Solo el cliente dueño puede actualizar o eliminar su trabajo.
-      allow update, delete: if request.auth != null
-                            && resource.data.clientId == request.auth.uid;
+      // El cliente dueño solo puede editar el contenido de su publicación.
+      // Los cambios de ciclo de vida (status, workerId, acceptedOfferId, route,
+      // completedAt, cancelReason) los hace la API: /acceptOffer, /cancelJob y
+      // /completeJob. Así el cliente no puede autocompletar ni autocancelar un
+      // trabajo saltándose las transacciones.
+      allow update: if signedIn()
+                    && smallEnough()
+                    && resource.data.clientId == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['details', 'pricing', 'location', 'updatedAt']);
+
+      // Solo se elimina un trabajo propio que siga pendiente (sin trabajador
+      // asignado ni ofertas aceptadas). Para el resto se usa /cancelJob.
+      allow delete: if signedIn()
+                    && resource.data.clientId == request.auth.uid
+                    && resource.data.status == 'pending';
     }
 
-    // Colección offers
+    // ===================== offers =====================
     match /offers/{offerId} {
       // El trabajador que creó la oferta puede leerla.
       // El cliente dueño del trabajo también puede leer las ofertas de ese trabajo.
-      allow read: if request.auth != null
+      allow read: if signedIn()
                   && (resource.data.workerId == request.auth.uid
                       || get(/databases/$(database)/documents/jobs/$(resource.data.jobId)).data.clientId == request.auth.uid);
 
-      // Un trabajador autenticado puede crear una oferta, asignándose como dueño.
-      allow create: if request.auth != null
-                    && request.resource.data.workerId == request.auth.uid;
+      // Solo un trabajador (role worker/both) puede ofertar un trabajo ajeno que
+      // siga pendiente. Nace siempre en estado pending y con los campos mínimos.
+      allow create: if hasRole(['worker', 'both'])
+                    && smallEnough()
+                    && request.resource.data.workerId == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.keys().hasAll(['jobId', 'workerId', 'price', 'estimatedTime', 'status'])
+                    && get(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)).data.clientId != request.auth.uid
+                    && get(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)).data.status == 'pending';
 
-      // Solo el trabajador que creó la oferta puede actualizarla (por ejemplo, retirarla).
-      allow update: if request.auth != null
-                    && resource.data.workerId == request.auth.uid;
+      // El trabajador dueño puede ajustar su propuesta o retirarla
+      // (pending -> withdrawn). No puede auto-aceptarse la oferta (eso lo hace
+      // el cliente vía /acceptOffer) ni cambiar a qué trabajo pertenece.
+      allow update: if signedIn()
+                    && smallEnough()
+                    && resource.data.workerId == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['price', 'message', 'estimatedTime', 'currency', 'status', 'updatedAt'])
+                    && (request.resource.data.status == resource.data.status
+                        || (resource.data.status == 'pending'
+                            && request.resource.data.status == 'withdrawn'));
 
-      // Eliminar ofertas solo desde Cloud Functions.
+      // Eliminar ofertas solo desde la API.
       allow delete: if false;
     }
 
-    // Colección skills
+    // ===================== skills =====================
     match /skills/{skillId} {
       // Cualquiera puede leer el catálogo de habilidades.
       allow read: if true;
 
-      // La escritura se maneja desde Cloud Functions.
+      // La escritura se maneja desde la API.
       allow write: if false;
     }
 
-    // Colección categories
+    // ===================== categories =====================
     match /categories/{categoryId} {
       // Cualquiera puede leer el catálogo de categorías.
       allow read: if true;
 
-      // La escritura se maneja desde Cloud Functions.
+      // La escritura se maneja desde la API.
       allow write: if false;
     }
 
-    // Colección vehicles
+    // ===================== vehicles =====================
     match /vehicles/{vehicleId} {
       // Cualquier usuario autenticado puede leer los vehículos.
-      allow read: if request.auth != null;
+      allow read: if signedIn();
 
       // Solo el trabajador dueño puede crear un vehículo, asignándose como ownerId.
-      allow create: if request.auth != null
+      allow create: if hasRole(['worker', 'both'])
+                    && smallEnough()
                     && request.resource.data.ownerId == request.auth.uid;
 
       // Solo el dueño puede actualizar o eliminar su vehículo.
-      allow update, delete: if request.auth != null
+      allow update, delete: if signedIn()
+                            && smallEnough()
                             && resource.data.ownerId == request.auth.uid;
     }
 
-    // Colección reviews
+    // ===================== reviews =====================
     match /reviews/{reviewId} {
       // Cualquier usuario autenticado puede leer las reseñas.
-      allow read: if request.auth != null;
+      allow read: if signedIn();
 
-      // Solo el autor autenticado puede crear una reseña, asignándose como reviewerId.
-      allow create: if request.auth != null
-                    && request.resource.data.reviewerId == request.auth.uid;
-
-      // Las reseñas no se modifican ni eliminan desde el cliente.
-      allow update, delete: if false;
+      // Las reseñas son transaccionales: solo se crean desde la API (POST /createReview),
+      // que valida autor, trabajo completado, 1 reseña por trabajo y recalcula stats.
+      allow create, update, delete: if false;
     }
 
-    // Colección notifications
+    // ===================== notifications =====================
     match /notifications/{notificationId} {
       // Solo el usuario destinatario puede leer sus notificaciones.
-      allow read: if request.auth != null
-                  && resource.data.userId == request.auth.uid;
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
 
-      // Las notificaciones se crean desde Cloud Functions.
-      allow create: if false;
+      // Los destinatarios solo pueden marcarlas como leídas (readAt/updatedAt).
+      allow update: if signedIn()
+                    && resource.data.userId == request.auth.uid
+                    && smallEnough()
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['readAt', 'updatedAt']);
 
-      // Solo el destinatario puede marcarlas como leídas (actualizar).
-      allow update: if request.auth != null
-                    && resource.data.userId == request.auth.uid;
-
-      // No se eliminan desde el cliente.
-      allow delete: if false;
+      // Las notificaciones se crean desde la API.
+      allow create, delete: if false;
     }
 
-    // Colección conversations
+    // ===================== conversations =====================
     match /conversations/{conversationId} {
       // Solo los participantes de la conversación pueden leerla.
-      allow read: if request.auth != null
-                  && request.auth.uid in resource.data.participants;
+      allow read: if signedIn() && request.auth.uid in resource.data.participants;
 
-      // La conversación se crea desde Cloud Functions al aceptar una oferta.
+      // La conversación se crea desde la API al aceptar una oferta.
       allow create: if false;
 
-      // Solo los participantes pueden actualizar (por ejemplo, lastMessage, lastReadAt).
-      allow update: if request.auth != null
-                    && request.auth.uid in resource.data.participants;
+      // Los participantes solo pueden tocar lastMessage/lastReadAt; la identidad,
+      // el estado y el snapshot los controla la API.
+      allow update: if signedIn()
+                    && request.auth.uid in resource.data.participants
+                    && smallEnough()
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['lastMessage', 'lastReadAt', 'updatedAt']);
 
       // No se eliminan desde el cliente.
       allow delete: if false;
@@ -129,11 +187,12 @@ service cloud.firestore {
       // Subcolección messages
       match /messages/{messageId} {
         // Solo los participantes de la conversación pueden leer los mensajes.
-        allow read: if request.auth != null
+        allow read: if signedIn()
                     && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
 
         // Solo los participantes pueden crear mensajes, asignándose como senderId.
-        allow create: if request.auth != null
+        allow create: if signedIn()
+                      && smallEnough()
                       && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
                       && request.resource.data.senderId == request.auth.uid;
 

@@ -83,3 +83,24 @@ export async function createAndSendNotification(
 
   return notificationRef.id;
 }
+
+/**
+ * Variante tolerante a fallos para usar DESPUÉS de confirmar una transacción.
+ *
+ * La notificación es un efecto secundario: si Firestore o FCM fallan, el estado
+ * del trabajo/oferta ya quedó guardado. Devolver 500 haría que el cliente crea
+ * que la operación falló y reintente, duplicando efectos. Por eso aquí solo se
+ * registra el error en logs.
+ */
+export async function sendNotificationSafely(
+  payload: NotificationPayload
+): Promise<void> {
+  try {
+    await createAndSendNotification(payload);
+  } catch (error) {
+    console.error(
+      `No se pudo crear/enviar la notificación (${payload.type} -> ${payload.userId}):`,
+      error
+    );
+  }
+}
