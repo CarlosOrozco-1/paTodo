@@ -78,24 +78,28 @@ En la terminal de Fedora:
 ```bash
 npm install -g firebase-tools
 firebase --version
+```
 
-## Importante: desplegar reglas antes de conectar frontends
+---
+
+## Paso 5: Desplegar reglas e índices antes de conectar frontends
 
 Las reglas de `firestore.rules` están definidas en el repositorio pero **no se aplican automáticamente**. Los frontends (React y Flutter) usan el SDK cliente, que **sí respeta las reglas**. Si no se despliegan, Firestore seguirá con las reglas anteriores (probablemente bloqueando todo).
 
-Antes de conectar los frontends, el backend lead debe ejecutar:
-
 ```bash
-firebase deploy --only firestore:rules
+firebase deploy --only firestore:rules,firestore:indexes
+```
 
 ---
 
 ## Verificación final
 
-Después de aplicar los cambios:
+1. Levanta los emuladores y la API: `npx firebase emulators:start --only auth,firestore` y `cd api && npm start` (ver `docs/ejecucion.md`).
+2. Comprueba el health check: `curl http://127.0.0.1:3000/` -> `{"status":"ok","service":"patodo-api"}`.
+3. Ejecuta la prueba E2E del flujo completo: `cd api && bash tests/e2e.sh`.
 
-1. Ejecuta `npm run build` en `functions/` para confirmar que todo compila.
-2. Verifica que no queden referencias a `sendNotification` en ningún archivo (`grep -r "sendNotification" functions/src/`).
-3. Confirma que `index.ts` solo exporta las 5 funciones (`acceptOffer`, `cancelJob`, `completeJob`, `createReview`, `computeRoute`).
+> **Nota:** la lógica de servidor **no** vive en Cloud Functions. El backend transaccional es la API
+> Express en `api/` (desplegada en Render). El código heredado de Cloud Functions quedó archivado en
+> `docs/functions-legacy/` y no debe desplegarse (`firebase deploy --only functions`).
 
-Cuando termines, avísame para levantar los emuladores y probar.
+

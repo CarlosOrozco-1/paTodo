@@ -1,14 +1,14 @@
 {
   "info": {
     "name": "PaTodo - Producción (API Render)",
-    "description": "Flujos de prueba contra la API REST en producción (https://patodo.onrender.com) usando Firebase (Auth, Firestore) reales.\n\nRequisitos:\n1. La API debe estar desplegada en Render con FIREBASE_SERVICE_ACCOUNT (Service Account en base64) y CORS_ORIGINS.\n2. Rellena la variable {{apiKey}}: Firebase Console -> Configuración del proyecto -> Tus apps -> SDK web -> apiKey (no es secreta).\n3. Usa correos distintos para cliente y trabajador ({{idToken}} guarda UN solo usuario por vez; cambia el correo en signUp para el otro rol).\n\nOrden recomendado:\n1. 'Registrar usuario (signUp Auth)' -> guarda {{idToken}} y {{uid}}.\n2. 'Crear perfil (POST /createUser)' con el uid del token.\n3. 'Publicar trabajo' con token de cliente.\n4. 'Crear oferta' con token de trabajador.\n5. 'acceptOffer' con token de cliente -> 'completeJob' -> 'createReview'.\n\nNota: los endpoints /createUser, /acceptOffer, /completeJob, /cancelJob, /createReview y /computeRoute los ejecuta la API con credenciales de administrador (reglas de Firestore no bloquean). jobs y offers se escriben directo a Firestore REST porque las reglas validan que clientId/workerId == tu uid. CORS no bloquea a Postman (no envía Origin).",
+    "description": "Flujos de prueba contra la API REST en producción (https://patodo.onrender.com) usando Firebase (Auth, Firestore) reales.\n\nRequisitos:\n1. La API debe estar desplegada en Render con FIREBASE_SERVICE_ACCOUNT (Service Account en base64) y CORS_ORIGINS.\n2. Rellena la variable {{apiKey}}: Firebase Console -> Configuración del proyecto -> Tus apps -> SDK web -> apiKey (no es secreta).\n3. Usa correos distintos para cliente y trabajador ({{idToken}} guarda UN solo usuario por vez; cambia el correo en signUp para el otro rol).\n\nOrden recomendado:\n1. 'Registrar usuario (signUp Auth)' -> guarda {{idToken}} y {{uid}}.\n2. 'Crear perfil (POST /createUser)' con el uid del token (asigna el Custom Claim `role`).\n3. 'Refrescar token (Custom Claim role)' -> OBLIGATORIO antes de escribir en Firestore: el claim solo viaja en tokens nuevos.\n4. 'Publicar trabajo' con token de cliente.\n5. Repite 1-3 con el correo del trabajador (role worker) y ejecuta 'Crear oferta'.\n6. Refresca el token del cliente y ejecuta 'acceptOffer' -> 'completeJob' -> 'createReview'.\n\nNota: los endpoints /createUser, /acceptOffer, /completeJob, /cancelJob, /createReview y /computeRoute los ejecuta la API con credenciales de administrador (reglas de Firestore no bloquean). jobs y offers se escriben directo a Firestore REST: las reglas exigen que clientId/workerId sea tu uid, que el rol del token sea client/worker/both y que el trabajo esté en pending. CORS no bloquea a Postman (no envía Origin).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "apiURL", "value": "https://patodo.onrender.com" },
     { "key": "authURL", "value": "https://identitytoolkit.googleapis.com" },
     { "key": "fsURL", "value": "https://firestore.googleapis.com/v1/projects/pa-todo/databases/(default)/documents" },
-    { "key": "apiKey", "value": "" },
+    { "key": "apiKey", "value": "AIzaSyBm2-3lFSDowZxcG_I3jmm-Ua2MqECZwKw" },
     { "key": "idToken", "value": "" },
     { "key": "uid", "value": "" },
     { "key": "jobId", "value": "" },
@@ -80,7 +80,7 @@
           }
         },
         {
-          "name": "Iniciar sesión (obtener idToken)",
+          "name": "Refrescar token (Custom Claim role)",
           "event": [
             {
               "listen": "test",

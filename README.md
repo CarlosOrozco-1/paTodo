@@ -14,7 +14,7 @@ Piensa en nosotros como un "InDrive" pero para servicios generales, del hogar y 
 
 ## 🛠 Stack tecnológico
 
-- **Backend:** Firebase (Firestore, Auth, Cloud Functions) — sin servidor propio
+- **Backend:** Firebase gestionado (Firestore, Auth, FCM, Realtime Database) + API REST transaccional (Express + TypeScript, en `api/`, desplegada en Render)
 - **Web:** React + Vite + TypeScript
 - **Móvil:** Flutter (Android & iOS)
 
@@ -22,9 +22,9 @@ Piensa en nosotros como un "InDrive" pero para servicios generales, del hogar y 
 
 ```
 .
-├── docs/                    # Documentación (arquitectura, plan de desarrollo)
+├── docs/                    # Documentación (arquitectura, plan de desarrollo, functions-legacy archivado)
 ├── spec/                    # OpenAPI + JSON Schemas (fuente de verdad de datos)
-├── functions/               # Cloud Functions (Node.js)
+├── api/                     # API REST transaccional (Express + TypeScript)
 ├── frontend-web/            # App web React (Vite + TypeScript)
 ├── frontend-mobile/         # App móvil Flutter
 ├── firestore.rules          # Reglas de seguridad de Firestore

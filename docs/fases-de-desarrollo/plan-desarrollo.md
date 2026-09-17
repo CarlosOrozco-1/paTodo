@@ -4,15 +4,16 @@
 
 Plataforma de servicios bajo demanda que conecta a clientes con trabajadores cercanos, permitiendo publicar trabajos, recibir ofertas y negociar precios. Similar a InDrive, pero orientado a servicios domésticos y de emergencia (plomería, mecánica, jardinería, etc.).
 
-**Tecnologías principales:**
-- Backend: **Spring Boot 3.5.16 (Java 25)** — sin Lombok (incompatible con Java 25)
-- Base de datos: **MongoDB (Atlas)** con Spring Data MongoDB
-- Tiempo real: **Spring WebSocket (STOMP over WebSocket)**
-- API Docs: **SpringDoc OpenAPI 3 (Swagger UI)**
+**Tecnologías principales:** *(actualizadas a la arquitectura vigente; ver `docs/arquitectura.md`)*
+- Backend gestionado: **Firebase** (Auth, Firestore, FCM, Realtime Database, Storage)
+- API transaccional: **Express 5 + TypeScript** (`api/`), desplegada en **Render**
+- Autenticación: **Firebase Authentication** (Email/Password); la API verifica el ID token con el Admin SDK
+- Autorización: **`firestore.rules`** para las escrituras directas del cliente
+- Tiempo real: **listeners de Firestore** + **Realtime Database** para el historial de ubicaciones
+- API Docs: **OpenAPI 3** en `spec/openapi.yaml` (sin Swagger UI)
 - App móvil: **Flutter** (Android & iOS nativo)
 - App web: **React 18 + Vite + TypeScript**
-- Servidor: **Oracle Cloud Free (6 GB RAM)**
-- Build: **Gradle (Kotlin DSL)**
+- Build: **npm + `tsc`** (API), **Vite** (web), **Flutter** (móvil)
 
 ---
 
@@ -29,17 +30,16 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 ### Herramientas
 - OpenAPI 3.0 (API REST) - `spec/openapi.yaml`
 - JSON Schema (modelos de datos) - `spec/schemas/*.json`
-- SpringDoc OpenAPI (Swagger UI automático en `/swagger-ui.html`)
-- openapi-generator (cliente React TypeScript + cliente Flutter/Dart)
-- Gradle (build backend)
+- openapi-generator (cliente React TypeScript + cliente Flutter/Dart) — opcional
+- npm + TypeScript (`tsc`) para construir la API (`api/`)
 
 ---
 
 ## 3. Fases de Desarrollo
 
 ### Fase 0: Estructura del Repositorio ✅
-- [x] Crear monorepo con carpetas `backend`, `frontend` (flutter + react), `spec`, `docs`.
-- [x] Inicializar backend Spring Boot con Gradle.
+- [x] Crear monorepo con carpetas `api`, `frontend-web`, `frontend-mobile`, `spec`, `docs`.
+- [x] Inicializar el backend (originalmente Spring Boot; migrado después a Firebase + API Express en `api/`).
 - [x] Crear proyecto Flutter con `flutter create`.
 - [x] Crear proyecto React con `npm create vite@latest frontend-web -- --template react-ts`.
 - [x] Configurar `.gitignore` global.
@@ -49,12 +49,13 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 ---
 
 ### Fase 1: Especificación de Modelos de Datos (JSON Schemas) ✅
-- [x] Definir cada colección de MongoDB en `spec/schemas/*.json`.
-- [x] Colecciones: `users`, `vehicles`, `categories`, `skills`, `jobs`, `offers`, `messages`, `reviews`, `job_routes`, `location_history`, `notifications`, `conversations`.
+- [x] Definir cada colección de Firestore en `spec/schemas/*.json`.
+- [x] Colecciones: `users`, `vehicles`, `categories`, `skills`, `jobs`, `offers`, `conversations` (+ subcolección `messages`), `reviews`, `notifications`.
+  - *Nota:* `job_routes` y `location_history` quedaron sin uso: la ruta se guarda en el campo `jobs.route` y el historial de ubicaciones vive en Firebase Realtime Database, no en Firestore.
 - [x] Incluir subdocumentos y validaciones (tipos, obligatorios, rangos).
-- [x] **Cambios recientes:** Separado catálogo maestro `skills`; `users`, `categories`, `jobs` referencian `ObjectId` de `skills`; añadidos campos UI a `categories` (`icon`, `color`, `description`, `isActive`, `sortOrder`, `parentId`, `imageUrl`); nuevos campos en `message`, `location_history`, `job_route`, `offer`, `review`, `vehicle`.
+- [x] **Cambios recientes:** Separado catálogo maestro `skills`; `users`, `categories`, `jobs` referencian los IDs de `skills`; añadidos campos UI a `categories` (`icon`, `color`, `description`, `isActive`, `sortOrder`, `parentId`, `imageUrl`); nuevos campos en `message`, `offer`, `review`, `vehicle`.
 
-**Entregable:** Archivos JSON Schema completos (12 schemas).
+**Entregable:** Archivos JSON Schema completos (un schema por colección).
 
 ---
 
@@ -62,72 +63,63 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 - [x] Definir todos los endpoints REST en `spec/openapi.yaml`.
 - [x] Referenciar los JSON Schemas mediante `$ref`.
 - [x] Incluir descripciones, parámetros y respuestas.
-- [x] Agregar autenticación Bearer (JWT).
+- [x] Agregar autenticación Bearer (ID token de Firebase Auth).
 - [x] Actualizado referencia `category.json` → `categories.json`.
 
 **Entregable:** `spec/openapi.yaml` validado.
 
 ---
 
-### Fase 3: Configuración de MongoDB Atlas ✅
-- [x] Crear cluster gratuito en MongoDB Atlas.
-- [x] Configurar usuario y contraseña.
-- [x] Obtener URI de conexión.
-- [x] Guardar credenciales en `backend/src/main/resources/application.yaml` (no versionar secrets).
-- [x] **Migración completada:** Colecciones actualizadas con nuevos schemas, índices creados, `skills` poblado, `conversations` creado desde `messages`.
+### Fase 3: Configuración de Firebase (Firestore, Auth y emuladores) ✅
+- [x] Crear el proyecto `pa-todo` en Firebase Console (ver `docs/firebase-setup.md`).
+- [x] Habilitar Firebase Authentication (Email/Password).
+- [x] Crear la base de Firestore `(default)`, edición Standard, región `nam5`.
+- [x] Guardar el service account como secreto (`FIREBASE_SERVICE_ACCOUNT`), nunca versionado.
+- [x] **Migración completada:** colecciones actualizadas con nuevos schemas, índices creados, `skills` poblado, `conversations` creado desde `messages`.
 
-**Entregable:** Conexión lista y datos migrados.
+**Entregable:** Proyecto Firebase configurado, con reglas e índices listos.
 
 ---
 
-### Fase 4: Backend Base (Spring Boot 3) ✅
-- [x] Configurar `build.gradle.kts` con dependencias:
-  - `spring-boot-starter-web`
-  - `spring-boot-starter-data-mongodb`
-  - `spring-boot-starter-security`
-  - `spring-boot-starter-validation`
-  - `spring-boot-starter-websocket` (STOMP)
-  - `springdoc-openapi-starter-webmvc-ui`
-  - `jjwt-api`, `jjwt-impl`, `jjwt-jackson` (JWT)
-  - `bcrypt` (password encoding). **Nota:** Lombok fue eliminado (Java 25 no compatible); se usa Java plano.
-- [x] Configurar `application.yaml`:
-  - MongoDB Atlas URI
-  - JWT secret, expiration
-  - Server port, servlet context-path
-  - WebSocket broker config
-- [x] Implementar modelos de dominio (Document classes) basados en JSON Schemas
-- [x] Crear repositorios `MongoRepository` por colección
-- [x] Configurar Security: JWT filter, AuthenticationManager, PasswordEncoder, UserDetailsService
-- [x] Implementar AuthController: registro, login
-- [x] Configurar CORS global para React + Flutter
-- [x] Configurar manejo global de excepciones (`@ControllerAdvice`)
+### Fase 4: Backend Base (API Express + Firebase Admin) ✅
+- [x] Configurar `api/package.json` con las dependencias reales:
+  - `express` (5.x)
+  - `cors`
+  - `dotenv`
+  - `firebase-admin`
+  - dev: `typescript`, `ts-node`
+- [x] Inicializar el Admin SDK (`api/src/shared/admin.ts`) con `FIREBASE_SERVICE_ACCOUNT` (base64) y detección automática de emuladores en local.
+- [x] Configurar variables de entorno en `api/.env` (`CORS_ORIGINS`, `PORT`, emuladores). **Nota:** ya no existe `application.yaml`.
+- [x] Modelar los documentos de Firestore según los JSON Schemas de `spec/schemas/` (sin capa de repositorios: el Admin SDK accede directo).
+- [x] Implementar la verificación del ID token (`requireAuth`) y el manejo centralizado de errores (`{ error, code }`).
+- [x] Implementar el health check `GET /` y `POST /createUser`. El registro/login lo gestiona el SDK de Firebase Auth en el cliente.
+- [x] Configurar CORS por allowlist (`CORS_ORIGINS`) para React + Flutter.
 
-**Entregable:** API base con endpoints de autenticación funcionando + Swagger UI en `/swagger-ui.html`. Docs de ejecución: `docs/ejecucion.md`. Arquitectura (modular monolith): `docs/arquitectura.md`.
+**Entregable:** API base funcionando (health check + `POST /createUser`). Docs de ejecución: `docs/ejecucion.md`. Arquitectura: `docs/arquitectura.md`.
 
 ---
 
 ### Fase 5: Implementación de Endpoints REST ✅
-- [x] Implementar cada endpoint definido en el YAML usando controladores Spring MVC
-- [x] Usar DTOs (Request/Response) mapeados desde/hacia entidades
-- [x] Validación con `@Valid` + Bean Validation (JSR-380)
-- [x] Asegurar que las respuestas coincidan con los schemas OpenAPI
-- [x] Manejar errores y códigos de estado consistentes (`ProblemDetail` RFC 7807)
-- [x] Endpoints: Auth, Users, Categories/Skills, Jobs, Offers, Messages, Reviews, Routes, Locations, Notifications
-- [ ] Paginación con `Pageable` + `PagedModel` (Spring HATEOAS)
+- [x] Implementar cada endpoint definido en el YAML como ruta de Express en `api/src/routes/`.
+- [x] Validar el body y los permisos en cada ruta (propiedad del recurso y estado del trabajo).
+- [x] Asegurar que las respuestas coincidan con los schemas OpenAPI.
+- [x] Manejar errores y códigos de estado consistentes (`{ error, code }`).
+- [x] Endpoints de la API: `createUser`, `acceptOffer`, `cancelJob`, `completeJob`, `createReview`, `computeRoute`.
+- [x] El resto de operaciones (Auth, Users, Categories/Skills, Jobs, Offers, Messages, Notifications) se hace con los **SDKs de Firebase** desde el cliente, no con endpoints REST.
+- [ ] Paginación de lecturas en los frontends (consultas de Firestore con `limit`/`startAfter`).
 
 **Entregable:** API REST completa y funcional.
 
 ---
 
-### Fase 6: Tiempo Real (Spring WebSocket + STOMP) ✅
-- [x] Configurar `WebSocketMessageBrokerConfigurer` (SimpleBroker + ApplicationDestinationPrefixes)
-- [x] Definir destinos: `/topic/jobs.{jobId}`, `/topic/offers.{jobId}`, `/user/{userId}/notifications`, `/topic/chat.{jobId}`, `/topic/location.{jobId}`
-- [x] Autenticar handshake WebSocket con JWT (HandshakeInterceptor)
-- [x] Crear `@MessageMapping` handlers para: chat, location updates, job status
-- [x] Integrar con servicios para emitir eventos via `SimpMessagingTemplate`
-- [x] Manejar suscripciones por `jobId` y `userId`
+### Fase 6: Tiempo Real (listeners de Firestore + Realtime Database) ✅
+- [x] Sincronización en tiempo real con listeners de Firestore (`onSnapshot` en web, streams en Flutter).
+- [x] Chat en la subcolección `conversations/{conversationId}/messages`, con escritura directa del cliente autorizada por `firestore.rules`.
+- [x] Historial de ubicaciones en Firebase Realtime Database.
+- [x] Notificaciones: documentos en `notifications` + push por FCM con `firebase-admin/messaging`.
+- [x] Autorización de cada escritura resuelta por `firestore.rules` (sin broker ni handshake propio).
 
-**Entregable:** Comunicación en tiempo real operativa (STOMP over WebSocket).
+**Entregable:** Comunicación en tiempo real operativa (listeners de Firestore + Realtime Database).
 
 ---
 
@@ -137,7 +129,7 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 - [ ] Configurar Zustand/Redux Toolkit para estado global
 - [ ] Implementar autenticación (login, register, token refresh, protected routes)
 - [ ] Pantallas: Dashboard, Job List/Map, Job Detail, Create Job, My Offers, Chat, Profile, Notifications
-- [ ] Consumir WebSocket STOMP con `@stomp/stompjs` + `sockjs-client`
+- [ ] Consumir actualizaciones en tiempo real con los SDKs de Firebase (`firebase/firestore` `onSnapshot`, `firebase/auth`)
 - [ ] Mapas con `react-leaflet` + OpenStreetMap (gratis) o Google Maps
 - [ ] Responsive design (mobile-first) con Tailwind CSS
 
@@ -150,7 +142,7 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 - [ ] Configurar Flutter + Riverpod/BLoC para estado
 - [ ] Implementar autenticación (secure storage para tokens)
 - [ ] Pantallas equivalentes a React: Dashboard, Jobs, Offers, Chat, Tracking, Profile
-- [ ] Consumir WebSocket STOMP con `stomp_dart_client`
+- [ ] Consumir actualizaciones en tiempo real con `cloud_firestore` y `firebase_auth`
 - [ ] Mapas con `flutter_map` + OpenStreetMap o `google_maps_flutter`
 - [ ] Permisos ubicación (Android/iOS), background location updates
 - [ ] Push notifications con Firebase Cloud Messaging (FCM)
@@ -162,8 +154,8 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 ### Fase 9: Geolocalización y Mapas (Compartido)
 - [ ] Obtener ubicación del dispositivo (permission handling)
 - [ ] Mostrar mapas (OpenStreetMap via Leaflet/flutter_map)
-- [ ] Enviar y recibir actualizaciones de ubicación mediante WebSockets (STOMP)
-- [ ] Almacenar rutas en `job_routes` para reutilización
+- [ ] Enviar y recibir actualizaciones de ubicación mediante Realtime Database + listeners de Firestore
+- [ ] Guardar la ruta calculada en el campo `jobs.route`
 - [ ] Cálculo de rutas (OSRM self-hosted / GraphHopper / Google Directions API)
 
 **Entregable:** Seguimiento en tiempo real y visualización de rutas en ambas apps.
@@ -171,28 +163,26 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 ---
 
 ### Fase 10: Pruebas y Calidad
-- [ ] Pruebas unitarias: JUnit 5 + Mockito (services, mappers, utils)
-- [ ] Pruebas de integración: `@SpringBootTest` + Testcontainers (MongoDB)
-- [ ] Pruebas de contrato: validar API contra OpenAPI (SpringDoc + assertj)
-- [ ] Pruebas WebSocket: `WebSocketTestClient`
+- [ ] Pruebas E2E de la API + emuladores: `api/tests/e2e.sh`
+- [ ] Pruebas por endpoint de la API (validación de body, permisos y estados)
+- [ ] Pruebas de contrato: validar la API contra `spec/openapi.yaml`
+- [ ] Pruebas de `firestore.rules` con el emulador de Firestore
 - [ ] Frontend React: Vitest + React Testing Library + MSW
 - [ ] Frontend Flutter: `flutter_test` + `integration_test`
-- [ ] Linting: Checkstyle/SpotBugs (backend), ESLint (React), `flutter analyze` (Flutter)
-- [ ] CI/CD: GitHub Actions (build, test, docker)
+- [ ] Linting: ESLint + `tsc` (API y web), `flutter analyze` (Flutter)
+- [ ] CI/CD: GitHub Actions (build, test, deploy)
 
 **Entregable:** Reporte de pruebas y cobertura >80%.
 
 ---
 
 ### Fase 11: Despliegue
-- [ ] Dockerfile multi-stage para backend (JRE 17 slim)
-- [ ] Docker Compose para local (backend + mongo + osrm opcional)
-- [ ] Desplegar backend en Oracle Cloud (systemd + Nginx reverse proxy)
-- [ ] Servir frontend React (build estático) con Nginx
-- [ ] Configurar HTTPS (Let's Encrypt / Certbot auto-renewal)
+- [x] Desplegar la API Express en Render (plan gratuito): `https://patodo.onrender.com`
+- [ ] Servir el frontend web (build estático de Vite) con Firebase Hosting
+- [x] Desplegar `firestore.rules` e índices con `firebase deploy`
 - [ ] Publicar app Android (Play Store) y iOS (App Store / TestFlight)
-- [ ] Configurar variables de entorno de producción (GitHub Secrets / Vault)
-- [ ] Backup automatizado MongoDB Atlas + monitoring (Grafana/Prometheus opcional)
+- [ ] Configurar variables de entorno de producción (`FIREBASE_SERVICE_ACCOUNT`, `CORS_ORIGINS`, `PORT`)
+- [ ] Backup/exportación de Firestore + monitoring
 
 **Entregable:** Sistema accesible públicamente en producción.
 
@@ -203,25 +193,25 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 | Persona | Rol principal | Responsabilidades |
 |---------|---------------|-------------------|
 | P1 | Líder / Backend | Coordinación, arquitectura, auth, CI/CD, security |
-| P2 | Backend / Data | Modelos, repositorios, endpoints jobs/offers, índices MongoDB |
-| P3 | Backend / Real-time | WebSocket STOMP, notificaciones, chat, location tracking |
-| P4 | Frontend React | Web app UI/UX, consumo API, mapas, WebSocket client |
-| P5 | Frontend Flutter | Mobile app UI/UX, consumo API, mapas, FCM, background location |
+| P2 | Backend / Data | Documentos de Firestore, endpoints de la API (jobs/offers), índices de Firestore |
+| P3 | Backend / Real-time | Listeners de Firestore y Realtime Database, notificaciones, chat, location tracking |
+| P4 | Frontend React | Web app UI/UX, SDKs de Firebase y consumo de la API, mapas |
+| P5 | Frontend Flutter | Mobile app UI/UX, SDKs de Firebase y consumo de la API, mapas, FCM, background location |
 | P6 | QA / DevOps | Pruebas, documentación, despliegue, monitoreo, performance |
 
 ---
 
 ## 5. Seguridad
 
-- **Contraseñas**: hash con BCrypt (Spring Security `BCryptPasswordEncoder`, strength=12).
-- **Autenticación**: JWT (access token 15min, refresh token 7d, rotation + blacklist).
-- **Autorización**: `@PreAuthorize` + roles (CLIENT, WORKER, BOTH) + ownership checks.
-- **HTTPS**: obligatorio en producción (Nginx TLS termination).
-- **Validación**: Bean Validation (JSR-380) en DTOs + JSON Schema validation opcional.
-- **CORS**: configurado estricto para dominios React/Flutter conocidos.
-- **Rate limiting**: Bucket4j en auth y endpoints públicos.
-- **Sanitización**: inputs en chat y campos libres (OWASP Java HTML Sanitizer).
-- **Headers de seguridad**: Spring Security headers (HSTS, CSP, X-Frame-Options).
+- **Contraseñas**: gestionadas por Firebase Authentication (hash propio de la plataforma).
+- **Autenticación**: ID tokens de Firebase Auth; la API los verifica con el Admin SDK (`Authorization: Bearer <idToken>`).
+- **Autorización**: `firestore.rules` para las escrituras directas del cliente; en la API, verificación de propiedad (`clientId`, `workerId`, `reviewerId`) y del estado del trabajo.
+- **HTTPS**: obligatorio en producción (Render y Firebase sirven por HTTPS).
+- **Validación**: validación explícita del body en cada ruta de la API + JSON Schemas en `spec/schemas/`.
+- **CORS**: allowlist por `CORS_ORIGINS` para los dominios React/Flutter conocidos.
+- **Rate limiting**: pendiente (a nivel de servicio/edge, no en la aplicación).
+- **Sanitización**: inputs en campos libres (chat) y límites de tamaño en las reglas.
+- **Secrets**: service account solo por variable de entorno (`FIREBASE_SERVICE_ACCOUNT`), nunca versionado.
 
 ---
 
@@ -230,9 +220,9 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 | Semana | Fase(s) |
 |--------|---------|
 | 1-2    | Fase 0-2 (estructura, schemas, OpenAPI) ✅ |
-| 3      | Fase 3-4 (Atlas, backend base Spring Boot, auth) 🔄 |
+| 3      | Fase 3-4 (Firebase, backend base: API Express, auth) 🔄 |
 | 4-5    | Fase 5 (endpoints REST) |
-| 6      | Fase 6 (WebSocket STOMP) ✅ |
+| 6      | Fase 6 (tiempo real: Firestore + Realtime Database) ✅ |
 | 7-8    | Fase 7 (React Web) |
 | 9-10   | Fase 8 (Flutter Mobile) |
 | 11     | Fase 9 (Geolocalización + Mapas) |
@@ -243,15 +233,15 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 
 ## 7. Criterios de Aceptación (MVP)
 
-- [ ] Usuario puede registrarse e iniciar sesión (JWT access + refresh).
+- [ ] Usuario puede registrarse e iniciar sesión (Firebase Auth, Email/Password).
 - [ ] Cliente publica trabajo con categoría, skills, ubicación y precio.
-- [ ] Trabajadores cercanos reciben notificación en tiempo real (STOMP WebSocket).
+- [ ] Trabajadores cercanos reciben notificación en tiempo real (FCM + `notifications`).
 - [ ] Trabajadores envían ofertas y cliente las acepta/rechaza.
-- [ ] Chat entre cliente y trabajador asignado (persistido en MongoDB).
-- [ ] Seguimiento en tiempo real de ubicaciones (worker → job via STOMP).
+- [ ] Chat entre cliente y trabajador asignado (persistido en Firestore, `conversations.messages`).
+- [ ] Seguimiento en tiempo real de ubicaciones (worker → job vía Realtime Database).
 - [ ] Al finalizar, ambos se califican (reviews con aspects).
-- [ ] React Web y Flutter Mobile comparten la misma API sin duplicar lógica.
-- [ ] Documentación OpenAPI disponible en `/swagger-ui.html` y `/v3/api-docs`.
+- [ ] React Web y Flutter Mobile comparten la misma especificación y los SDKs de Firebase sin duplicar lógica.
+- [ ] Documentación de los endpoints de la API disponible en `spec/openapi.yaml`.
 
 ---
 
@@ -268,11 +258,13 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 | `messages` | ✅ Migrado | +`conversationId`, `type`, `metadata`, `readAt`, `replyTo` |
 | `conversations` | ✅ Nueva | 1 por job, `participantIds`, `unreadCount`, `lastMessage` |
 | `reviews` | ✅ Actualizado | +`aspects`, `isPublic`, `response` |
-| `job_routes` | ✅ Actualizado | +`polyline`, `waypoints[]` |
-| `location_history` | ✅ Migado | Renombrada, `jobId` nullable, +GPS fields, TTL 30d |
 | `notifications` | ✅ Nueva | Vacía, validador + índices |
 
-**Índices creados** en `spec/indexes.json` (2dsphere, compound, unique, TTL).
+> **Nota:** las filas de `job_routes` y `location_history` correspondían al diseño con MongoDB y
+> quedaron fuera de uso. Hoy la ruta vive en el campo `jobs.route` y el historial de ubicaciones en
+> Firebase Realtime Database (no en Firestore).
+
+**Índices creados** en `firestore.indexes.json` (compuestos y de colección).
 
 ---
 

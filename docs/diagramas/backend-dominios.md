@@ -1,153 +1,147 @@
-# Diagramas del Backend — Dominios y Conexiones
+# Diagramas de PaTodo — Componentes y Conexiones
 
-Documento de apoyo para explicar el **monolito modular** del backend (`PaTodo/backend`).
-Complementa a [`docs/arquitectura.md`](../arquitectura.md), que define las reglas; aquí se
-visualiza **qué dominios existen y cómo se conectan entre sí**.
+Documento de apoyo para explicar la arquitectura real del proyecto: **Firebase gestionado**
+(Auth, Firestore, FCM, Realtime Database) más una **API REST transaccional** en Express
+(`api/`). Complementa a [`docs/arquitectura.md`](../arquitectura.md), que define las reglas;
+aquí se visualiza **qué componentes existen y cómo se conectan entre sí**.
 
 > Los diagramas están en formato [Mermaid](https://mermaid.js.org/). Zed y GitHub los renderizan
-> automáticamente al abrir este archivo. La convención es **flecha sólida = dependencia de negocio**
-> y **flecha punteada = dependencia a `common` o cruce irregular**.
+> automáticamente al abrir este archivo. La convención es **flecha sólida = llamada real** y
+> **flecha punteada = relación de lectura/escritura indirecta**.
 
 ---
 
-## 1. Dominios y sus colecciones
+## 1. Vista general
 
-| Módulo | Colecciones (MongoDB Atlas, base `paTodo`) | Servicios principales |
-|---|---|---|
-| `user` | `users`, `vehicles` | `AuthService`, `UserService`, `VehicleService` |
-| `job` | `jobs`, `offers`, `job_routes`, `location_history` | `JobService`, `OfferService`, `JobRouteService`, `LocationService` |
-| `message` | `conversations`, `messages` | `MessageService` |
-| `review` | `reviews` | `ReviewService` |
-| `catalog` | `categories`, `skills` | `CategoryService`, `SkillService` |
-| `notification` | `notifications` | `NotificationService` |
-| `common` | *(ninguna)* | Seguridad JWT, config y manejo de errores transversales |
-
----
-
-## 2. Vista general: dominios y dependencias
-
-Muestra los 7 módulos y las **únicas dependencias que cruzan** entre ellos.
-Las flechas sólidas son llamadas reales entre servicios; las punteadas representan el uso de
-`common` (permitido) y el único cruce que **viola la regla de oro** (`common` hacia `user`).
+Los frontends tienen **dos caminos**: el SDK de Firebase (autenticación, lecturas en tiempo real
+y escrituras sobre documentos propios) y la API Express (operaciones transaccionales).
 
 ```mermaid
 flowchart TD
-    JOB["job - jobs, offers, job_routes, location_history"]
-    USER["user - users, vehicles"]
-    REV["review - reviews"]
-    NOT["notification - notifications"]
-    MSG["message - conversations, messages"]
-    CAT["catalog - categories, skills"]
-    COMMON["common - security, config, exception, dto"]
+    WEB["Frontend web — React + Vite"]
+    MOB["Frontend móvil — Flutter"]
+    SDK["Firebase SDK del cliente"]
+    API["API REST — Express — api/"]
+    RULES["firestore.rules"]
+    AUTH["Firebase Authentication"]
+    FS["Cloud Firestore"]
+    RTDB["Realtime Database — historial de ubicaciones"]
+    FCM["Cloud Messaging (FCM)"]
+    OSRM["OSRM — cálculo de rutas"]
 
-    JOB -->|"OfferService usa UserService.getPublicProfile() que devuelve PublicUserDto"| USER
-    JOB -->|"OfferService usa NotificationService.notify()"| NOT
-    REV -->|"ReviewService usa UserService.updateStatsAfterReview()"| USER
+    WEB --> SDK
+    MOB --> SDK
+    WEB -->|"HTTPS + idToken"| API
+    MOB -->|"HTTPS + idToken"| API
 
-    COMMON -.->|"MongoUserDetailsService y UserPrincipal usan User + UserRepository - cruce irregular"| USER
+    SDK --> AUTH
+    SDK -->|"escrituras del cliente"| RULES
+    RULES --> FS
+    SDK -.->|"lecturas en tiempo real"| FS
+    SDK -->|"registro de token / recepción de push"| FCM
+    SDK --> RTDB
 
-    USER -.->|"exception, PageResponse, JwtTokenProvider"| COMMON
-    JOB -.->|"exception, PageResponse"| COMMON
-    REV -.->|"exception"| COMMON
-    NOT -.->|"exception, PageResponse"| COMMON
-    MSG -.->|"exception"| COMMON
-    CAT -.->|"exception"| COMMON
+    API -->|"verifica el ID token"| AUTH
+    API -->|"Admin SDK: omite las reglas"| FS
+    API --> OSRM
+    API --> FCM
 ```
 
 **Lectura del diagrama**
 
-- `job` es el dominio **núcleo** y el que más se conecta: consulta `user` (para armar el
-  *snapshot* del trabajador) y `notification` (para avisar de nuevas ofertas).
-- `review` escribe en `user` para actualizar el promedio de calificación.
-- Todos los módulos usan `common` para excepciones y paginación; solo `user` usa `common.security`
-  (`JwtTokenProvider`) al emitir tokens.
-- La flecha punteada `common` hacia `user` es la **única dependencia que rompe el aislamiento**:
-  la capa de seguridad necesita el modelo y el repositorio de `user` para autenticar.
-- `message`, `catalog` y `notification` están **completamente desacoplados** del resto (solo dependen de `common`).
+- El **SDK del cliente** mantiene la sesión (`Auth`), escucha cambios (`Firestore`), envía el
+  historial de ubicaciones (`Realtime Database`) y recibe notificaciones (`FCM`).
+- Las escrituras directas del cliente **siempre pasan por `firestore.rules`**, que las autoriza
+  según el `uid` del token.
+- La **API Express** es el único componente con el Admin SDK: verifica el ID token de cada
+  petición y ejecuta las transacciones, **omitiendo las reglas** de Firestore.
+- No hay Cloud Functions en el diagrama porque **no existen** en este proyecto: su lógica quedó
+  archivada en `docs/functions-legacy/`.
 
 ---
 
-## 3. Estructura interna de un módulo y la "regla de oro"
+## 2. Responsabilidades por componente
 
-Cada dominio encapsula sus propias capas. La regla **no negociable** es que un módulo **solo**
-toca sus colecciones a través de su propio `repository`, y que **nunca** importa el `model` ni el
-`repository` de otro módulo; si necesita datos ajenos, usa el **servicio o DTO del módulo dueño**.
+| Componente | Escribe | Lee |
+|---|---|---|
+| Frontends (React/Flutter) | Sus propios documentos vía SDK: `jobs` (cliente), `offers` (trabajador), `messages`, perfil propio, `fcmTokens` | Todo lo permitido por `firestore.rules` |
+| API Express (`api/`) | `users`, `jobs`, `offers`, `conversations`, `reviews`, `notifications` (dentro de transacciones) | Todo (Admin SDK) |
+| `firestore.rules` | — (es el árbitro) | — |
+| Firebase Auth | — | ID tokens de las peticiones con `Bearer` |
+| OSRM | — | Coordenadas del trabajador y del trabajo → ruta guardada en `jobs.route` |
 
-```mermaid
-flowchart TD
-    subgraph MODA["Módulo A (dueño de la colección A)"]
-        CA["controller"] --> SA["service"] --> RA["repository"] --> MA["model @Document"]
-    end
-    subgraph MODB["Módulo B"]
-        CB["controller"] --> SB["service"] --> RB["repository"] --> MB["model @Document"]
-    end
-
-    SB -->|"permitido: service y DTO del módulo dueño"| SA
-    RB -.->|"prohibido: repository o model ajenos"| MA
-
-    MA --> DBA[("colección A")]
-    MB --> DBB[("colección B")]
-```
-
-Y la ruta que sigue una petición dentro de un módulo:
-
-```mermaid
-flowchart LR
-    HTTP["Petición HTTP o STOMP"] --> CTRL["controller: valida DTO con @Valid y mapea HTTP"]
-    CTRL --> SVC["service: toda la lógica de negocio"]
-    SVC --> REPO["repository: acceso a datos"]
-    REPO --> MODEL["model @Document"]
-    MODEL --> DB[("MongoDB Atlas")]
-```
+Los endpoints disponibles y quién puede llamarlos están en
+[`docs/arquitectura.md`](../arquitectura.md#3-api-rest-express).
 
 ---
 
-## 4. Ejemplo concreto: trabajador envía una oferta
+## 3. Escritura directa: publicar un trabajo o enviar una oferta
 
-Secuencia real de `POST /jobs/{jobId}/offers`, donde se ven en acción los cruces de `job` hacia
-`user` y hacia `notification` de la sección 2.
+El cliente no pasa por la API: escribe el documento y las reglas deciden.
 
 ```mermaid
 sequenceDiagram
-    actor W as Trabajador
-    participant OC as OfferController (job)
-    participant OS as OfferService (job)
-    participant JR as JobRepository (job)
-    participant OR as OfferRepository (job)
-    participant US as UserService (user)
-    participant NS as NotificationService (notification)
-    participant WS as Broker STOMP
+    actor U as Usuario (React o Flutter)
+    participant SDK as Firebase SDK
+    participant R as firestore.rules
+    participant FS as Cloud Firestore
 
-    W->>OC: POST /jobs/{jobId}/offers
-    OC->>OS: createOffer(workerId, jobId, dto)
-    OS->>JR: findById(jobId)
-    JR-->>OS: Job
-    OS->>OS: valida estado pending y que no sea su propio trabajo
-    OS->>US: getPublicProfile(workerId)
-    US-->>OS: PublicUserDto
-    OS->>OS: construye Offer.WorkerSnapshot
-    OS->>OR: save(offer)
-    OR-->>OS: Offer
-    OS->>WS: convertAndSend de /topic/offers.{jobId}
-    OS->>NS: notify(clientId, new_offer, ...)
-    NS->>WS: convertAndSendToUser de /notifications
-    OS-->>OC: OfferResponse
-    OC-->>W: 201 Created
+    U->>SDK: crea el documento en jobs u offers
+    SDK->>R: evalúa la escritura con request.auth
+    alt El uid del token es dueño del recurso
+        R-->>FS: permite
+        FS-->>U: documento creado
+    else No cumple
+        R-->>U: permission-denied
+    end
 ```
-
-> Nota: `job` **no** guarda una referencia viva al `User`; copia los datos que necesita en el
-> `WorkerSnapshot` dentro del documento `Offer`. Así el dominio queda aislado aunque el usuario cambie
-> después.
 
 ---
 
-## 5. Estado del aislamiento
+## 4. Operación transaccional: aceptar una oferta (`POST /acceptOffer`)
 
-- ✅ Ningún módulo (salvo `common`) importa `model` ni `repository` de otro dominio.
-- ✅ Los `controller` no tocan `repository`: delegan siempre en su `service`.
-- ✅ Los cruces entre dominios son solo hacia `service` o `dto` del dueño (permitido).
-- ⚠️ `common.security` (`MongoUserDetailsService`, `UserPrincipal`) depende de `user.model` y
-  `user.repository`. Es el único punto a decidir: aceptarlo como excepción de infraestructura o
-  mover esas dos clases al módulo `user`.
-- ⏳ Pendiente según `arquitectura.md`: crear `common/event/EventPublisher` para sustituir las
-  llamadas directas entre servicios por eventos de dominio.
+Secuencia real de la API: autentica, ejecuta la transacción y notifica fuera de ella.
+
+```mermaid
+sequenceDiagram
+    actor C as Cliente
+    participant API as API Express (api/)
+    participant AD as Admin SDK
+    participant FS as Cloud Firestore
+    participant FCM as FCM
+
+    C->>API: POST /acceptOffer con Authorization Bearer idToken
+    API->>AD: verifyIdToken(idToken)
+    AD-->>API: uid
+    API->>FS: runTransaction
+    Note over FS: offer aceptada · demás ofertas pending a rejected
+    Note over FS: job a accepted con workerId y acceptedOfferId
+    Note over FS: crea conversations con status active
+    FS-->>API: transacción aplicada
+    API->>FS: crea notifications (offer_accepted / offer_rejected)
+    API->>FCM: push a los trabajadores implicados
+    API-->>C: 200 con el job en status accepted
+```
+
+---
+
+## 5. Operación transaccional: completar un trabajo (`POST /completeJob`)
+
+```mermaid
+sequenceDiagram
+    actor P as Cliente o trabajador asignado
+    participant API as API Express (api/)
+    participant FS as Cloud Firestore
+    participant FCM as FCM
+
+    P->>API: POST /completeJob con Authorization Bearer idToken
+    API->>FS: runTransaction
+    Note over FS: job a completed con completedAt
+    Note over FS: conversations activas a closed
+    Note over FS: users worker: stats.completedJobs +1
+    Note over FS: y availability.isOnline = false
+    FS-->>API: transacción aplicada
+    API->>FS: crea notifications (job_completed)
+    API->>FCM: push a la contraparte
+    API-->>P: 200 con el job en status completed
+```

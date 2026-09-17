@@ -7,9 +7,12 @@ Este directorio conserva el código **legacy** del backend implementado con
 
 El backend lógico del proyecto (creación de usuarios, aceptación de ofertas,
 completar trabajos, reseñas, rutas, notificaciones) estuvo implementado como
-Cloud Functions de Firebase (TypeScript) en esta carpeta. Las reglas e índices
-de Firestore (`firestore.rules`, `firestore.indexes.json`) están pensadas para
-ese diseño y siguen vigentes.
+Cloud Functions de Firebase (TypeScript) en esta carpeta.
+
+> Ojo: `firestore.rules` y `firestore.indexes.json` nacieron con ese diseño, pero
+> las reglas se **reescribieron y endurecieron** para el diseño actual (autorización
+> por Custom Claim `role` y por propiedad del recurso, con las transacciones en
+> `api/`). Este código legacy **no** refleja las reglas vigentes.
 
 ## ¿Por qué se suspendió?
 
