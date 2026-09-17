@@ -1,5 +1,6 @@
 # Secrets - nunca versionar
 .env
+*firebase-adminsdk*.json
 
 # Entornos / IDEs
 .idea/
