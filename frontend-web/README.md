@@ -1,32 +1,38 @@
-# React + TypeScript + Vite
+# PaTodo — Frontend Web (instrucciones de integración)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+El equipo de frontend web tiene su propio repositorio. Esta carpeta **solo conserva
+lo mínimo para conectar con el backend de PaTodo**:
 
-Currently, two official plugins are available:
+- `src/lib/firebase.ts` → inicializa Firebase (Auth + Firestore), con soporte de emuladores.
+- `src/lib/api.ts` → cliente HTTP con Bearer token para la API REST transaccional.
+- `.env.example` → variables de entorno (API key, URLs, emuladores).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Qué necesita tu equipo para conectar
 
-## React Compiler
+1. **API key y projectId de Firebase** (de la consola Firebase del proyecto `pa-todo`,
+   o los de tu entorno). Están en `.env.example`.
+2. **URL de la API REST** cuando esté desplegada (hoy en desarrollo se usa el emulador).
+3. Los endpoints en `Spec Driven`: `docs/api-conexion.md` y `spec/openapi.yaml`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Configuración
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+cp .env.example .env
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Reglas de integración (cruciales)
+
+1. **Registro**: Firebase Auth crea la cuenta; luego `POST /createUser` crea `users/{uid}`
+   y asigna el **Custom Claim `role`** (`client`/`worker`/`both`).
+2. **Refresco de token**: el claim solo viaja en tokens nuevos. Tras crear el perfil
+   usa `getIdToken(true)` antes de escribir en Firestore (`getFreshToken` en `lib/api.ts`).
+3. **Escrituras directas vs API**:
+   - `jobs` y `offers` → Firestore SDK directo (reglas exigen `clientId`/`workerId == uid` y `pending`).
+   - `users.role/stats`, `reviews`, `notifications`, `conversations`, aceptar/cancelar/completar
+     trabajos y las rutas → **solo API**.
+4. **Rutas**: `POST /computeRoute` devuelve distancia, tiempo y geolocalización del trazo
+   de ruta (trabajador → job, con apoyo de destino si es viaje). Ver `docs/api-conexion.md`.
+
+Contrato de la API: `../docs/api-conexion.md`. Spec OpenAPI: `../spec/openapi.yaml`.

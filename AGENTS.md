@@ -71,3 +71,19 @@ Los roles se asignan mediante **Custom Claims** en Firebase Auth (claim `role`) 
 - Migración a Firebase completada (Auth, Firestore, reglas e índices).
 - Fase 2 en curso: configuración del proyecto Firebase y autenticación.
 - API REST transaccional (`api/`) implementada y desplegada en Render; `firestore.rules` endurecido con autorización por rol y por propiedad del recurso.
+
+## Integración de los frontends (equipos web y móvil)
+
+Los equipos web y móvil tienen **sus propios repositorios**; las carpetas
+`frontend-web/` y `frontend-mobile/` del monorepo solo conservan una **base
+mínima de conexión** (config de Firebase, URL de la API y README local), no la
+app. Antes de tocar esas carpetas o de integrar algo, leer:
+
+- `docs/api-conexion.md` → cómo conectar Firebase y la API REST (URLs por entorno,
+  división "quién escribe qué", trazo de ruta §5.1).
+- `frontend-web/README.md` y `frontend-mobile/README.md` → base de conexión local.
+- `spec/openapi.yaml` y `spec/schemas/` → contrato exacto (no inventar campos).
+
+Regla clave para los agentes de integración: el **Custom Claim `role`** solo viaja
+en tokens nuevos; tras `POST /createUser` (o cambio de rol) el cliente debe
+refrescar el token (`getIdToken(true)`) antes de escribir en Firestore.

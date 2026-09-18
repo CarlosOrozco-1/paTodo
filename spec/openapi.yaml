@@ -403,12 +403,22 @@ paths:
   /computeRoute:
     post:
       tags: [routes]
-      summary: Calcular y almacenar la ruta de un trabajo
+      summary: Calcular la ruta de un trabajo (distancia y tiempo de llegada)
       description: |
-        Calcula la ruta entre la ubicación del trabajador asignado y el lugar del
-        trabajo usando OSRM, y la guarda como campo `route` dentro del documento
-        del job. Solo el cliente o el trabajador del trabajo pueden solicitarla,
-        y el trabajo ya debe tener trabajador y ubicaciones registradas.
+        Calcula la ruta con OSRM y devuelve distancia, duración y geometría.
+        Dos modos:
+
+        - **Vista previa (trabajador)**: cualquier trabajador (`role` worker o
+          both) puede pedir la ruta desde SU ubicación (`users/{uid}.location`)
+          hasta el trabajo, aunque el job todavía esté pendiente (sin
+          trabajador asignado). No guarda nada en el job.
+        - **Oficial (asignado)**: el cliente o el trabajador asignado puede
+          solicitar la ruta, que se persiste en `job.route`.
+
+        Si el job tiene `destination` (servicio de viaje), la ruta incluye dos
+        tramos (`legs`): trabajador → punto de recogida (`location`) y punto de
+        recogida → destino (`destination`). El trabajador necesita tener su
+        ubicación (`users/{uid}.location`) registrada para la vista previa.
       requestBody:
         required: true
         content:
@@ -418,10 +428,11 @@ paths:
               properties:
                 jobId:
                   type: string
+                  description: ID del trabajo (colección jobs).
               required: [jobId]
       responses:
         '200':
-          description: Ruta calculada y almacenada.
+          description: Ruta calculada. Incluye `legs` cuando hay destino de viaje.
           content:
             application/json:
               schema:
@@ -429,19 +440,47 @@ paths:
                 properties:
                   geometry:
                     type: object
-                    description: GeoJSON LineString con las coordenadas.
+                    description: GeoJSON LineString con las coordenadas de la ruta completa.
                   distance:
                     type: number
-                    description: Distancia en metros.
+                    description: Distancia total en metros.
                   duration:
                     type: number
-                    description: Duración en segundos.
+                    description: Duración total en segundos.
                   source:
                     type: string
                     example: osrm
                   computedAt:
                     type: string
                     format: date-time
+                  legs:
+                    type: array
+                    description: Tramos de la ruta (trabajador→recogida, recogida→destino cuando aplica).
+                    items:
+                      type: object
+                      properties:
+                        from:
+                          type: object
+                          properties:
+                            latitude: { type: number }
+                            longitude: { type: number }
+                        to:
+                          type: object
+                          properties:
+                            latitude: { type: number }
+                            longitude: { type: number }
+                        distance:
+                          type: number
+                          description: Distancia del tramo en metros.
+                        duration:
+                          type: number
+                          description: Duración del tramo en segundos.
+                  persisted:
+                    type: boolean
+                    description: true si la ruta se guardó en job.route (modo oficial), false si fue solo vista previa.
+                  preview:
+                    type: boolean
+                    description: true si fue una vista previa de trabajador no asignado.
         '400':
           $ref: '#/components/responses/InvalidArgument'
         '401':

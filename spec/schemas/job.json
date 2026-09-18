@@ -79,6 +79,39 @@
       },
       "required": ["geopoint", "geohash", "address"]
     },
+    "destination": {
+      "type": ["object", "null"],
+      "title": "Destino (servicios de viaje)",
+      "description": "Ubicación de destino en solicitudes de viaje/transporte (por ejemplo, 'llevar a una persona o paquete a un lugar'). Cuando está presente, `location` es el punto de recogida y `destination` el punto de entrega. Null cuando el servicio se realiza solo en el lugar del trabajo.",
+      "properties": {
+        "geopoint": {
+          "type": "object",
+          "title": "Coordenadas geográficas",
+          "description": "Latitud y longitud del destino.",
+          "properties": {
+            "latitude": { "type": "number", "title": "Latitud" },
+            "longitude": { "type": "number", "title": "Longitud" }
+          },
+          "required": ["latitude", "longitude"]
+        },
+        "geohash": {
+          "type": "string",
+          "title": "Geohash",
+          "description": "Código geohash del destino."
+        },
+        "address": {
+          "type": "string",
+          "title": "Dirección",
+          "description": "Dirección legible del destino."
+        },
+        "placeId": {
+          "type": "string",
+          "title": "ID del lugar",
+          "description": "Identificador opcional de Google Places del destino."
+        }
+      },
+      "required": ["geopoint", "geohash", "address"]
+    },
     "pricing": {
       "type": "object",
       "title": "Precio",
@@ -191,6 +224,62 @@
           "format": "date-time",
           "title": "Fecha de cálculo",
           "description": "Momento en que se calculó la ruta."
+        },
+        "legs": {
+          "type": ["array", "null"],
+          "title": "Tramos de la ruta",
+          "description": "Desglose de la ruta por tramos (por ejemplo, trabajador → punto de recogida y punto de recogida → destino en servicios de viaje). Null si solo existe un tramo único.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "object",
+                "properties": {
+                  "longitude": { "type": "number" },
+                  "latitude": { "type": "number" }
+                },
+                "required": ["longitude", "latitude"]
+              },
+              "to": {
+                "type": "object",
+                "properties": {
+                  "longitude": { "type": "number" },
+                  "latitude": { "type": "number" }
+                },
+                "required": ["longitude", "latitude"]
+              },
+              "distance": {
+                "type": "number",
+                "minimum": 0,
+                "title": "Distancia del tramo en metros"
+              },
+              "duration": {
+                "type": "number",
+                "minimum": 0,
+                "title": "Duración del tramo en segundos"
+              },
+              "geometry": {
+                "type": "object",
+                "title": "Geometría del tramo (GeoJSON LineString)",
+                "properties": {
+                  "type": { "type": "string" },
+                  "coordinates": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "longitude": { "type": "number" },
+                        "latitude": { "type": "number" }
+                      },
+                      "required": ["longitude", "latitude"]
+                    }
+                  }
+                },
+                "required": ["type", "coordinates"]
+              }
+            },
+            "required": ["from", "to", "distance", "duration"]
+          }
         }
       },
       "required": ["geometry", "distance", "duration", "source", "computedAt"]

@@ -103,13 +103,90 @@ Contrato:
 | `POST /cancelJob` | `{jobId, reason?}` | `200` job `status: "cancelled"` |
 | `POST /completeJob` | `{jobId}` | `200` job `status: "completed"` |
 | `POST /createReview` | `{jobId, rating(1-5), comment?}` | `201` review |
-| `POST /computeRoute` | `{jobId}` | `200` ruta OSRM |
+| `POST /computeRoute` | `{jobId}` | `200` trazo de ruta (con `geometry`, `distance`, `duration`, `legs`; ver §5.1) |
 | `GET /` | — | `200 {"status":"ok"}` (health) |
 
 Formato de error: `{ error: string, code: string }` con el status HTTP real
 (400 `invalid-argument`, 401 `unauthenticated`, 403 `permission-denied`,
 404 `not-found`, 409 `already-exists`, 412 `failed-precondition`,
 429 `resource-exhausted` cuando se supera el rate limit, y 502/503 `unavailable` si OSRM falla).
+
+### 5.1 El trazo de ruta (`POST /computeRoute`)
+
+Este es el endpoint que pintan los mapas: devuelve la **ruta geográfica real**
+(trabajador → trabajo → destino opcional) con distancia, tiempo de llegada y la
+línea que se dibuja sobre el mapa.
+
+**Modos de uso** (la API decide automáticamente por el rol del token):
+
+- **Vista previa (trabajador NO asignado)**: un `worker`/`both` puede pedir la
+  ruta desde **su propia ubicación** (`users/{uid}.location`) hacia un trabajo
+  que sigue `pending`. Sirve para mostrar distancia y tiempo de llegada antes de
+  ofertar. No persiste nada (`preview: true`, `persisted: false`).
+- **Oficial (asignado)**: el `client` dueño del trabajo o el `worker` asignado
+  obtienen la ruta calculada desde la ubicación del **trabajador asignado** y se
+  **persiste en `job.route`** (`preview: false`, `persisted: true`).
+
+**Trabajos de viaje (`destination`)**: si el job tiene `destination`, `location`
+es el punto de **recogida** y `destination` el de **entrega**. La ruta se calcula
+en dos tramos (están en `legs`): trabajador → recogida, y recogida → destino. El
+`geometry` siempre es el trazo completo (GeoJSON LineString) para pintarlo de una
+sola vez en el mapa.
+
+**Contrato de la respuesta**:
+
+```ts
+{
+  geometry: LineString,   // { type: "LineString", coordinates: [ [lng,lat], ... ] } — píntalo como polyline
+  distance: number,       // metros totales
+  duration: number,       // segundos totales
+  source: "osrm",
+  computedAt: string,     // ISO
+  legs: [                // un leg = un tramo con su propia distancia/duración
+    { from: {latitude, longitude}, to: {latitude, longitude}, distance: number, duration: number }
+  ],
+  preview: boolean,       // true = vista previa de trabajador sin asignar
+  persisted: boolean      // true = quedó guardada en job.route
+}
+```
+
+**Reglas para el integrador**:
+
+1. El trabajador **debe tener ubicación** (`users/{uid}.location`) con su
+   `geopoint` actualizado; si no existe, la API responde `412 failed-precondition`.
+2. Para un trabajo ya asignado, la ruta se calcula desde la ubicación del
+   trabajador asignado (`jobs/{jobId}.workerId` → `users/{workerId}.location`),
+   así el **cliente** ve la distancia/tiempo del trabajador real.
+3. `job.route` queda disponible para re-lectura directa desde Firestore (sin
+   recalcular), con los campos `distance`, `duration`, `geometry`, `legs`,
+   `source`, `computedAt`.
+4. Para pintar: usa `geometry.coordinates` (formato `[lng, lat]`, el de GeoJSON)
+   con cualquier librería de mapas (Leaflet `L.polyline`, Google Maps `Polyline`,
+   `flutter_map`, etc.). Los marcadores de recogida y destino se pueden ubicar
+   con `legs[0].from`, `legs[0].to` / `legs[1].to`.
+
+Ejemplo real (trabajo con destino de viaje, vista previa de un trabajador):
+
+```json
+{
+  "geometry": { "type": "LineString", "coordinates": [[...290 pares lng/lat...]] },
+  "distance": 10442,
+  "duration": 890,
+  "source": "osrm",
+  "computedAt": "2026-…Z",
+  "legs": [
+    { "from": {"latitude": 19.42, "longitude": -99.16}, "to": {"latitude": 19.43, "longitude": -99.15}, "distance": 2955, "duration": 298 },
+    { "from": {"latitude": 19.43, "longitude": -99.15}, "to": {"latitude": 19.44, "longitude": -99.13}, "distance": 7487, "duration": 592 }
+  ],
+  "preview": true,
+  "persisted": false
+}
+```
+
+| Modo | Llamador | `preview` | `persisted` | Origen de la ruta |
+|---|---|---|---|---|
+| Vista previa | `worker`/`both`, job `pending` | `true` | `false` | `users/{uid}.location` del llamador |
+| Oficial | `client` (dueño) o `worker` asignado | `false` | `true` | `users/{workerId}.location` |
 
 ## 6. Desarrollo local (emuladores)
 
