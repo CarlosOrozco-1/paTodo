@@ -18,7 +18,7 @@ info:
     en su documento de `users` y como **Custom Claim** `role` en Firebase Auth.
     Las reglas de seguridad de Firestore (`firestore.rules`) usan ese claim para
     autorizar las escrituras directas del cliente.
-  version: 0.3.0
+  version: 0.4.0
 servers:
   - url: https://patodo.onrender.com
     description: Producción (Render)
@@ -31,6 +31,8 @@ tags:
     description: Registro y gestión de usuarios
   - name: jobs
     description: Operaciones críticas sobre trabajos
+  - name: search
+    description: Búsquedas (trabajos cercanos por proximidad)
   - name: offers
     description: Aceptación y rechazo de ofertas
   - name: reviews
@@ -273,6 +275,85 @@ paths:
           $ref: '#/components/responses/FailedPrecondition'
 
   # ===================== TRABAJOS =====================
+  /jobs/nearby:
+    get:
+      tags: [search]
+      summary: Buscar trabajos cercanos (por geohash y distancia)
+      description: |
+        Devuelve los trabajos `pending` que están dentro de un radio (en km)
+        desde una coordenada. Pensado para el worker: ve los trabajos que le
+        quedan cerca junto con la distancia en línea recta.
+
+        Implementación: la búsqueda usa el índice `(status, location.geohash)`
+        existente (geohash de 6+ caracteres dentro de `location`) con rango por
+        bounding box (geofire-common) y después filtra con haversine para
+        descartar las esquinas del recuadro. Los resultados se ordenan por
+        distancia (menor primero).
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema:
+            type: number
+            example: 14.63
+          description: Latitud del punto de búsqueda.
+        - in: query
+          name: lng
+          required: true
+          schema:
+            type: number
+            example: -90.51
+          description: Longitud del punto de búsqueda.
+        - in: query
+          name: radiusKm
+          schema:
+            type: number
+            minimum: 0.1
+            maximum: 50
+            default: 10
+            example: 5
+          description: Radio de búsqueda en kilómetros.
+        - in: query
+          name: categoryId
+          required: false
+          schema:
+            type: string
+            example: cat-viaje
+          description: Filtrar por categoría del trabajo.
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+          description: Máximo de trabajos a devolver.
+      responses:
+        '200':
+          description: Trabajos cercanos encontrados, ordenados por distancia.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    description: Trabajos pendientes dentro del radio, ordenados por distancia.
+                    items:
+                      type: object
+                      allOf:
+                        - $ref: './schemas/job.json'
+                      properties:
+                        distanceKm:
+                          type: number
+                          description: Distancia en línea recta (haversine) desde el punto de búsqueda.
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+
   /cancelJob:
     post:
       tags: [jobs]

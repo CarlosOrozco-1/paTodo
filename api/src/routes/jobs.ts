@@ -1,11 +1,105 @@
 import { Router } from "express";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../shared/admin";
-import { requireAuth } from "../shared/auth";
+import { getAuthenticatedUser, requireAuth } from "../shared/auth";
 import { httpError, handleError } from "../shared/errors";
+import { distanceKm, geohashBoundsForRadius, MAX_SEARCH_RADIUS_KM } from "../shared/geo";
 import { sendNotificationSafely } from "../shared/notifications";
 
 export const jobsRouter = Router();
+
+/**
+ * GET /jobs/nearby?lat=&lng=&radiusKm=&categoryId=&limit=
+ *
+ * Busca trabajos pending dentro de un radio desde un punto. Solo para
+ * workers/both (quienes buscan trabajos). Usa el índice (status, geohash).
+ */
+jobsRouter.get("/jobs/nearby", async (request, response) => {
+  try {
+    const decoded = await getAuthenticatedUser(request);
+    const role = decoded.role as string | undefined;
+    if (!role || (role !== "worker" && role !== "both")) {
+      throw httpError(
+        403,
+        "permission-denied",
+        "Solo los trabajadores pueden buscar trabajos cercanos."
+      );
+    }
+
+    const rawLat = request.query.lat;
+    const rawLng = request.query.lng;
+    const rawRadius = request.query.radiusKm ?? "10";
+    const rawLimit = request.query.limit ?? "20";
+    const categoryId = typeof request.query.categoryId === "string" ? request.query.categoryId : undefined;
+
+    const lat = Number(rawLat);
+    const lng = Number(rawLng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      throw httpError(400, "invalid-argument", "Los parámetros lat y lng deben ser números.");
+    }
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      throw httpError(400, "invalid-argument", "Coordenadas fuera de rango.");
+    }
+
+    const radiusKm = Number(rawRadius);
+    if (!Number.isFinite(radiusKm) || radiusKm <= 0) {
+      throw httpError(400, "invalid-argument", "radiusKm debe ser un número positivo.");
+    }
+    if (radiusKm > MAX_SEARCH_RADIUS_KM) {
+      throw httpError(
+        400,
+        "invalid-argument",
+        `radiusKm no puede superar ${MAX_SEARCH_RADIUS_KM} km.`
+      );
+    }
+
+    const limit = Math.min(Math.max(Math.trunc(Number(rawLimit) || 20), 1), 50);
+
+    // 1) Rango de geohash que cubre el radio (geofire-common).
+    const bounds = geohashBoundsForRadius(lat, lng, radiusKm);
+
+    // 2) Buscar en cada rango (índice compuesto status+location.geohash), en paralelo.
+    const queries = bounds.map(([start, end]) =>
+      db
+        .collection("jobs")
+        .where("status", "==", "pending")
+        .where("location.geohash", ">=", start)
+        .where("location.geohash", "<=", end)
+        .limit(200)
+        .get()
+    );
+    const snapshots = await Promise.all(queries);
+
+    // 3) Calcular distancia exacta y descartar las esquinas del recuadro.
+    const seen = new Set<string>();
+    const items: any[] = [];
+
+    for (const snapshot of snapshots) {
+      for (const doc of snapshot.docs) {
+        if (seen.has(doc.id)) continue;
+        seen.add(doc.id);
+
+        const data = doc.data() as any;
+        const loc = data.location as
+          | { geopoint?: { latitude: number; longitude: number } }
+          | undefined;
+        if (!loc?.geopoint) continue;
+
+        const d = distanceKm(lat, lng, loc.geopoint.latitude, loc.geopoint.longitude);
+        if (d > radiusKm) continue;
+        if (categoryId && data.details?.categoryId !== categoryId) continue;
+
+        items.push({ id: doc.id, ...data, distanceKm: Number(d.toFixed(2)) });
+      }
+    }
+
+    // 4) Ordenar por distancia (más cercano primero) y acotar.
+    items.sort((a, b) => a.distanceKm - b.distanceKm);
+    response.status(200).json({ items: items.slice(0, limit) });
+  } catch (error) {
+    handleError(error, response);
+  }
+});
 
 /**
  * POST /cancelJob

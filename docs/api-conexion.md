@@ -104,6 +104,7 @@ Contrato:
 | `POST /completeJob` | `{jobId}` | `200` job `status: "completed"` |
 | `POST /createReview` | `{jobId, rating(1-5), comment?}` | `201` review |
 | `POST /computeRoute` | `{jobId}` | `200` trazo de ruta (con `geometry`, `distance`, `duration`, `legs`; ver §5.1) |
+| `GET /jobs/nearby` | query: `lat`, `lng`, `radiusKm`(≤50), `categoryId?`, `limit?` | `200 {items}` trabajos `pending` ordenados por `distanceKm` (ver §5.2) |
 | `GET /` | — | `200 {"status":"ok"}` (health) |
 
 Formato de error: `{ error: string, code: string }` con el status HTTP real
@@ -187,6 +188,46 @@ Ejemplo real (trabajo con destino de viaje, vista previa de un trabajador):
 |---|---|---|---|---|
 | Vista previa | `worker`/`both`, job `pending` | `true` | `false` | `users/{uid}.location` del llamador |
 | Oficial | `client` (dueño) o `worker` asignado | `false` | `true` | `users/{workerId}.location` |
+
+## 5.2 Búsqueda de trabajos cercanos (`GET /jobs/nearby`)
+
+Este es el endpoint que usan las apps para mostrar el mapa de "trabajos cerca de
+mí": devuelve los trabajos `pending` del área, ordenados por distancia en línea
+recta.
+
+**Llamador:** solo `worker`/`both` (un `client` obtiene `403 permission-denied`).
+
+**Query params** (`spec/openapi.yaml` es la fuente de verdad):
+
+| Parámetro | Tipo | Obligatorio | Descripción |
+|---|---|---|---|
+| `lat` | number | sí | Latitud del centro de búsqueda |
+| `lng` | number | sí | Longitud del centro de búsqueda |
+| `radiusKm` | number | no (default 10) | Radio máximo; **límite 50 km** (más, `400`) |
+| `categoryId` | string | no | Filtra por categoría del trabajo |
+| `limit` | number | no (default 20, máx 50) | Máximo de resultados |
+
+**Contrato de la respuesta**:
+
+```ts
+{
+  items: Array<Job & { distanceKm: number }>  // Job completo + distancia en km (2 decimales)
+}
+```
+
+**Cómo funciona por dentro** (para conocer las limitaciones):
+
+- Usa el índice compuesto `(status, location.geohash)` y un **prefijo geohash**
+  (`location.geohash` de 6+ caracteres) calculado con `geofire-common`
+  (geohashQueryBounds). Después filtra por haversine para descartar las esquinas
+  del recuadro y ordena por `distanceKm` ascendente.
+- El cliente publica su trabajo con `location.geohash` **dentro** de `location`
+  (ver `spec/schemas/job.json`); sin ese campo el job no aparece en la búsqueda.
+- `distanceKm` es la distancia en línea recta (haversine), **no** una ruta real.
+  Para distancia/tiempo reales por calles, usa `POST /computeRoute` (§5.1).
+
+**Errores**: `400 invalid-argument` (parámetros inválidos o `radiusKm > 50`),
+`403 permission-denied` (rol cliente), `401 unauthenticated` (sin token).
 
 ## 6. Desarrollo local (emuladores)
 
