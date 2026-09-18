@@ -1,24 +1,30 @@
 {
   "info": {
     "name": "PaTodo - Emulador local (API Express)",
-    "description": "Flujos de prueba contra la API REST local (Express, puerto 3000) usando los emuladores de Firebase (auth 9099, firestore 8081).\n\nRequisitos: emuladores corriendo (npx firebase emulators:start --only auth,firestore) y la API en api/ (npm start con CORS_ORIGINS y puerto 3000).\n\nOrden recomendado:\n1. 'Registrar usuario (signUp)' crea la cuenta en Auth (emulador).\n2. 'Crear perfil (POST /createUser)' guarda uid en la variable {{uid}} y asigna el Custom Claim role.\n3. 'Refrescar token (Custom Claim role)' → OBLIGATORIO antes de escribir en Firestore.\n4. 'Publicar trabajo' con el token del cliente.\n5. Cambia al usuario trabajador (repite 1-3) y 'Crear oferta'.\n6. 'acceptOffer' → completa el job y crea la reseña (completeJob, createReview).\n\nLa API valida el header Authorization: Bearer {{idToken}}. Los endpoints /createUser, /acceptOffer, /completeJob, /cancelJob, /createReview y /computeRoute son exclusivos de la API (antes Cloud Functions); jobs y offers se escriben directo a Firestore REST: las reglas exigen que clientId/workerId sea tu uid, que el rol del token sea client/worker/both y que el job esté en pending.",
+    "description": "Flujo E2E completo contra la API REST local (Express, puerto 3000) usando los emuladores de Firebase (auth 9099, firestore 8081).\n\nRequisitos:\n1. Emuladores: npx firebase emulators:start --only auth,firestore\n2. API: en api/ con CORS_ORIGINS=http://localhost:5173 y puerto 3000 (npm start).\n\nOrden recomendado (secuencial, un solo Run):\n1. 'Cliente' - registra el cliente y crea su perfil (role client).\n2. 'Publicar trabajo (Firestore REST)' - el cliente publica el job en pending (guarda {{jobId}}).\n3. 'Trabajador' - registra el trabajador y crea su perfil (role worker).\n4. 'Crear oferta (Firestore REST)' - el trabajador oferta el job (guarda {{offerId}}).\n5. 'Ubicación del trabajador (Firestore PATCH)' - necesaria para /computeRoute.\n6. 'API REST (transacciones)' - acceptOffer → computeRoute → completeJob → createReview.\n7. 'Consultar datos (Firestore REST)' - lectura opcional.\n\nNotas:\n- Roles distintos solo se logran con cuentas distintas: {{clientEmail}} (cliente) y {{workerEmail}} (trabajador).\n- El Custom Claim `role` lo asigna POST /createUser y solo viaja en tokens nuevos: por eso cada rol refresca su token (pasos 1 y 3).\n- jobs y offers se escriben directo a Firestore REST; las reglas exigen que clientId/workerId sea tu uid, rol client/worker/both, status pending y los campos mínimos (clientId, details, location, pricing, status / jobId, workerId, price, estimatedTime, status).\n- La ubicación (GeoPoint + geohash) se envía con geoPointValue (formato de la API REST de Firestore).\n- /createUser, /acceptOffer, /completeJob, /cancelJob, /createReview y /computeRoute son exclusivos de la API (uses credenciales de administrador). CORS no bloquea a Postman (no envía Origin).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
+    { "key": "apiURL", "value": "http://127.0.0.1:3000" },
     { "key": "authURL", "value": "http://127.0.0.1:9099" },
     { "key": "fsURL", "value": "http://127.0.0.1:8081/v1/projects/pa-todo/databases/(default)/documents" },
-    { "key": "apiURL", "value": "http://127.0.0.1:3000" },
-    { "key": "idToken", "value": "" },
-    { "key": "uid", "value": "" },
+    { "key": "clientEmail", "value": "cliente@test.com" },
+    { "key": "workerEmail", "value": "trabajador@test.com" },
+    { "key": "clientPassword", "value": "test1234" },
+    { "key": "workerPassword", "value": "test1234" },
+    { "key": "clientToken", "value": "" },
+    { "key": "workerToken", "value": "" },
+    { "key": "clientUid", "value": "" },
+    { "key": "workerUid", "value": "" },
     { "key": "jobId", "value": "" },
     { "key": "offerId", "value": "" }
   ],
   "item": [
     {
-      "name": "1. Usuarios",
+      "name": "1. Cliente (registro y perfil)",
       "item": [
         {
-          "name": "Registrar usuario (signUp Auth)",
+          "name": "Registrar cliente (signUp Auth)",
           "event": [
             {
               "listen": "test",
@@ -26,9 +32,11 @@
                 "type": "text/javascript",
                 "exec": [
                   "const res = pm.response.json();",
-                  "pm.collectionVariables.set('idToken', res.idToken);",
-                  "pm.collectionVariables.set('uid', res.localId);",
-                  "console.log('idToken y uid guardados:', res.localId);"
+                  "if (res.idToken) {",
+                  "  pm.collectionVariables.set('clientToken', res.idToken);",
+                  "  pm.collectionVariables.set('clientUid', res.localId);",
+                  "  console.log('clientToken y clientUid guardados:', res.localId);",
+                  "}"
                 ]
               }
             }
@@ -38,7 +46,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"cliente@test.com\",\n  \"password\": \"test1234\",\n  \"returnSecureToken\": true\n}"
+              "raw": "{\n  \"email\": \"{{clientEmail}}\",\n  \"password\": \"{{clientPassword}}\",\n  \"returnSecureToken\": true\n}"
             },
             "url": {
               "raw": "{{authURL}}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake",
@@ -49,7 +57,7 @@
           }
         },
         {
-          "name": "Crear perfil (POST /createUser)",
+          "name": "Crear perfil cliente (POST /createUser)",
           "event": [
             {
               "listen": "test",
@@ -57,8 +65,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "const res = pm.response.json();",
-                  "pm.collectionVariables.set('uid', res.uid || pm.collectionVariables.get('uid'));",
-                  "console.log('Perfil creado para uid:', res.uid);"
+                  "pm.collectionVariables.set('clientUid', res.uid || pm.collectionVariables.get('clientUid'));",
+                  "console.log('Perfil cliente creado para uid:', res.uid);"
                 ]
               }
             }
@@ -67,17 +75,17 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"uid\": \"{{uid}}\",\n  \"email\": \"cliente@test.com\",\n  \"role\": \"client\",\n  \"profile\": {\n    \"firstName\": \"Carlos\",\n    \"lastName\": \"Cliente\"\n  },\n  \"contact\": {\n    \"phone\": \"+502 5555-0001\"\n  }\n}"
+              "raw": "{\n  \"uid\": \"{{clientUid}}\",\n  \"email\": \"{{clientEmail}}\",\n  \"role\": \"client\",\n  \"profile\": {\n    \"firstName\": \"Carlos\",\n    \"lastName\": \"Cliente\"\n  },\n  \"contact\": {\n    \"phone\": \"+502 5555-0001\"\n  }\n}"
             },
             "url": { "raw": "{{apiURL}}/createUser", "host": ["{{apiURL}}"], "path": ["createUser"] }
           }
         },
         {
-          "name": "Refrescar token (Custom Claim role)",
+          "name": "Refrescar token cliente (Custom Claim role)",
           "event": [
             {
               "listen": "test",
@@ -85,10 +93,10 @@
                 "type": "text/javascript",
                 "exec": [
                   "const res = pm.response.json();",
-                  "pm.collectionVariables.set('idToken', res.idToken);",
+                  "pm.collectionVariables.set('clientToken', res.idToken);",
                   "const payload = JSON.parse(atob(res.idToken.split('.')[1]));",
-                  "pm.collectionVariables.set('uid', payload.user_id || res.localId);",
-                  "console.log('idToken y uid guardados');"
+                  "pm.collectionVariables.set('clientUid', payload.user_id || res.localId);",
+                  "console.log('clientToken y clientUid guardados');"
                 ]
               }
             }
@@ -98,7 +106,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"cliente@test.com\",\n  \"password\": \"test1234\",\n  \"returnSecureToken\": true\n}"
+              "raw": "{\n  \"email\": \"{{clientEmail}}\",\n  \"password\": \"{{clientPassword}}\",\n  \"returnSecureToken\": true\n}"
             },
             "url": {
               "raw": "{{authURL}}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake",
@@ -134,11 +142,11 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fields\": {\n    \"clientId\": { \"stringValue\": \"{{uid}}\" },\n    \"details\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"title\": { \"stringValue\": \"Cambio de llanta\" },\n          \"description\": { \"stringValue\": \"Llanta ponchada en la zona\" },\n          \"categoryId\": { \"stringValue\": \"cat-mecanica\" },\n          \"skillIds\": { \"arrayValue\": { \"values\": [ { \"stringValue\": \"sk-cambio-llantas\" } ] } }\n        }\n      }\n    },\n    \"location\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"geopoint\": {\n            \"mapValue\": {\n              \"fields\": {\n                \"latitude\": { \"doubleValue\": 14.6349 },\n                \"longitude\": { \"doubleValue\": -90.5069 }\n              }\n            }\n          },\n          \"geohash\": { \"stringValue\": \"9fvg4\" },\n          \"address\": { \"stringValue\": \"Zona 10, Guatemala\" }\n        }\n      }\n    },\n    \"pricing\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"proposedPrice\": { \"doubleValue\": 50 },\n          \"currency\": { \"stringValue\": \"GTQ\" },\n          \"priceType\": { \"stringValue\": \"negotiable\" }\n        }\n      }\n    },\n    \"status\": { \"stringValue\": \"pending\" }\n  }\n}"
+              "raw": "{\n  \"fields\": {\n    \"clientId\": { \"stringValue\": \"{{clientUid}}\" },\n    \"details\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"title\": { \"stringValue\": \"Cambio de llanta\" },\n          \"description\": { \"stringValue\": \"Llanta ponchada en la zona\" },\n          \"categoryId\": { \"stringValue\": \"cat-mecanica\" },\n          \"skillIds\": { \"arrayValue\": { \"values\": [ { \"stringValue\": \"sk-cambio-llantas\" } ] } }\n        }\n      }\n    },\n    \"location\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"geopoint\": {\n            \"geoPointValue\": { \"latitude\": 14.6349, \"longitude\": -90.5069 }\n          },\n          \"geohash\": { \"stringValue\": \"9fvg4\" },\n          \"address\": { \"stringValue\": \"Zona 10, Guatemala\" }\n        }\n      }\n    },\n    \"pricing\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"proposedPrice\": { \"doubleValue\": 50 },\n          \"currency\": { \"stringValue\": \"GTQ\" },\n          \"priceType\": { \"stringValue\": \"negotiable\" }\n        }\n      }\n    },\n    \"status\": { \"stringValue\": \"pending\" }\n  }\n}"
             },
             "url": { "raw": "{{fsURL}}/jobs", "host": ["{{fsURL}}"], "path": ["jobs"] }
           }
@@ -146,7 +154,105 @@
       ]
     },
     {
-      "name": "3. Crear oferta (Firestore REST)",
+      "name": "3. Trabajador (registro y perfil)",
+      "item": [
+        {
+          "name": "Registrar trabajador (signUp Auth)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.idToken) {",
+                  "  pm.collectionVariables.set('workerToken', res.idToken);",
+                  "  pm.collectionVariables.set('workerUid', res.localId);",
+                  "  console.log('workerToken y workerUid guardados:', res.localId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{workerEmail}}\",\n  \"password\": \"{{workerPassword}}\",\n  \"returnSecureToken\": true\n}"
+            },
+            "url": {
+              "raw": "{{authURL}}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake",
+              "host": ["{{authURL}}"],
+              "path": ["identitytoolkit.googleapis.com", "v1", "accounts:signUp"],
+              "query": [{ "key": "key", "value": "fake" }]
+            }
+          }
+        },
+        {
+          "name": "Crear perfil trabajador (POST /createUser)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.collectionVariables.set('workerUid', res.uid || pm.collectionVariables.get('workerUid'));",
+                  "console.log('Perfil trabajador creado para uid:', res.uid);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"uid\": \"{{workerUid}}\",\n  \"email\": \"{{workerEmail}}\",\n  \"role\": \"worker\",\n  \"profile\": {\n    \"firstName\": \"Juan\",\n    \"lastName\": \"Worker\"\n  },\n  \"contact\": {\n    \"phone\": \"+502 5555-0002\"\n  }\n}"
+            },
+            "url": { "raw": "{{apiURL}}/createUser", "host": ["{{apiURL}}"], "path": ["createUser"] }
+          }
+        },
+        {
+          "name": "Refrescar token trabajador (Custom Claim role)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.collectionVariables.set('workerToken', res.idToken);",
+                  "const payload = JSON.parse(atob(res.idToken.split('.')[1]));",
+                  "pm.collectionVariables.set('workerUid', payload.user_id || res.localId);",
+                  "console.log('workerToken y workerUid guardados');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{workerEmail}}\",\n  \"password\": \"{{workerPassword}}\",\n  \"returnSecureToken\": true\n}"
+            },
+            "url": {
+              "raw": "{{authURL}}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake",
+              "host": ["{{authURL}}"],
+              "path": ["identitytoolkit.googleapis.com", "v1", "accounts:signInWithPassword"],
+              "query": [{ "key": "key", "value": "fake" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Crear oferta (Firestore REST)",
       "item": [
         {
           "name": "Crear oferta (token trabajador)",
@@ -169,11 +275,11 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fields\": {\n    \"jobId\": { \"stringValue\": \"{{jobId}}\" },\n    \"workerId\": { \"stringValue\": \"{{uid}}\" },\n    \"workerSnapshot\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"name\": { \"stringValue\": \"Juan Worker\" },\n          \"rating\": { \"doubleValue\": 4.5 },\n          \"completedJobs\": { \"integerValue\": \"8\" }\n        }\n      }\n    },\n    \"price\": { \"integerValue\": \"45\" },\n    \"currency\": { \"stringValue\": \"GTQ\" },\n    \"estimatedTime\": { \"integerValue\": \"30\" },\n    \"message\": { \"stringValue\": \"Incluyo materiales\" },\n    \"status\": { \"stringValue\": \"pending\" }\n  }\n}"
+              "raw": "{\n  \"fields\": {\n    \"jobId\": { \"stringValue\": \"{{jobId}}\" },\n    \"workerId\": { \"stringValue\": \"{{workerUid}}\" },\n    \"workerSnapshot\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"name\": { \"stringValue\": \"Juan Worker\" },\n          \"rating\": { \"doubleValue\": 4.5 },\n          \"completedJobs\": { \"integerValue\": \"8\" }\n        }\n      }\n    },\n    \"price\": { \"integerValue\": \"45\" },\n    \"currency\": { \"stringValue\": \"GTQ\" },\n    \"estimatedTime\": { \"integerValue\": \"30\" },\n    \"message\": { \"stringValue\": \"Incluyo materiales\" },\n    \"status\": { \"stringValue\": \"pending\" }\n  }\n}"
             },
             "url": { "raw": "{{fsURL}}/offers", "host": ["{{fsURL}}"], "path": ["offers"] }
           }
@@ -181,15 +287,49 @@
       ]
     },
     {
-      "name": "4. API REST (transacciones)",
+      "name": "5. Ubicación del trabajador (Firestore PATCH)",
       "item": [
         {
-          "name": "acceptOffer",
+          "name": "Actualizar ubicación del trabajador (para /computeRoute)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{workerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": {\n    \"location\": {\n      \"mapValue\": {\n        \"fields\": {\n          \"geopoint\": {\n            \"geoPointValue\": { \"latitude\": 14.6246, \"longitude\": -90.5328 }\n          },\n          \"geohash\": { \"stringValue\": \"9fgwp\" },\n          \"address\": { \"stringValue\": \"Zona 1, Guatemala\" }\n        }\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{fsURL}}/users/{{workerUid}}?updateMask.fieldPaths=location",
+              "host": ["{{fsURL}}"],
+              "path": ["users", "{{workerUid}}"],
+              "query": [{ "key": "updateMask.fieldPaths", "value": "location" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. API REST (transacciones)",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": null,
+            "url": { "raw": "{{apiURL}}/", "host": ["{{apiURL}}"], "path": [] }
+          }
+        },
+        {
+          "name": "acceptOffer (token cliente)",
           "request": {
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
             ],
             "body": {
               "mode": "raw",
@@ -204,7 +344,7 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
             ],
             "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\"\n}" },
             "url": { "raw": "{{apiURL}}/computeRoute", "host": ["{{apiURL}}"], "path": ["computeRoute"] }
@@ -216,7 +356,7 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
             ],
             "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\"\n}" },
             "url": { "raw": "{{apiURL}}/completeJob", "host": ["{{apiURL}}"], "path": ["completeJob"] }
@@ -228,7 +368,7 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
             ],
             "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"reason\": \"Ya no lo necesito\"\n}" },
             "url": { "raw": "{{apiURL}}/cancelJob", "host": ["{{apiURL}}"], "path": ["cancelJob"] }
@@ -240,7 +380,7 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{idToken}}" }
+              { "key": "Authorization", "value": "Bearer {{clientToken}}" }
             ],
             "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"rating\": 5,\n  \"comment\": \"Excelente servicio\"\n}" },
             "url": { "raw": "{{apiURL}}/createReview", "host": ["{{apiURL}}"], "path": ["createReview"] }
@@ -249,13 +389,13 @@
       ]
     },
     {
-      "name": "5. Consultar datos (Firestore REST)",
+      "name": "7. Consultar datos (Firestore REST)",
       "item": [
         {
           "name": "Leer un trabajo",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{idToken}}" }],
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
             "url": { "raw": "{{fsURL}}/jobs/{{jobId}}", "host": ["{{fsURL}}"], "path": ["jobs", "{{jobId}}"] }
           }
         },
@@ -263,8 +403,8 @@
           "name": "Leer un usuario",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{idToken}}" }],
-            "url": { "raw": "{{fsURL}}/users/{{uid}}", "host": ["{{fsURL}}"], "path": ["users", "{{uid}}"] }
+            "header": [{ "key": "Authorization", "value": "Bearer {{clientToken}}" }],
+            "url": { "raw": "{{fsURL}}/users/{{clientUid}}", "host": ["{{fsURL}}"], "path": ["users", "{{clientUid}}"] }
           }
         }
       ]
