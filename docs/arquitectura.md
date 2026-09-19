@@ -50,7 +50,8 @@ header `Authorization: Bearer <idToken>`.
 | POST | `/cancelJob` | Cliente dueño del trabajo |
 | POST | `/completeJob` | Cliente o trabajador asignado |
 | POST | `/createReview` | Participante de un trabajo completado |
-| POST | `/computeRoute` | Cliente o trabajador asignado |
+| POST | `/computeRoute` | Cliente dueño o trabajador asignado (ver §5.1) |
+| GET | `/jobs/nearby` | Trabajador / `both` (ver §5.2) |
 
 Formato de error: `{ error: string, code: string }` con el status HTTP real
 (400 `invalid-argument`, 401 `unauthenticated`, 403 `permission-denied`,
