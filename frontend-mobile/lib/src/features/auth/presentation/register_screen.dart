@@ -90,7 +90,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   /// Modal de éxito + salida a login (cerramos sesión para que el flujo
   /// login muestre la pantalla de inicio de sesión limpia).
   Future<void> _showSuccessModal() async {
-    final email = _email.text.trim();
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -120,13 +119,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Te enviamos un correo de confirmación a\n$email.\n\n'
-                  'Revisa tu correo y confirma tu cuenta.'
-                  'Si no ves el correo, revisa tu spam.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppTheme.textLight),
-                ),
+            Text(
+              'Te enviamos un correo de confirmación.\n\n'
+              'Si tu correo es real, ábrelo y confirma tu cuenta.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppTheme.textLight),
+            ),
               ],
             ),
             actions: [

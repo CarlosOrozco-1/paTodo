@@ -23,7 +23,7 @@ class AppConfig {
   /// Google → Configuración del SDK web.
   static const String googleWebClientId = String.fromEnvironment(
     'GOOGLE_WEB_CLIENT_ID',
-    defaultValue: '',
+    defaultValue: '377828600122-r6kc7b5surfos5ha27fbs4lb9ue7672t.apps.googleusercontent.com',
   );
 
   static String get baseUrl {
