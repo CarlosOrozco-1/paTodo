@@ -14,6 +14,18 @@ class AppConfig {
     defaultValue: 'pa-todo',
   );
 
+  /// Web OAuth Client ID (Google Cloud → "Web client (auto created by
+  /// Google Service)"). Obligatorio en Android para login con Google
+  /// (google_sign_in v7 lo exige para emitir idToken).
+  /// Se inyecta en build-time:
+  ///   flutter run --dart-define=GOOGLE_WEB_CLIENT_ID=xxx.apps.googleusercontent.com
+  /// DEV: copiarlo de Firebase Console → Authentication → Sign-in method →
+  /// Google → Configuración del SDK web.
+  static const String googleWebClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue: '',
+  );
+
   static String get baseUrl {
     if (_definedBaseUrl.isNotEmpty) return _definedBaseUrl;
     // Emuladores locales: la API Express corre en el host (no en el emulador).

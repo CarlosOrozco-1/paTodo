@@ -87,3 +87,16 @@ app. Antes de tocar esas carpetas o de integrar algo, leer:
 Regla clave para los agentes de integración: el **Custom Claim `role`** solo viaja
 en tokens nuevos; tras `POST /createUser` (o cambio de rol) el cliente debe
 refrescar el token (`getIdToken(true)`) antes de escribir en Firestore.
+
+## Lenguaje: usuario vs desarrollador
+
+- **Usuario final:** mensajes en lenguaje natural, sin tecnicismos. Nada de
+  "Render", "cold start", "timeout", "status 400/500", "SocketException" o
+  nombres de servicios. Ej.: "Creando tu cuenta…" / "Esto puede tardar unos
+  segundos…" / "No pudimos completar la acción. Inténtalo de nuevo."
+- **Desarrollador:** los detalles técnicos van solo en comentarios de código
+  (`// DEV:`), `debugPrint` y logs, nunca en la UI. Ej.:
+  `// DEV: Render (plan gratuito) tarda 20-50s en despertar en la primera
+  petición; por eso el timeout de Dio es de 60s.`
+- Las esperas largas (registro, publicación) usan **modal de espera no
+  cancelable** con mensaje amable; el error muestra reintento genérico.

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'firebase_options.dart';
+import 'src/core/config/app_config.dart';
 import 'src/core/theme/app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'src/shared/widgets/main_scaffold.dart';
-import 'src/features/services/presentation/home_service_screen.dart';
 import 'src/features/services/presentation/create_service_screen.dart';
 import 'src/features/search/presentation/search_screen.dart';
 import 'src/features/activity/presentation/activity_screen.dart';
@@ -23,6 +24,19 @@ void main() async {
     debugPrint('Firebase inicializado: ${Firebase.app().options.projectId}');
   } catch (e) {
     debugPrint('Firebase not initialized: $e');
+  }
+
+  // DEV: google_sign_in v7 exige initialize() antes de authenticate(), y en
+  // Android exige serverClientId (Web OAuth client) para emitir idToken.
+  try {
+    final sid = AppConfig.googleWebClientId;
+    debugPrint('GTRACE_INIT: serverClientId_len=${sid.length} value=$sid');
+    await GoogleSignIn.instance.initialize(
+      serverClientId: sid.isNotEmpty ? sid : null,
+    );
+    debugPrint('GTRACE_INIT_OK');
+  } catch (e) {
+    debugPrint('GoogleSignIn not initialized: $e');
   }
 
   runApp(const PaTodoApp());
