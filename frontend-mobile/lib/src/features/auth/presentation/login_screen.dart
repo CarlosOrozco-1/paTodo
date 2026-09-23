@@ -66,28 +66,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loginGoogle() async {
     setState(() { _googleLoading = true; _error = null; });
     try {
-      final (:cred, :isNew) = await _repo.signInWithGoogle();
-      if (!mounted) return;
-      if (isNew) {
-        // Usuario Google nuevo: pedir rol para crear perfil en la API.
-        final role = await _askRole(cred.user?.displayName ?? '');
-        if (role == null) {
-          await _repo.signOut();
-          return;
-        }
-        // DEV: espera larga (Render despierta 20-50s) → modal no cancelable.
-        _showWaiting();
-        try {
-          final parts = (cred.user?.displayName ?? '').split(' ');
-          await _repo.ensureApiProfile(
-            role: role,
-            firstName: parts.isNotEmpty ? parts.first : '',
-            lastName: parts.length > 1 ? parts.sublist(1).join(' ') : '',
-          );
-        } finally {
-          if (mounted) Navigator.of(context).pop();
-        }
-      }
+      // DEV: el perfil (rol + contacto) ya NO se pide aquí. ProfileGate
+      // detecta si falta users/{uid} y manda a CompleteProfileScreen.
+      await _repo.signInWithGoogle();
       // main.dart redirige solo vía authStateChanges.
     } catch (e) {
       debugPrint('GOOGLE_LOGIN_ERROR: $e');
@@ -99,60 +80,6 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
-  }
-
-  Future<String?> _askRole(String name) async {
-    String role = 'client';
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Hola${name.isEmpty ? '' : ', $name'}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('¿Cómo quieres usar PaTodo?'),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final r in const ['client', 'worker', 'both'])
-                    ChoiceChip(
-                      label: Text(r == 'client' ? 'Cliente' : r == 'worker' ? 'Profesional' : 'Ambos'),
-                      selected: role == r,
-                      selectedColor: AppTheme.primaryGreen.withValues(alpha: 0.2),
-                      onSelected: (_) => setD(() => role = r),
-                    ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppTheme.primaryGreen),
-              onPressed: () => Navigator.of(ctx).pop(role),
-              child: const Text('Continuar'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showWaiting() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const AlertDialog(
-        content: Row(children: [
-          CircularProgressIndicator(),
-          SizedBox(width: 20),
-          Expanded(child: Text('Entrando…\nEsto puede tardar unos segundos…')),
-        ]),
-      ),
-    );
   }
 
   void _openRecovery() {

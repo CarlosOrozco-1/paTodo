@@ -52,6 +52,48 @@ patodo/
 - No inventar endpoints fuera de `spec/openapi.yaml`.
 - No duplicar lógica entre frontends; compartir convenciones y usar la misma especificación.
 
+### Despliegues: cuándo se actualiza cada servicio
+
+- **Render** ejecuta SOLO la carpeta `api/`. Su deploy se actualiza únicamente
+  cuando cambia la API (código en `api/` o `spec/` que la afecte). **Los cambios
+  en `frontend-mobile/`, `frontend-web/`, `docs/` o `AGENTS.md` NO requieren
+  redeploy de Render**; esa es la build del APK/web, no el servidor.
+- **Firebase (Firestore)** se actualiza con `firebase deploy` desde la raíz:
+  - `firebase deploy --only firestore:rules` → tras tocar `firestore.rules`.
+  - `firebase deploy --only firestore:indexes` → tras tocar `firestore.indexes.json`.
+  - No desplegar el índice a la par del código puede romper consultas con
+    `where + orderBy` (error `FAILED_PRECONDITION: The query requires an index`).
+- Un error de la app móvil no implica necesariamente un deploy desactualizado:
+  verificar en orden → (1) índice Firestore, (2) reglas Firestore, (3) `api/`
+  en Render, (4) estatus del request (cold start de Render en plan gratuito).
+- Los logs de Android (`InsetsState`, `VRI`, `Choreographer`) son ruido del
+  sistema operativo del emulador/dispositivo, NO errores de la app o del backend.
+
+## Flujo de trabajo con Git (respaldo e integración)
+
+Estrategia para integrar código de otros desarrolladores **sin romper** el
+trabajo local ni generar conflictos a ciegas. Documentación detallada en
+`docs/trabajo-git.md`.
+
+- Ramas:
+  - `desa` (remoto): rama de trabajo principal con upstream.
+  - `backup` (SOLO local, NO se sube al remoto): respaldo del código verificado.
+  - `integracion-*` (temporal, local): donde se bajó/prueba el código ajeno.
+- Regla de oro: **backup siempre apunta a un commit verificado**. Solo se adelanta
+  cuando `desa` pasó las pruebas completas.
+- Flujo por cada pull/integración de código ajeno:
+  1. Desde `desa` limpia y commiteada: `git switch -c integracion-desa`.
+  2. Integrar ahí el código del desarrollador (merge/pull) y probar.
+  3. Si todo va bien → `git switch desa && git merge integracion-desa` → probar
+     en `desa` nuevamente → si ok: `git branch -f backup desa` y borrar
+     `integracion-desa`.
+  4. Si algo se rompe → `git switch desa` (el código ajeno jamás toca `desa`
+     ni `backup`), borrar `integracion-desa`, y continuar desde el respaldo.
+- **Antes** de adelantar `backup`, el trabajo que se quiere respaldar debe estar
+  COMMITEADO en `desa` (una rama respalda commits, no archivos sueltos).
+- Los conflictos no se evitan con ramas, se controlan: al aislar el código ajeno
+  en `integracion-*`, se decide cuándo y si mergea, sin exponer el respaldo.
+
 ## Roles de usuario
 
 - `client`: publica trabajos.

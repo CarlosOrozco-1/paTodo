@@ -64,7 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (e.response?.statusCode == 403) {
         setState(() { _role = 'client'; _loading = false; });
       } else {
-        setState(() { _error = 'Sin conexión o servidor no disponible.'; _loading = false; });
+        setState(() { _error = 'No pudimos conectar. Revisa tu internet e inténtalo de nuevo.'; _loading = false; });
       }
     } catch (_) {
       if (mounted) setState(() { _error = 'Ocurrió un error inesperado.'; _loading = false; });

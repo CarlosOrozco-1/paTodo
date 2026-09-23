@@ -6,7 +6,7 @@ import 'src/core/config/app_config.dart';
 import 'src/core/theme/app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'src/shared/widgets/main_scaffold.dart';
-import 'src/features/home/presentation/welcome_screen.dart';
+import 'src/features/home/presentation/profile_gate.dart';
 import 'src/features/services/presentation/create_service_screen.dart';
 import 'src/features/search/presentation/search_screen.dart';
 import 'src/features/activity/presentation/activity_screen.dart';
@@ -64,8 +64,9 @@ class PaTodoApp extends StatelessWidget {
             return const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
           if (snap.data == null) return const LoginScreen();
-          // Bienvenida: el usuario elige qué hacer hoy (publicar o buscar).
-          return const WelcomeScreen();
+          // Bienvenida/completar perfil: ProfileGate decide según exista
+          // el doc users/{uid} (centraliza todos los métodos de entrada).
+          return const ProfileGate();
         },
       ),
     );

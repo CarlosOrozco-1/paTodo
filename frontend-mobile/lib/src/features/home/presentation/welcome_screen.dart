@@ -23,9 +23,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Future<void> _loadUser() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)

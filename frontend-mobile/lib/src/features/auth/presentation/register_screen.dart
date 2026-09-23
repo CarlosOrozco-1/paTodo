@@ -73,14 +73,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         setState(
           () =>
               _error =
-                  'El servidor tarda en despertar (Render). Espera 1 min y reintenta.',
+                  'No pudimos crear tu cuenta. Revisa tu internet e inténtalo de nuevo.',
         );
       } else if (m.contains('status code of 400')) {
-        setState(() => _error = 'Datos inválidos para la API (400).');
+        setState(() => _error = 'Verifica los datos que ingresaste.');
       } else if (m.contains('status code of 409')) {
-        setState(() => _error = 'Ese usuario ya existe en el servidor (409).');
+        setState(() => _error = 'Ese usuario ya existe.');
       } else {
-        setState(() => _error = 'No se pudo crear la cuenta. Detalle: $m');
+        setState(() => _error = 'No se pudo crear la cuenta. Inténtalo de nuevo.');
       }
     } finally {
       if (mounted) setState(() => _loading = false);

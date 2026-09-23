@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -95,11 +94,11 @@ class AuthRepository {
   Future<void> sendPasswordReset(String email) =>
       _auth.sendPasswordResetEmail(email: email);
 
-  /// Login con Google. Retorna (credencial, esNuevoUsuario).
-  /// DEV: Google no trae rol; si es nuevo, la UI debe pedir rol y llamar
-  /// ensureApiProfile() antes de seguir. Requiere SHA-1 registrado en
-  /// Firebase Console y provider Google habilitado.
-  Future<({UserCredential cred, bool isNew})> signInWithGoogle() async {
+  /// Login con Google. Retorna la credencial.
+  /// DEV: el perfil NO se crea aquí; ProfileGate detecta si falta el doc
+  /// users/{uid} y manda al usuario a CompleteProfileScreen.
+  /// Requiere SHA-1 registrado en Firebase Console y provider Google habilitado.
+  Future<UserCredential> signInWithGoogle() async {
     // DEV: sin GOOGLE_WEB_CLIENT_ID (dart-define), Android lanza
     // clientConfigurationError "serverClientId must be provided".
     if (AppConfig.googleWebClientId.isEmpty) {
@@ -115,18 +114,16 @@ class AuthRepository {
     debugPrint('GTRACE_STEP4_FIREBASE_SIGNIN_BEGIN');
     final cred = await _auth.signInWithCredential(credential);
     debugPrint('GTRACE_STEP5_FIREBASE_OK: ${cred.user!.uid}');
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(cred.user!.uid)
-        .get();
-    return (cred: cred, isNew: !doc.exists);
+    return cred;
   }
 
-  /// Crea el perfil en la API para usuarios Google nuevos (rol elegido en UI).
+  /// Crea el perfil en la API (POST /createUser). Lo usan el registro y
+  /// CompleteProfileScreen. [phone] es obligatorio en PaTodo (contacto).
   Future<void> ensureApiProfile({
     required String role,
     required String firstName,
     required String lastName,
+    required String phone,
   }) async {
     final user = _auth.currentUser!;
     debugPrint('REGISTER_BASEURL: ${_api.dio.options.baseUrl}');
@@ -136,7 +133,7 @@ class AuthRepository {
       'email': user.email,
       'role': role,
       'profile': {'firstName': firstName, 'lastName': lastName},
-      'contact': {'phone': ''},
+      'contact': {'phone': normalizeGtPhone(phone)},
     }, options: orgOptions(token));
     debugPrint('SIGNUP_API_OK: ${res.statusCode}');
     await user.getIdToken(true);

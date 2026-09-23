@@ -1,6 +1,7 @@
 # Secrets - nunca versionar
 .env
 *firebase-adminsdk*.json
+frontend-mobile/android/app/google-services.json
 
 # Entornos / IDEs
 .idea/
