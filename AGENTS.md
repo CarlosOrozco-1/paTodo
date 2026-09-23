@@ -77,6 +77,8 @@ trabajo local ni generar conflictos a ciegas. Documentación detallada en
 
 - Ramas:
   - `desa` (remoto): rama de trabajo principal con upstream.
+  - `pre` (remoto): pre-producción. Avanza solo con código ya probado en `desa`.
+  - `pro` (remoto): producción. Avanza solo con código ya probado en `pre`.
   - `backup` (SOLO local, NO se sube al remoto): respaldo del código verificado.
   - `integracion-*` (temporal, local): donde se bajó/prueba el código ajeno.
 - Regla de oro: **backup siempre apunta a un commit verificado**. Solo se adelanta
@@ -89,6 +91,11 @@ trabajo local ni generar conflictos a ciegas. Documentación detallada en
      `integracion-desa`.
   4. Si algo se rompe → `git switch desa` (el código ajeno jamás toca `desa`
      ni `backup`), borrar `integracion-desa`, y continuar desde el respaldo.
+- Propagación de releases en cascada: `desa` (pasa pruebas) → **merge a `pre`**
+  (pasa pruebas) → **merge a `pro`**. Las promociones se hacen desde `desa`
+  verificado; `pre`/`pro` NO saltan estados sin haber probado el anterior.
+  Todo merge pasa por una rama temporal `integracion-*` y se prueba dos veces
+  (en la rama destino antes de mover `backup`).
 - **Antes** de adelantar `backup`, el trabajo que se quiere respaldar debe estar
   COMMITEADO en `desa` (una rama respalda commits, no archivos sueltos).
 - Los conflictos no se evitan con ramas, se controlan: al aislar el código ajeno

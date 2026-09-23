@@ -9,6 +9,8 @@
 | Rama | Dónde vive | Función |
 |---|---|---|
 | `desa` | Remoto (upstream) | Rama principal de trabajo. Es la que se pushea. |
+| `pre` | Remoto (upstream) | Pre-producción. Avanza solo con código ya probado en `desa`. |
+| `pro` | Remoto (upstream) | Producción. Avanza solo con código ya probado en `pre`. |
 | `backup` | **Solo local** (no se sube) | Respaldo del código **verificado**. Apunta siempre a un commit probado. |
 | `integracion-*` | Solo local, temporal | Donde se baja y se prueba el código de los demás. Se borra al terminar. |
 
@@ -53,3 +55,31 @@ completas.** Nunca se mergea hacia `backup`; se usa `git branch -f`.
   respaldo verificado.
 - Flujo mental de cada ciclo: **`integracion-desa` (prueba) → `desa` (verificado)
   → `backup` (respaldo)**.
+
+## Propagación de releases (desa → pre → pro)
+
+Los releases avanzan **en cascada**, sin saltar etapas:
+
+```
+desa (pasa pruebas) ──merge──▶ pre (pasa pruebas) ──merge──▶ pro
+```
+
+1. **Promover `desa` → `pre`:** con `desa` verificado, llevar `pre` al día y
+   traer lo probado vía rama temporal:
+   ```bash
+   git switch pre
+   git fetch origin && git merge origin/pre   # pre al día con el remoto
+   git switch -c integracion-pre              # separar la promoción
+   git merge desa                             # traer lo ya probado en desa
+   # PROBAR en integracion-pre (dos verificaciones antes de tocar pre)
+   git switch pre
+   git merge integracion-pre
+   # probar en pre nuevamente
+   git branch -d integracion-pre
+   git push
+   ```
+2. **Promover `pre` → `pro`:** repetir el mismo patrón usando `pro` como destino
+   y `pre` como fuente (solo código ya probado en `pre`).
+3. `pre`/`pro` **nunca** saltan estados: no se mergea `desa` directo a `pro`.
+4. `backup` se mueve únicamente tras verificar `desa`; las promociones a `pre`
+   y `pro` no mueven `backup`.
