@@ -905,25 +905,270 @@ class ModernJobCard extends StatelessWidget {
 
 // ─────────────────────────── Pantalla de Detalle ───────────────────────────
 
-class JobDetailScreen extends StatelessWidget {
+class JobDetailScreen extends StatefulWidget {
   final Map<String, dynamic> jobData;
   final String jobId;
 
   const JobDetailScreen({required this.jobData, required this.jobId});
 
   @override
+  State<JobDetailScreen> createState() => _JobDetailScreenState();
+}
+
+class _JobDetailScreenState extends State<JobDetailScreen> {
+  // Datos del cliente que publicó el trabajo
+  String? _clientName;
+  String? _clientAvatarUrl;
+  bool _loadingClient = true;
+
+  // Datos del trabajador asignado (si existe)
+  String? _workerName;
+  String? _workerAvatarUrl;
+  bool _loadingWorker = false;
+
+  // Estado del botón de oferta
+  bool _sendingOffer = false;
+
+  // Rol del usuario actual
+  String? _currentUserRole;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadParticipants();
+  }
+
+  Future<void> _loadParticipants() async {
+    // Cargar rol del usuario actual
+    try {
+      final tokenResult = await FirebaseAuth.instance.currentUser?.getIdTokenResult(false);
+      if (mounted) {
+        setState(() => _currentUserRole = (tokenResult?.claims?['role'] as String?) ?? 'client');
+      }
+    } catch (_) {}
+
+    // Cargar perfil del cliente que publicó
+    final clientId = widget.jobData['clientId'] as String?;
+    if (clientId != null) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(clientId).get();
+        final profile = (doc.data()?['profile'] as Map<String, dynamic>?) ?? {};
+        final name = '${profile['firstName'] ?? ''} ${profile['lastName'] ?? ''}'.trim();
+        if (mounted) {
+          setState(() {
+            _clientName = name.isNotEmpty ? name : 'Cliente';
+            _clientAvatarUrl = profile['avatarUrl'] as String?;
+            _loadingClient = false;
+          });
+        }
+      } catch (_) {
+        if (mounted) setState(() { _clientName = 'Cliente'; _loadingClient = false; });
+      }
+    } else {
+      if (mounted) setState(() { _clientName = 'Cliente'; _loadingClient = false; });
+    }
+
+    // Cargar perfil del trabajador asignado si existe
+    final workerId = widget.jobData['workerId'] as String?;
+    if (workerId != null) {
+      if (mounted) setState(() => _loadingWorker = true);
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(workerId).get();
+        final profile = (doc.data()?['profile'] as Map<String, dynamic>?) ?? {};
+        final name = '${profile['firstName'] ?? ''} ${profile['lastName'] ?? ''}'.trim();
+        if (mounted) {
+          setState(() {
+            _workerName = name.isNotEmpty ? name : 'Trabajador';
+            _workerAvatarUrl = profile['avatarUrl'] as String?;
+            _loadingWorker = false;
+          });
+        }
+      } catch (_) {
+        if (mounted) setState(() { _workerName = 'Trabajador'; _loadingWorker = false; });
+      }
+    }
+  }
+
+  void _showSendOfferDialog(BuildContext context) {
+    final priceCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    final currency = (widget.jobData['pricing'] as Map<String, dynamic>?)?['currency'] ?? 'Q';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Enviar oferta',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'El cliente revisará tu propuesta y decidirá si te contrata.',
+                style: TextStyle(color: AppTheme.textLight, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+              // Precio propuesto
+              TextField(
+                controller: priceCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Tu precio ($currency)',
+                  prefixIcon: const Icon(Icons.attach_money, color: AppTheme.primaryGreen),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              // Nota opcional
+              TextField(
+                controller: noteCtrl,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: 'Mensaje al cliente (opcional)',
+                  alignLabelWithHint: true,
+                  prefixIcon: const Padding(
+                    padding: EdgeInsets.only(bottom: 40),
+                    child: Icon(Icons.chat_bubble_outline, color: AppTheme.primaryGreen),
+                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: StatefulBuilder(
+                  builder: (ctx, setSheetState) => FilledButton.icon(
+                    onPressed: _sendingOffer
+                        ? null
+                        : () async {
+                            final priceText = priceCtrl.text.trim();
+                            if (priceText.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Ingresa el precio de tu oferta.')),
+                              );
+                              return;
+                            }
+                            final offerPrice = double.tryParse(priceText);
+                            if (offerPrice == null || offerPrice <= 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Ingresa un precio válido.')),
+                              );
+                              return;
+                            }
+
+                            setSheetState(() {});
+                            setState(() => _sendingOffer = true);
+                            Navigator.pop(context); // cerrar sheet
+
+                            try {
+                              final uid = FirebaseAuth.instance.currentUser?.uid;
+                              if (uid == null) throw Exception('Sin sesión');
+
+                              // DEV: Escritura directa a Firestore — las offers son creadas por el worker/both.
+                              await FirebaseFirestore.instance
+                                  .collection('jobs')
+                                  .doc(widget.jobId)
+                                  .collection('offers')
+                                  .add({
+                                'workerId': uid,
+                                'jobId': widget.jobId,
+                                'proposedPrice': offerPrice,
+                                'currency': currency,
+                                'note': noteCtrl.text.trim(),
+                                'status': 'pending',
+                                'createdAt': FieldValue.serverTimestamp(),
+                              });
+
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('¡Oferta enviada! El cliente la revisará pronto.'),
+                                    backgroundColor: AppTheme.primaryGreen,
+                                  ),
+                                );
+                              }
+                            } catch (_) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('No pudimos enviar tu oferta. Inténtalo de nuevo.'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (mounted) setState(() => _sendingOffer = false);
+                            }
+                          },
+                    icon: _sendingOffer
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.send_rounded),
+                    label: Text(_sendingOffer ? 'Enviando…' : 'Enviar oferta'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.primaryGreen,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final jobData = widget.jobData;
     final details = jobData['details'] as Map<String, dynamic>? ?? {};
     final pricing = jobData['pricing'] as Map<String, dynamic>? ?? {};
     final loc = jobData['location'] as Map<String, dynamic>? ?? {};
 
     final title = details['title'] as String? ?? 'Sin título';
     final desc = details['description'] as String? ?? 'Sin descripción';
-    final categoryId = details['categoryId'] as String? ?? 'general';
+    final categoryId = (details['categoryId'] as String? ?? 'general').toLowerCase();
     final price = (pricing['proposedPrice'] ?? 0.0) as num;
     final currency = pricing['currency'] as String? ?? 'Q';
     final status = jobData['status'] as String? ?? 'pending';
     final address = loc['address'] as String?;
+    final clientId = jobData['clientId'] as String?;
+    final workerId = jobData['workerId'] as String?;
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+
+    final isOwner = currentUid == clientId;
+    final isWorkerRole = _currentUserRole == 'worker' || _currentUserRole == 'both';
+    final canSendOffer = !isOwner && isWorkerRole && status == 'pending';
 
     final rawGeo = loc['geopoint'];
     LatLng latLng = const LatLng(14.6349, -90.5069);
@@ -941,151 +1186,483 @@ class JobDetailScreen extends StatelessWidget {
       }
     }
 
-    final statusColor = switch (status) {
-      'pending' => Colors.orange,
-      'accepted' => Colors.blue,
-      'completed' => Colors.green,
-      _ => Colors.grey,
+    // Colores y etiquetas de estado
+    final Color statusColor;
+    final String statusLabel;
+    final IconData statusIcon;
+    switch (status) {
+      case 'pending':
+        statusColor = const Color(0xFFE65100);
+        statusLabel = 'Pendiente';
+        statusIcon = Icons.schedule_rounded;
+        break;
+      case 'accepted':
+        statusColor = const Color(0xFF1565C0);
+        statusLabel = 'Aceptado';
+        statusIcon = Icons.handshake_outlined;
+        break;
+      case 'completed':
+        statusColor = const Color(0xFF2E7D32);
+        statusLabel = 'Completado';
+        statusIcon = Icons.check_circle_outline_rounded;
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusLabel = status;
+        statusIcon = Icons.info_outline;
+    }
+
+    // Icono y color de categoría
+    const categoryIcons = <String, IconData>{
+      'mecanica': Icons.build_rounded,
+      'plomeria': Icons.water_drop_rounded,
+      'electricidad': Icons.bolt_rounded,
+      'jardineria': Icons.yard_rounded,
+      'limpieza': Icons.cleaning_services_rounded,
+      'pintura': Icons.format_paint_rounded,
+      'general': Icons.handyman_rounded,
     };
-    final statusLabel = switch (status) {
-      'pending' => 'Pendiente',
-      'accepted' => 'Aceptado',
-      'completed' => 'Completado',
-      _ => status,
+    const categoryColors = <String, Color>{
+      'mecanica': Color(0xFFB71C1C),
+      'plomeria': Color(0xFF0D47A1),
+      'electricidad': Color(0xFFF57F17),
+      'jardineria': Color(0xFF1B5E20),
+      'limpieza': Color(0xFF006064),
+      'pintura': Color(0xFF4A148C),
+      'general': Color(0xFF3E2723),
     };
+    final catIcon = categoryIcons[categoryId] ?? Icons.handyman_rounded;
+    final catColor = categoryColors[categoryId] ?? const Color(0xFF3E2723);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: const Color(0xFFF0F2F5),
+      floatingActionButton: canSendOffer
+          ? FloatingActionButton.extended(
+              onPressed: _sendingOffer ? null : () => _showSendOfferDialog(context),
+              backgroundColor: AppTheme.primaryGreen,
+              elevation: 6,
+              icon: _sendingOffer
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                  : const Icon(Icons.handshake_outlined, color: Colors.white),
+              label: Text(
+                _sendingOffer ? 'Enviando…' : 'Enviar oferta',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+            )
+          : null,
       body: CustomScrollView(
         slivers: [
+          // ── Hero expandido ──
           SliverAppBar(
-            expandedHeight: 140,
+            expandedHeight: 200,
             pinned: true,
-            backgroundColor: const Color(0xFF2E7D32),
+            stretch: true,
+            backgroundColor: const Color(0xFF1B5E20),
             iconTheme: const IconThemeData(color: Colors.white),
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 56, bottom: 16),
+              stretchModes: const [StretchMode.zoomBackground, StretchMode.blurBackground],
+              titlePadding: const EdgeInsets.fromLTRB(56, 0, 16, 20),
               title: Text(
                 title,
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                maxLines: 1,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                  shadows: [Shadow(color: Colors.black38, blurRadius: 8)],
+                ),
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Gradiente base
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF1B5E20), Color(0xFF2E7D32), Color(0xFF43A047)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
                   ),
-                ),
+                  // Patrón decorativo de círculos
+                  Positioned(
+                    right: -30, top: -30,
+                    child: Container(
+                      width: 160, height: 160,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.06),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: -20, bottom: 20,
+                    child: Container(
+                      width: 100, height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.05),
+                      ),
+                    ),
+                  ),
+                  // Icono de categoría grande
+                  Positioned(
+                    right: 24, top: 20,
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: Colors.white.withOpacity(0.2)),
+                      ),
+                      child: Icon(catIcon, color: Colors.white, size: 28),
+                    ),
+                  ),
+                  // Gradiente inferior para legibilidad del título
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.transparent, Colors.black.withOpacity(0.4)],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Precio + estado
+
+                  // ── Tarjeta Hero: Precio + Estado + Categoría ──
                   Container(
-                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 4))],
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: catColor.withOpacity(0.12),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
-                    child: Row(
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: Column(
+                        // Barra de color de categoría en la parte superior
+                        Container(
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: catColor,
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Presupuesto', style: TextStyle(color: AppTheme.textLight, fontSize: 12)),
-                              const SizedBox(height: 4),
-                              Text(
-                                '$currency ${price.toStringAsFixed(2)}',
-                                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.primaryGreen),
+                              // Precio
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Presupuesto',
+                                      style: TextStyle(color: Colors.grey[500], fontSize: 11, letterSpacing: 0.5, fontWeight: FontWeight.w600),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '$currency ${price.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppTheme.primaryGreen,
+                                        letterSpacing: -1,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    // Chip de categoría
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: catColor.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(catIcon, size: 13, color: catColor),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            categoryId,
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: catColor),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Estado
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: statusColor.withOpacity(0.25), width: 1.5),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(statusIcon, size: 14, color: statusColor),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          statusLabel,
+                                          style: TextStyle(color: statusColor, fontWeight: FontWeight.w800, fontSize: 12),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const Text('Estado', style: TextStyle(color: AppTheme.textLight, fontSize: 12)),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: statusColor.withOpacity(0.3)),
-                              ),
-                              child: Text(statusLabel,
-                                  style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 13)),
-                            ),
-                          ],
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  _SectionCard(
-                    icon: Icons.description_outlined,
-                    title: 'Descripción',
-                    child: Text(desc, style: const TextStyle(color: AppTheme.textDark, height: 1.5)),
-                  ),
-                  const SizedBox(height: 16),
-
-                  _SectionCard(
-                    icon: Icons.category_outlined,
-                    title: 'Categoría',
-                    child: Text(categoryId,
-                        style: const TextStyle(color: AppTheme.textDark, fontWeight: FontWeight.w500)),
-                  ),
-                  const SizedBox(height: 16),
-
-                  _SectionCard(
-                    icon: Icons.location_on_outlined,
-                    title: address != null ? 'Ubicación — $address' : 'Ubicación',
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        height: 220,
-                        child: FlutterMap(
-                          options: MapOptions(initialCenter: latLng, initialZoom: 15),
-                          children: [
-                            TileLayer(
-                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                              userAgentPackageName: 'com.example.frontend',
-                            ),
-                            MarkerLayer(
-                              markers: [
-                                Marker(
-                                  point: latLng,
-                                  width: 44,
-                                  height: 44,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.primaryGreen,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white, width: 2),
-                                      boxShadow: [const BoxShadow(color: Colors.black26, blurRadius: 6)],
-                                    ),
-                                    child: const Icon(Icons.place, color: Colors.white, size: 22),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                  // ── Sección de participantes (Publicado por / Quién lo hace) ──
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
                         ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        // ── Publicado por
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1565C0).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.person_rounded, size: 14, color: Color(0xFF1565C0)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'PUBLICADO POR',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.grey[500],
+                                      letterSpacing: 1.0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              _loadingClient
+                                  ? const _MiniShimmer()
+                                  : _ParticipantRow(
+                                      name: isOwner ? 'Tú' : (_clientName ?? 'Cliente'),
+                                      avatarUrl: isOwner ? null : _clientAvatarUrl,
+                                      badge: isOwner ? 'Tu publicación' : 'Cliente',
+                                      badgeColor: const Color(0xFF1565C0),
+                                    ),
+                            ],
+                          ),
+                        ),
+                        Divider(height: 1, color: Colors.grey[100], indent: 20, endIndent: 20),
+                        // ── Quién lo realiza
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1B5E20).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      workerId != null ? Icons.construction_rounded : Icons.hourglass_empty_rounded,
+                                      size: 14,
+                                      color: const Color(0xFF1B5E20),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'QUIÉN LO REALIZA',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.grey[500],
+                                      letterSpacing: 1.0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              _loadingWorker
+                                  ? const _MiniShimmer()
+                                  : workerId == null
+                                      ? _AssignmentStatus(
+                                          taken: false,
+                                          workerName: null,
+                                          workerAvatarUrl: null,
+                                          isCurrentUser: false,
+                                        )
+                                      : _AssignmentStatus(
+                                          taken: true,
+                                          workerName: currentUid == workerId ? 'Tú' : (_workerName ?? 'Trabajador'),
+                                          workerAvatarUrl: currentUid == workerId ? null : _workerAvatarUrl,
+                                          isCurrentUser: currentUid == workerId,
+                                        ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Descripción ──
+                  _DetailCard(
+                    icon: Icons.description_outlined,
+                    iconColor: const Color(0xFF37474F),
+                    label: 'DESCRIPCIÓN',
+                    child: Text(
+                      desc,
+                      style: const TextStyle(
+                        color: AppTheme.textDark,
+                        height: 1.6,
+                        fontSize: 14,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 16),
+
+                  // ── Mapa ──
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.07),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryGreen.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.location_on_rounded, size: 14, color: AppTheme.primaryGreen),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  address != null ? address.toUpperCase() : 'UBICACIÓN',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.grey[500],
+                                    letterSpacing: 1.0,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                          child: SizedBox(
+                            height: 230,
+                            child: FlutterMap(
+                              options: MapOptions(initialCenter: latLng, initialZoom: 15),
+                              children: [
+                                TileLayer(
+                                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                  userAgentPackageName: 'com.example.frontend',
+                                ),
+                                MarkerLayer(
+                                  markers: [
+                                    Marker(
+                                      point: latLng,
+                                      width: 52,
+                                      height: 52,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primaryGreen,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 3),
+                                          boxShadow: [
+                                            BoxShadow(color: AppTheme.primaryGreen.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4)),
+                                          ],
+                                        ),
+                                        child: const Icon(Icons.place_rounded, color: Colors.white, size: 24),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  if (canSendOffer) const SizedBox(height: 100),
+                  if (!canSendOffer) const SizedBox(height: 32),
                 ],
               ),
             ),
@@ -1096,43 +1673,283 @@ class JobDetailScreen extends StatelessWidget {
   }
 }
 
-class _SectionCard extends StatelessWidget {
+// ─────────────────────────── Widgets auxiliares de detalle ───────────────────────────
+
+/// Card de detalle genérica con etiqueta, icono y contenido.
+class _DetailCard extends StatelessWidget {
   final IconData icon;
-  final String title;
+  final Color iconColor;
+  final String label;
   final Widget child;
 
-  const _SectionCard({required this.icon, required this.title, required this.child});
+  const _DetailCard({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 4))],
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 18, color: AppTheme.primaryGreen),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 14, color: iconColor),
+              ),
               const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-                      color: AppTheme.textLight, letterSpacing: 0.3),
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.grey[500],
+                  letterSpacing: 1.0,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           child,
-    ],
+        ],
       ),
     );
   }
 }
+
+/// Fila de participante (cliente o trabajador) con avatar y badge.
+class _ParticipantRow extends StatelessWidget {
+  final String name;
+  final String? avatarUrl;
+  final String badge;
+  final Color badgeColor;
+
+  const _ParticipantRow({
+    required this.name,
+    required this.avatarUrl,
+    required this.badge,
+    required this.badgeColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Avatar
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: badgeColor.withOpacity(0.1),
+            border: Border.all(color: badgeColor.withOpacity(0.3), width: 2),
+          ),
+          child: avatarUrl != null && avatarUrl!.isNotEmpty
+              ? ClipOval(child: Image.network(avatarUrl!, fit: BoxFit.cover))
+              : Center(
+                  child: Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: badgeColor),
+                  ),
+                ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            name,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.textDark),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: badgeColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: badgeColor.withOpacity(0.3)),
+          ),
+          child: Text(
+            badge,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: badgeColor),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Widget que muestra si el trabajo está libre o quién lo está haciendo.
+class _AssignmentStatus extends StatelessWidget {
+  final bool taken;
+  final String? workerName;
+  final String? workerAvatarUrl;
+  final bool isCurrentUser;
+
+  const _AssignmentStatus({
+    required this.taken,
+    required this.workerName,
+    required this.workerAvatarUrl,
+    required this.isCurrentUser,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!taken) {
+      return Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.hourglass_empty_rounded, color: Colors.orange, size: 22),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Disponible',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.textDark),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Nadie ha aceptado este trabajo aún.',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textLight),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.orange.withOpacity(0.4)),
+            ),
+            child: const Text(
+              'Libre',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Trabajo asignado
+    final displayName = workerName ?? 'Trabajador';
+    const workerBadgeColor = Color(0xFF2E7D32);
+
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: workerBadgeColor.withOpacity(0.1),
+            border: Border.all(color: workerBadgeColor.withOpacity(0.3), width: 1.5),
+          ),
+          child: workerAvatarUrl != null && workerAvatarUrl!.isNotEmpty
+              ? ClipOval(child: Image.network(workerAvatarUrl!, fit: BoxFit.cover))
+              : Center(
+                  child: Text(
+                    displayName[0].toUpperCase(),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: workerBadgeColor),
+                  ),
+                ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                displayName,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.textDark),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                isCurrentUser ? 'Este trabajo es tuyo.' : 'Este trabajador ya aceptó el trabajo.',
+                style: const TextStyle(fontSize: 12, color: AppTheme.textLight),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: workerBadgeColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: workerBadgeColor.withOpacity(0.3)),
+          ),
+          child: const Text(
+            'En progreso',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: workerBadgeColor),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shimmer mini para carga de participantes.
+class _MiniShimmer extends StatefulWidget {
+  const _MiniShimmer();
+  @override
+  State<_MiniShimmer> createState() => _MiniShimmerState();
+}
+
+class _MiniShimmerState extends State<_MiniShimmer> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(duration: const Duration(milliseconds: 900), vsync: this)..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0.3, end: 0.8).animate(_ctrl);
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, __) => Opacity(
+        opacity: _anim.value,
+        child: Row(
+          children: [
+            Container(width: 44, height: 44, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.grey[300])),
+            const SizedBox(width: 12),
+            Container(height: 16, width: 120, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(8))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
