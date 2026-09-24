@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import 'app_logo.dart';
+import 'user_avatar.dart';
 
 class HomeHeader extends StatelessWidget {
   final String title;
   final String subtitle;
   final String? profileImageUrl;
+  final String? name;
+  final String? email;
 
   const HomeHeader({
     super.key,
     required this.title,
     required this.subtitle,
     this.profileImageUrl,
+    this.name,
+    this.email,
   });
 
   @override
@@ -48,12 +53,11 @@ class HomeHeader extends StatelessWidget {
               ),
             ],
           ),
-          CircleAvatar(
+          UserAvatar(
+            photoUrl: profileImageUrl,
+            name: name,
+            email: email,
             radius: 25,
-            backgroundImage: profileImageUrl != null
-                ? NetworkImage(profileImageUrl!)
-                : null,
-            child: profileImageUrl == null ? const Icon(Icons.person) : null,
           ),
         ],
       ),

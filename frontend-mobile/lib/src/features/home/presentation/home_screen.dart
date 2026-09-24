@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/user_avatar.dart';
 
 /// Pantalla de inicio unificada:
 /// - Lee el rol del Custom Claim (`client`/`worker`/`both`).
@@ -22,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final ApiClient _api = ApiClient.create();
   String? _role;
   String? _displayName;
+  String? _photoUrl;
   int _bothTab = 0; // 0: Trabajos Cercanos, 1: Mis Trabajos
   List<Map<String, dynamic>> _nearby = [];
   bool _loading = true;
@@ -41,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final role = (tokenResult?.claims?['role'] as String?) ?? 'client';
 
       String? name;
+      String? photo = user?.photoURL;
       if (user != null) {
         try {
           final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
@@ -50,6 +53,10 @@ class _HomeScreenState extends State<HomeScreen> {
           if (fullName.isNotEmpty) {
             name = fullName;
           }
+          final customPhoto = profile?['avatarUrl'] as String?;
+          if (customPhoto != null && customPhoto.isNotEmpty) {
+            photo = customPhoto;
+          }
         } catch (_) {}
       }
 
@@ -57,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _role = role;
         if (name != null) _displayName = name;
+        _photoUrl = photo;
       });
       if (role == 'client') {
         // Los datos llegan por StreamBuilder; terminamos el loading.
@@ -131,7 +139,8 @@ class _HomeScreenState extends State<HomeScreen> {
             _HeroBanner(
               displayName: displayName,
               role: _role,
-              profileImageUrl: 'https://i.pravatar.cc/150?u=$email',
+              email: email,
+              profileImageUrl: _photoUrl,
             ),
 
             // ── Contenido principal ──
@@ -293,11 +302,13 @@ class _HomeScreenState extends State<HomeScreen> {
 class _HeroBanner extends StatelessWidget {
   final String displayName;
   final String? role;
+  final String? email;
   final String? profileImageUrl;
 
   const _HeroBanner({
     required this.displayName,
     required this.role,
+    this.email,
     this.profileImageUrl,
   });
 
@@ -374,14 +385,13 @@ class _HeroBanner extends StatelessWidget {
                       border: Border.all(color: Colors.white, width: 2.5),
                       boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8)],
                     ),
-                    child: CircleAvatar(
+                    child: UserAvatar(
+                      photoUrl: profileImageUrl,
+                      name: displayName,
+                      email: email,
                       radius: 26,
-                      backgroundImage:
-                          profileImageUrl != null ? NetworkImage(profileImageUrl!) : null,
                       backgroundColor: Colors.white24,
-                      child: profileImageUrl == null
-                          ? const Icon(Icons.person, color: Colors.white)
-                          : null,
+                      textColor: Colors.white,
                     ),
                   ),
                 ],

@@ -3,7 +3,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'firebase_options.dart';
 import 'src/core/config/app_config.dart';
-import 'src/core/theme/app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'src/shared/widgets/main_scaffold.dart';
 import 'src/features/home/presentation/profile_gate.dart';
@@ -14,6 +13,8 @@ import 'src/features/profile/presentation/profile_screen.dart';
 import 'src/features/auth/presentation/login_screen.dart';
 import 'src/features/auth/presentation/register_screen.dart';
 import 'src/features/home/presentation/home_screen.dart';
+
+import 'src/core/theme/theme_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,27 +49,35 @@ class PaTodoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'PaTodo',
-      theme: AppTheme.lightTheme,
-      debugShowCheckedModeBanner: false,
-      routes: {
-        '/login': (_) => const LoginScreen(),
-        '/register': (_) => const RegisterScreen(),
-        '/home': (_) => const MainScreen(),
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        final ctrl = ThemeController.instance;
+        return MaterialApp(
+          title: 'PaTodo',
+          theme: ctrl.buildTheme(isDark: false),
+          darkTheme: ctrl.buildTheme(isDark: true),
+          themeMode: ctrl.themeMode,
+          debugShowCheckedModeBanner: false,
+          routes: {
+            '/login': (_) => const LoginScreen(),
+            '/register': (_) => const RegisterScreen(),
+            '/home': (_) => const MainScreen(),
+          },
+          home: StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (_, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              }
+              if (snap.data == null) return const LoginScreen();
+              // Bienvenida/completar perfil: ProfileGate decide según exista
+              // el doc users/{uid} (centraliza todos los métodos de entrada).
+              return const ProfileGate();
+            },
+          ),
+        );
       },
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (_, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
-          }
-          if (snap.data == null) return const LoginScreen();
-          // Bienvenida/completar perfil: ProfileGate decide según exista
-          // el doc users/{uid} (centraliza todos los métodos de entrada).
-          return const ProfileGate();
-        },
-      ),
     );
   }
 }
