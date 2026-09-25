@@ -24,8 +24,8 @@ service cloud.firestore {
 
     // ===================== users =====================
     match /users/{userId} {
-      // Solo el propio usuario autenticado puede leer su documento.
-      allow read: if signedIn() && request.auth.uid == userId;
+      // Cualquier usuario autenticado puede leer los perfiles de los usuarios.
+      allow read: if signedIn();
 
       // El usuario puede editar su perfil/contacto/ubicación/dispositivos, pero
       // nunca campos que controla la API: uid, email, role, stats, createdAt.

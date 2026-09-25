@@ -740,26 +740,36 @@ class ModernJobCard extends StatelessWidget {
   final Map<String, dynamic> jobData;
   final String jobId;
 
-  const ModernJobCard({required this.jobData, required this.jobId});
+  const ModernJobCard({super.key, required this.jobData, required this.jobId});
 
   static const _categoryIcons = <String, IconData>{
-    'mecanica': Icons.build,
-    'plomeria': Icons.water_drop,
-    'electricidad': Icons.bolt,
-    'jardineria': Icons.yard,
-    'limpieza': Icons.cleaning_services,
-    'pintura': Icons.format_paint,
-    'general': Icons.handyman,
+    'mecanica': Icons.build_rounded,
+    'plomeria': Icons.water_drop_rounded,
+    'electricidad': Icons.bolt_rounded,
+    'jardineria': Icons.yard_rounded,
+    'limpieza': Icons.cleaning_services_rounded,
+    'pintura': Icons.format_paint_rounded,
+    'general': Icons.handyman_rounded,
   };
 
   static const _categoryColors = <String, Color>{
-    'mecanica': Color(0xFFE53935),
-    'plomeria': Color(0xFF1E88E5),
-    'electricidad': Color(0xFFFDD835),
-    'jardineria': Color(0xFF43A047),
-    'limpieza': Color(0xFF00ACC1),
-    'pintura': Color(0xFF8E24AA),
-    'general': Color(0xFF6D4C41),
+    'mecanica': Color(0xFFD32F2F),
+    'plomeria': Color(0xFF1976D2),
+    'electricidad': Color(0xFFF57C00),
+    'jardineria': Color(0xFF388E3C),
+    'limpieza': Color(0xFF0097A7),
+    'pintura': Color(0xFF7B1FA2),
+    'general': Color(0xFF5D4037),
+  };
+
+  static const _categoryNames = <String, String>{
+    'mecanica': 'Mecánica',
+    'plomeria': 'Plomería',
+    'electricidad': 'Electricidad',
+    'jardineria': 'Jardinería',
+    'limpieza': 'Limpieza',
+    'pintura': 'Pintura',
+    'general': 'General',
   };
 
   void _openDetail(BuildContext context) {
@@ -773,21 +783,40 @@ class ModernJobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final details = jobData['details'] as Map<String, dynamic>? ?? {};
     final pricing = jobData['pricing'] as Map<String, dynamic>? ?? {};
-    final title = details['title'] as String? ?? 'Sin título';
-    final categoryId = (details['categoryId'] as String? ?? 'general').toLowerCase();
-    final status = jobData['status'] as String? ?? 'pending';
-    final price = (pricing['proposedPrice'] ?? 0.0);
-    final currency = pricing['currency'] as String? ?? 'Q';
-    final distanceKm = jobData['distanceKm'];
+    final location = jobData['location'] as Map<String, dynamic>? ?? {};
 
-    final initial = title.isNotEmpty ? title[0].toUpperCase() : '?';
-    final icon = _categoryIcons[categoryId] ?? Icons.handyman;
-    final color = _categoryColors[categoryId] ?? const Color(0xFF6D4C41);
+    final title = (details['title'] ?? jobData['title'] ?? 'Sin título').toString();
+    final description = (details['description'] ?? jobData['description'] ?? '').toString();
+    final categoryId = (details['categoryId'] ?? jobData['categoryId'] ?? 'general').toString().toLowerCase();
+    final status = (jobData['status'] ?? 'pending').toString();
+    
+    final priceRaw = pricing['proposedPrice'] ?? jobData['proposedPrice'] ?? jobData['price'] ?? 0.0;
+    final price = priceRaw is num ? priceRaw : (double.tryParse(priceRaw.toString()) ?? 0.0);
+    
+    final currency = (pricing['currency'] ?? jobData['currency'] ?? 'Q').toString();
+    final address = (location['address'] ?? jobData['address'] ?? '').toString();
+
+    // Extraer distancia de forma segura sin importar si viene como double, int o String
+    final rawDistance = jobData['distanceKm'];
+    String? distanceKm;
+    if (rawDistance != null) {
+      if (rawDistance is num) {
+        distanceKm = rawDistance.toStringAsFixed(1);
+      } else {
+        final parsed = double.tryParse(rawDistance.toString());
+        distanceKm = parsed != null ? parsed.toStringAsFixed(1) : rawDistance.toString();
+      }
+    }
+    final clientName = jobData['clientName']?.toString();
+
+    final catIcon = _categoryIcons[categoryId] ?? Icons.handyman_rounded;
+    final catColor = _categoryColors[categoryId] ?? const Color(0xFF5D4037);
+    final catName = _categoryNames[categoryId] ?? categoryId.toUpperCase();
 
     final statusColor = switch (status) {
-      'pending' => Colors.orange,
-      'accepted' => Colors.blue,
-      'completed' => Colors.green,
+      'pending' => const Color(0xFFE65100),
+      'accepted' => const Color(0xFF1565C0),
+      'completed' => const Color(0xFF2E7D32),
       _ => Colors.grey,
     };
     final statusLabel = switch (status) {
@@ -796,103 +825,224 @@ class ModernJobCard extends StatelessWidget {
       'completed' => 'Completado',
       _ => status,
     };
+    final statusIcon = switch (status) {
+      'pending' => Icons.schedule_rounded,
+      'accepted' => Icons.handshake_rounded,
+      'completed' => Icons.check_circle_rounded,
+      _ => Icons.info_rounded,
+    };
 
-    return GestureDetector(
-      onTap: () => _openDetail(context),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(color: color.withOpacity(0.08), blurRadius: 16, offset: const Offset(0, 4)),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: IntrinsicHeight(
-            child: Row(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.15), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: catColor.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          onTap: () => _openDetail(context),
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(width: 6, color: color),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    child: Row(
-                      children: [
-                        // Avatar con inicial
-                        Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: color.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Center(
-                            child: Text(
-                              initial,
-                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color),
+                // ── Fila Superior: Categoría + Estado ──
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Chip de Categoría
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: catColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(catIcon, size: 14, color: catColor),
+                          const SizedBox(width: 6),
+                          Text(
+                            catName,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: catColor,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 14),
-                        // Texto
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        ],
+                      ),
+                    ),
+                    // Badge de Estado
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: statusColor.withValues(alpha: 0.25), width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, size: 12, color: statusColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            statusLabel,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: statusColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // ── Título del Trabajo ──
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textDark,
+                    letterSpacing: -0.3,
+                    height: 1.25,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+
+                // ── Descripción Corta (si existe) ──
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                      height: 1.35,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+                Divider(height: 1, color: Colors.grey[200]),
+                const SizedBox(height: 14),
+
+                // ── Fila Inferior: Detalles de Ubicación/Cliente + Presupuesto ──
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Ubicación / Cliente
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (clientName != null && clientName.isNotEmpty) ...[
+                            Row(
+                              children: [
+                                const Icon(Icons.person_outline_rounded, size: 14, color: AppTheme.textLight),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    clientName,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.textLight,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                          Row(
                             children: [
-                              Text(
-                                title,
-                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textDark),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              Icon(
+                                distanceKm != null ? Icons.near_me_rounded : Icons.location_on_outlined,
+                                size: 14,
+                                color: distanceKm != null ? AppTheme.primaryGreen : AppTheme.textLight,
                               ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(icon, size: 13, color: AppTheme.textLight),
-                                  const SizedBox(width: 4),
-                                  Text(categoryId, style: const TextStyle(fontSize: 12, color: AppTheme.textLight)),
-                                  if (distanceKm != null) ...[
-                                    const Text(' · ', style: TextStyle(color: AppTheme.textLight)),
-                                    const Icon(Icons.near_me, size: 12, color: AppTheme.textLight),
-                                    const SizedBox(width: 2),
-                                    Text('$distanceKm km',
-                                        style: const TextStyle(fontSize: 12, color: AppTheme.textLight)),
-                                  ],
-                                ],
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  distanceKm != null
+                                      ? 'A $distanceKm km de ti'
+                                      : (address.isNotEmpty ? address : 'Ubicación no especificada'),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: distanceKm != null ? FontWeight.w700 : FontWeight.w500,
+                                    color: distanceKm != null ? AppTheme.primaryGreen : AppTheme.textLight,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Precio + estado
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              '$currency ${(price as num).toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primaryGreen),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                statusLabel,
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+
+                    // Etiqueta de Precio / Presupuesto
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF1B5E20).withValues(alpha: 0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$currency ${price.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -938,52 +1088,129 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     _loadParticipants();
   }
 
+  String _extractName(Map<String, dynamic>? data, {required String defaultFallback}) {
+    if (data == null) return defaultFallback;
+    final profile = (data['profile'] as Map<String, dynamic>?) ?? {};
+    final firstName = (profile['firstName'] as String? ?? data['firstName'] as String? ?? '').trim();
+    final lastName = (profile['lastName'] as String? ?? data['lastName'] as String? ?? '').trim();
+    final fullName = '$firstName $lastName'.trim();
+    if (fullName.isNotEmpty) return fullName;
+
+    final displayName = (profile['displayName'] as String? ?? data['displayName'] as String? ?? data['name'] as String? ?? '').trim();
+    if (displayName.isNotEmpty) return displayName;
+
+    final email = (data['email'] as String? ?? '').trim();
+    if (email.isNotEmpty) {
+      final username = email.split('@').first;
+      if (username.isNotEmpty) return username;
+    }
+
+    return defaultFallback;
+  }
+
   Future<void> _loadParticipants() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
     // Cargar rol del usuario actual
     try {
-      final tokenResult = await FirebaseAuth.instance.currentUser?.getIdTokenResult(false);
+      final tokenResult = await currentUser?.getIdTokenResult(false);
       if (mounted) {
         setState(() => _currentUserRole = (tokenResult?.claims?['role'] as String?) ?? 'client');
       }
     } catch (_) {}
 
-    // Cargar perfil del cliente que publicó
-    final clientId = widget.jobData['clientId'] as String?;
-    if (clientId != null) {
+    final clientId = (widget.jobData['clientId'] ?? widget.jobData['uid'])?.toString();
+    final isOwner = currentUser?.uid != null && clientId != null && currentUser!.uid == clientId;
+
+    // Nombre y avatar iniciales tomados directamente de los datos del trabajo (si vienen adjuntos)
+    final jobClientName = (widget.jobData['clientName'] ?? widget.jobData['client'] ?? widget.jobData['creatorName'])?.toString();
+    final jobClientAvatar = (widget.jobData['clientAvatarUrl'] ?? widget.jobData['avatarUrl'])?.toString();
+
+    String initialClientName = (jobClientName != null && jobClientName.trim().isNotEmpty)
+        ? jobClientName.trim()
+        : 'Cliente';
+    String? initialAvatar = (jobClientAvatar != null && jobClientAvatar.trim().isNotEmpty)
+        ? jobClientAvatar.trim()
+        : null;
+
+    // Si el usuario actual es el dueño, intentamos obtener su propio perfil desde Firestore (siempre permitido)
+    if (isOwner) {
       try {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(clientId).get();
-        final profile = (doc.data()?['profile'] as Map<String, dynamic>?) ?? {};
-        final name = '${profile['firstName'] ?? ''} ${profile['lastName'] ?? ''}'.trim();
-        if (mounted) {
-          setState(() {
-            _clientName = name.isNotEmpty ? name : 'Cliente';
-            _clientAvatarUrl = profile['avatarUrl'] as String?;
-            _loadingClient = false;
-          });
+        final ownDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+        if (ownDoc.exists) {
+          final ownData = ownDoc.data();
+          final profile = (ownData?['profile'] as Map<String, dynamic>?) ?? {};
+          final extracted = _extractName(ownData, defaultFallback: '');
+          if (extracted.isNotEmpty) {
+            initialClientName = extracted;
+          }
+          initialAvatar = profile['avatarUrl'] as String? ?? ownData?['avatarUrl'] as String? ?? currentUser.photoURL ?? initialAvatar;
         }
-      } catch (_) {
-        if (mounted) setState(() { _clientName = 'Cliente'; _loadingClient = false; });
+      } catch (e) {
+        debugPrint('DEV: Error al cargar perfil propio del cliente: $e');
       }
-    } else {
-      if (mounted) setState(() { _clientName = 'Cliente'; _loadingClient = false; });
+
+      if (initialClientName == 'Cliente') {
+        if (currentUser.displayName != null && currentUser.displayName!.trim().isNotEmpty) {
+          initialClientName = currentUser.displayName!.trim();
+        } else if (currentUser.email != null && currentUser.email!.trim().isNotEmpty) {
+          initialClientName = currentUser.email!.trim().split('@').first;
+        } else {
+          initialClientName = 'Tú';
+        }
+      }
     }
 
-    // Cargar perfil del trabajador asignado si existe
+    // Cargar perfil del cliente que publicó desde Firestore
+    if (clientId != null && clientId.isNotEmpty) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(clientId).get();
+        if (doc.exists) {
+          final data = doc.data();
+          final profile = (data?['profile'] as Map<String, dynamic>?) ?? {};
+          final name = _extractName(data, defaultFallback: initialClientName);
+          final avatar = profile['avatarUrl'] as String? ?? data?['avatarUrl'] as String? ?? initialAvatar;
+          if (mounted) {
+            setState(() {
+              _clientName = name;
+              _clientAvatarUrl = avatar;
+              _loadingClient = false;
+            });
+          }
+        } else {
+          if (mounted) setState(() { _clientName = initialClientName; _clientAvatarUrl = initialAvatar; _loadingClient = false; });
+        }
+      } catch (e) {
+        debugPrint('DEV: Error al cargar perfil de cliente: $e');
+        if (mounted) setState(() { _clientName = initialClientName; _clientAvatarUrl = initialAvatar; _loadingClient = false; });
+      }
+    } else {
+      if (mounted) setState(() { _clientName = initialClientName; _clientAvatarUrl = initialAvatar; _loadingClient = false; });
+    }
+
+    // Cargar perfil del trabajador asignado si existe desde Firestore
     final workerId = widget.jobData['workerId'] as String?;
     if (workerId != null) {
       if (mounted) setState(() => _loadingWorker = true);
       try {
         final doc = await FirebaseFirestore.instance.collection('users').doc(workerId).get();
-        final profile = (doc.data()?['profile'] as Map<String, dynamic>?) ?? {};
-        final name = '${profile['firstName'] ?? ''} ${profile['lastName'] ?? ''}'.trim();
-        if (mounted) {
-          setState(() {
-            _workerName = name.isNotEmpty ? name : 'Trabajador';
-            _workerAvatarUrl = profile['avatarUrl'] as String?;
-            _loadingWorker = false;
-          });
+        if (doc.exists) {
+          final data = doc.data();
+          final profile = (data?['profile'] as Map<String, dynamic>?) ?? {};
+          final name = _extractName(data, defaultFallback: 'Trabajador');
+          final avatar = profile['avatarUrl'] as String? ?? data?['avatarUrl'] as String?;
+          if (mounted) {
+            setState(() {
+              _workerName = name;
+              _workerAvatarUrl = avatar;
+              _loadingWorker = false;
+            });
+          }
+        } else {
+          if (mounted) setState(() { _workerName = 'Trabajador'; _loadingWorker = false; });
         }
-      } catch (_) {
+      } catch (e) {
+        debugPrint('DEV: Error al cargar perfil de trabajador: $e');
         if (mounted) setState(() { _workerName = 'Trabajador'; _loadingWorker = false; });
       }
     }
@@ -1496,8 +1723,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               _loadingClient
                                   ? const _MiniShimmer()
                                   : _ParticipantRow(
-                                      name: isOwner ? 'Tú' : (_clientName ?? 'Cliente'),
-                                      avatarUrl: isOwner ? null : _clientAvatarUrl,
+                                      name: _clientName != null && _clientName!.isNotEmpty
+                                          ? (isOwner ? '$_clientName (Tú)' : _clientName!)
+                                          : (isOwner ? 'Tú' : 'Cliente'),
+                                      avatarUrl: _clientAvatarUrl,
                                       badge: isOwner ? 'Tu publicación' : 'Cliente',
                                       badgeColor: const Color(0xFF1565C0),
                                     ),
