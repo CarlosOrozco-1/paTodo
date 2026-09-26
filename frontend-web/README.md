@@ -1,18 +1,9 @@
-# PaTodo — Frontend Web (instrucciones de integración)
+# PaTodo — Frontend Web
 
-El equipo de frontend web tiene su propio repositorio. Esta carpeta **solo conserva
-lo mínimo para conectar con el backend de PaTodo**:
-
-- `src/lib/firebase.ts` → inicializa Firebase (Auth + Firestore), con soporte de emuladores.
-- `src/lib/api.ts` → cliente HTTP con Bearer token para la API REST transaccional.
-- `.env.example` → variables de entorno (API key, URLs, emuladores).
-
-## Qué necesita tu equipo para conectar
-
-1. **API key y projectId de Firebase** (de la consola Firebase del proyecto `pa-todo`,
-   o los de tu entorno). Están en `.env.example`.
-2. **URL de la API REST** cuando esté desplegada (hoy en desarrollo se usa el emulador).
-3. Los endpoints en `Spec Driven`: `docs/api-conexion.md` y `spec/openapi.yaml`.
+Aplicación web de PaTodo (React 19 + TypeScript + Vite + Tailwind CSS 4) integrada en
+el monorepo. Conecta con Firebase (Auth + Firestore) y la API REST transaccional
+(`api/` → Render). Incluye interfaz para cliente, trabajador, mensajería y panel de
+administración (admin solo en modo demo).
 
 ## Configuración
 
@@ -22,17 +13,47 @@ npm install
 npm run dev
 ```
 
+La app queda en `http://localhost:5173`.
+
+Modos de operación (`VITE_API_MODE`):
+
+- `real` → Firebase + API REST (`https://patodo.onrender.com`). Modo por defecto.
+- `demo` → datos simulados en `localStorage` (sin backend; incluye el panel admin).
+- `auto` → prueba el health check de la API al arrancar y cae a `demo` si no responde.
+
+Otros build:
+
+```bash
+npm run build           # producción → ./dist
+npm run build:portable  # UN solo archivo HTML autocontenido → ./demohtml
+npm run lint            # oxlint
+```
+
+## Arquitectura de conexión
+
+- `src/api/firebase/init.ts` → Firebase (Auth + Firestore) del proyecto `pa-todo`.
+- `src/api/firebase/fs.ts` → mappers y lecturas directas de Firestore.
+- `src/api/real/*` → servicios reales. Los trabajos/ubicaciones los escribe el
+  cliente en Firestore (`real-jobs.ts` calcula el geohash). Las operaciones
+  transaccionales van a la API REST: `POST /createUser`, `/acceptOffer`,
+  `/cancelJob`, `/completeJob`, `/createReview` (ver `spec/openapi.yaml`).
+- `src/api/axiosClient.ts` → cliente HTTP con Bearer token (Firebase ID token) y
+  retry automático de 401/403 tras refrescar el token.
+
 ## Reglas de integración (cruciales)
 
-1. **Registro**: Firebase Auth crea la cuenta; luego `POST /createUser` crea `users/{uid}`
-   y asigna el **Custom Claim `role`** (`client`/`worker`/`both`).
+1. **Registro**: Firebase Auth crea la cuenta; luego `POST /createUser` crea
+   `users/{uid}` y asigna el **Custom Claim `role`** (`client`/`worker`).
 2. **Refresco de token**: el claim solo viaja en tokens nuevos. Tras crear el perfil
-   usa `getIdToken(true)` antes de escribir en Firestore (`getFreshToken` en `lib/api.ts`).
+   se usa `getIdToken(true)` antes de escribir en Firestore.
 3. **Escrituras directas vs API**:
-   - `jobs` y `offers` → Firestore SDK directo (reglas exigen `clientId`/`workerId == uid` y `pending`).
-   - `users.role/stats`, `reviews`, `notifications`, `conversations`, aceptar/cancelar/completar
-     trabajos y las rutas → **solo API**.
-4. **Rutas**: `POST /computeRoute` devuelve distancia, tiempo y geolocalización del trazo
-   de ruta (trabajador → job, con apoyo de destino si es viaje). Ver `docs/api-conexion.md`.
+   - `jobs`, `offers`, `users.profile/contact/location` → Firestore SDK directo
+     (las reglas exigen `clientId`/`workerId == uid`).
+   - cambiar estados (`acceptOffer`, `cancelJob`, `completeJob`), reseñas
+     (`createReview`) y `users.role/stats` → **solo API**.
+4. **Rol `both`**: la web registra `client`/`worker`; un usuario `both` existente
+   entra vía redirección a `/cliente` (los roles de ruta no incluyen `both`).
+   Pendiente de alinear con el monorepo cuando se soporte el flujo combinado.
 
 Contrato de la API: `../docs/api-conexion.md`. Spec OpenAPI: `../spec/openapi.yaml`.
+Guía por rol y órdenes: `../AGENTS.md`.

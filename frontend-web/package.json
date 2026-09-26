@@ -1,23 +1,42 @@
 {
-  "name": "patodo-frontend-web",
+  "name": "patodo",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:portable": "tsc -b && vite build --mode portable && node scripts/rename-portable.mjs",
+    "clean:portable": "node -e \"require('node:fs').rmSync('demohtml', { recursive: true, force: true }) && console.log('demohtml/ eliminado')\"",
+    "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
-    "firebase": "^11.7.0",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
+    "@react-oauth/google": "^0.13.5",
+    "axios": "^1.20.0",
+    "firebase": "^12.19.0",
+    "lucide-react": "^1.43.0",
+    "mapbox-gl": "^3.31.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-router": "^7.18.3",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/mapbox-gl": "^3.4.1",
+    "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
+    "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vite-plugin-singlefile": "^2.3.3"
   }
 }
