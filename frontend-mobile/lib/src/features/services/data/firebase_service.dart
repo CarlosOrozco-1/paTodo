@@ -36,8 +36,41 @@ class FirebaseService {
       updatedAt: DateTime.now(),
     );
 
+    final jobMap = job.toMap();
+
+    // Adjuntar nombre y foto del cliente creador al documento del trabajo
+    String? clientName;
+    String? clientAvatar;
     try {
-      await _firestore.collection('jobs').add(job.toMap());
+      final uDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (uDoc.exists) {
+        final uData = uDoc.data();
+        final profile = (uData?['profile'] as Map<String, dynamic>?) ?? {};
+        final fName = (profile['firstName'] as String? ?? uData?['firstName'] as String? ?? '').trim();
+        final lName = (profile['lastName'] as String? ?? uData?['lastName'] as String? ?? '').trim();
+        final full = '$fName $lName'.trim();
+        if (full.isNotEmpty) clientName = full;
+        clientAvatar = profile['avatarUrl'] as String? ?? uData?['avatarUrl'] as String?;
+      }
+    } catch (_) {}
+
+    if (clientName == null || clientName.isEmpty) {
+      if (user.displayName != null && user.displayName!.trim().isNotEmpty) {
+        clientName = user.displayName!.trim();
+      } else if (user.email != null && user.email!.trim().isNotEmpty) {
+        clientName = user.email!.trim().split('@').first;
+      }
+    }
+
+    if (clientName != null && clientName.isNotEmpty) {
+      jobMap['clientName'] = clientName;
+    }
+    if (clientAvatar != null && clientAvatar.isNotEmpty) {
+      jobMap['clientAvatarUrl'] = clientAvatar;
+    }
+
+    try {
+      await _firestore.collection('jobs').add(jobMap);
     } on FirebaseException catch (e) {
       if (e.code == 'permission-denied') {
         throw Exception(

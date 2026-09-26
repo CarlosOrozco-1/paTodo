@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/home_header.dart';
 import '../../../shared/widgets/service_card.dart';
@@ -14,10 +15,12 @@ class HomeServiceScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 50),
-          const HomeHeader(
+          HomeHeader(
             title: 'PaTodo',
             subtitle: 'Servicios confiables, cerca de ti',
-            profileImageUrl: 'https://i.pravatar.cc/150?u=a042581f4e29026704d', // Placeholder
+            profileImageUrl: FirebaseAuth.instance.currentUser?.photoURL,
+            name: FirebaseAuth.instance.currentUser?.displayName,
+            email: FirebaseAuth.instance.currentUser?.email,
           ),
           const SizedBox(height: 20),
           Padding(
