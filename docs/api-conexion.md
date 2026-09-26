@@ -255,6 +255,15 @@ connectFirestoreEmulator(getFirestore(), "127.0.0.1", 8081);
 Guía completa de pruebas: `docs/api-emulador.md`. Pruebas automatizadas:
 `api/tests/e2e.sh` (flujo completo) y `api/tests/security.sh` (autorización y reglas).
 
+> **Catálogo de categorías y skills:** las colecciones `categories` y `skills`
+> son catálogos maestros (reglas: lectura pública, escritura bloqueada) y se
+> pueblan solo con seed/API. Para cargar el catálogo semilla (mecánica,
+> plomería, electricidad, etc.) contra el emulador o producción:
+> `cd api && npm run seed:catalog`. Es no destructivo (upsert por `slug`) y usa
+> IDs deterministas (`categoryId` = slug), así los trabajos publicados con esas
+> categorías mantienen referencias estables. El script `npm run seed` **borra
+> todos los datos** y solo sirve para el emulador.
+
 ## 7. Pruebas con Postman
 
 - **Producción:** importar `docs/postman/patodo-produccion.postman_collection.json`.

@@ -129,10 +129,14 @@ Los roles se asignan mediante **Custom Claims** en Firebase Auth (claim `role`) 
 
 ## Integración de los frontends (equipos web y móvil)
 
-Los equipos web y móvil tienen **sus propios repositorios**; las carpetas
-`frontend-web/` y `frontend-mobile/` del monorepo solo conservan una **base
-mínima de conexión** (config de Firebase, URL de la API y README local), no la
-app. Antes de tocar esas carpetas o de integrar algo, leer:
+Los equipos web y móvil tienen **sus propios repositorios**. En el monorepo:
+- `frontend-web/` conserva la **app web completa** (React + Vite + TypeScript +
+  Tailwind, con Capacitor empaquetado como último paso); se integró desde el
+  repo de los compañeros y usa modo `demo`/`real`/`auto` (`.env`, por defecto
+  demo). Los frontends (web y móvil) comparten Firebase y la API REST.
+- `frontend-mobile/` conserva la **app móvil Flutter**.
+
+Antes de tocar esas carpetas o de integrar algo, leer:
 
 - `docs/api-conexion.md` → cómo conectar Firebase y la API REST (URLs por entorno,
   división "quién escribe qué", trazo de ruta §5.1).
@@ -142,6 +146,18 @@ app. Antes de tocar esas carpetas o de integrar algo, leer:
 Regla clave para los agentes de integración: el **Custom Claim `role`** solo viaja
 en tokens nuevos; tras `POST /createUser` (o cambio de rol) el cliente debe
 refrescar el token (`getIdToken(true)`) antes de escribir en Firestore.
+
+## Catálogo de categorías y skills
+
+- Las colecciones `categories` y `skills` son **catálogos maestros**: lectura
+  pública (reglas `allow read: if true`) y escritura **bloqueada** (reglas
+  `allow write: if false`), se poblan solo vía seed/API, nunca desde el cliente.
+- El schema vive en `spec/schemas/categories.json` y `spec/schemas/skills.json`.
+- Catálogo semilla: `npm run seed:catalog` en `api/` (script no destructivo,
+  upsert con IDs deterministas = `slug`, deja `isActive: true` y timestamps).
+- El seed de pruebas `npm run seed` (`api/src/seeder/seed.ts`) **borra todos los
+  datos** (users, auth, jobs, ofertas…) y solo crea 1 categoría; sirve para el
+  emulador, **jamás** contra producción.
 
 ## Lenguaje: usuario vs desarrollador
 
