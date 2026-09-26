@@ -66,6 +66,12 @@ patodo/
 - Un error de la app móvil no implica necesariamente un deploy desactualizado:
   verificar en orden → (1) índice Firestore, (2) reglas Firestore, (3) `api/`
   en Render, (4) estatus del request (cold start de Render en plan gratuito).
+- **Reglas desplegadas vs reglas del repo:** una integración (merge/pull) que
+  traiga cambios en `firestore.rules` NO los activa en producción. Si la app
+  recibe `PERMISSION_DENIED` en TODOS los listens (jobs, users/{uid}, etc.)
+  siendo que el cliente está autenticado y las reglas locales ya lo permiten,
+  el problema es que las reglas nuevas no están desplegadas. Solución:
+  `firebase deploy --only firestore:rules` desde la raíz.
 - Los logs de Android (`InsetsState`, `VRI`, `Choreographer`) son ruido del
   sistema operativo del emulador/dispositivo, NO errores de la app o del backend.
 
