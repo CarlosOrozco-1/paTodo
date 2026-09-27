@@ -19,6 +19,12 @@
       "title": "Descripción",
       "description": "Texto explicativo sobre qué implica esta habilidad."
     },
+    "categoryIds": {
+      "type": "array",
+      "items": { "type": "string" },
+      "title": "Categorías asociadas",
+      "description": "Lista de IDs de categorías (colección categories) a las que pertenece esta habilidad. Se usa para filtrar las habilidades al elegir una categoría."
+    },
     "icon": {
       "type": "string",
       "title": "Ícono",

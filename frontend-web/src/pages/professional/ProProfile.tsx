@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BadgeCheck, Briefcase, Camera, CheckCircle2, Mail, MapPin, Phone, Power, ShieldCheck, UserCheck } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { skillsService } from '@/api/categories.service';
+import { usersService } from '@/api/users.service';
 import { toast } from '@/stores/uiStore';
 import { getErrorMessage } from '@/api/axiosClient';
 import { Button } from '@/components/ui/Button';
@@ -72,11 +73,16 @@ export function ProProfile() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const updated = {
-        ...user!,
-        profile: { ...user!.profile, firstName, lastName, bio },
-        contact: { ...user!.contact, phone, address: { ...user!.contact.address, city } },
-        account: { ...user!.account, email },
+      const updated = await usersService.updateMe({
+        profile: { firstName, lastName, bio },
+        contact: {
+          phone,
+          alternatePhone: user!.contact.alternatePhone,
+          address: {
+            ...user!.contact.address,
+            city,
+          },
+        },
         skillIds: selectedSkills,
         availability: {
           ...user!.availability,
@@ -85,7 +91,7 @@ export function ProProfile() {
             radiusKm: Number(radius),
           },
         },
-      };
+      });
       setUser(updated);
       toast('success', 'Perfil actualizado correctamente');
     } catch (error) {

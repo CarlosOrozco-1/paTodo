@@ -18,6 +18,7 @@ interface SkillSeed {
   slug: string;
   description: string;
   icon?: string;
+  categoryIds: string[];
 }
 
 const categories: CategorySeed[] = [
@@ -32,18 +33,18 @@ const categories: CategorySeed[] = [
 ];
 
 const skills: SkillSeed[] = [
-  { name: "Cambio de llantas", slug: "cambio-llantas", description: "Reemplazo de llantas ponchadas", icon: "tire" },
-  { name: "Reparación de motor", slug: "reparacion-motor", description: "Diagnóstico y reparación de motores", icon: "engine" },
-  { name: "Batería", slug: "bateria", description: "Cambio y carga de baterías", icon: "battery" },
-  { name: "Plomería", slug: "plomeria-skill", description: "Instalación y reparación de tuberías", icon: "droplets" },
-  { name: "Fontanería", slug: "fontaneria", description: "Reparación de grifos y conexiones", icon: "faucet" },
-  { name: "Instalación eléctrica", slug: "instalacion-electrica", description: "Instalación de circuitos y contactos", icon: "zap" },
-  { name: "Cableado", slug: "cableado", description: "Tendido y reparación de cableado", icon: "cable" },
-  { name: "Reparación de muebles", slug: "reparacion-muebles", description: "Arreglo y restauración de muebles", icon: "hammer" },
-  { name: "Pintura interior", slug: "pintura-interior", description: "Pintura de paredes y techos", icon: "paintbrush" },
-  { name: "Jardinería", slug: "jardineria-skill", description: "Diseño y mantenimiento de jardines", icon: "flower" },
-  { name: "Limpieza doméstica", slug: "limpieza-domestica", description: "Limpieza de hogares y oficinas", icon: "sparkles" },
-  { name: "Asesoría legal", slug: "asesoria-legal", description: "Consultas y trámites legales", icon: "scale" },
+  { name: "Cambio de llantas", slug: "cambio-llantas", description: "Reemplazo de llantas ponchadas", icon: "tire", categoryIds: ["mecanica"] },
+  { name: "Reparación de motor", slug: "reparacion-motor", description: "Diagnóstico y reparación de motores", icon: "engine", categoryIds: ["mecanica"] },
+  { name: "Batería", slug: "bateria", description: "Cambio y carga de baterías", icon: "battery", categoryIds: ["mecanica"] },
+  { name: "Plomería", slug: "plomeria-skill", description: "Instalación y reparación de tuberías", icon: "droplets", categoryIds: ["plomeria"] },
+  { name: "Fontanería", slug: "fontaneria", description: "Reparación de grifos y conexiones", icon: "faucet", categoryIds: ["plomeria"] },
+  { name: "Instalación eléctrica", slug: "instalacion-electrica", description: "Instalación de circuitos y contactos", icon: "zap", categoryIds: ["electricidad"] },
+  { name: "Cableado", slug: "cableado", description: "Tendido y reparación de cableado", icon: "cable", categoryIds: ["electricidad"] },
+  { name: "Reparación de muebles", slug: "reparacion-muebles", description: "Arreglo y restauración de muebles", icon: "hammer", categoryIds: ["carpinteria"] },
+  { name: "Pintura interior", slug: "pintura-interior", description: "Pintura de paredes y techos", icon: "paintbrush", categoryIds: ["pintura"] },
+  { name: "Jardinería", slug: "jardineria-skill", description: "Diseño y mantenimiento de jardines", icon: "flower", categoryIds: ["jardineria"] },
+  { name: "Limpieza doméstica", slug: "limpieza-domestica", description: "Limpieza de hogares y oficinas", icon: "sparkles", categoryIds: ["limpieza"] },
+  { name: "Asesoría legal", slug: "asesoria-legal", description: "Consultas y trámites legales", icon: "scale", categoryIds: ["abogado"] },
 ];
 
 async function seedCategories(): Promise<void> {
@@ -78,6 +79,7 @@ async function seedSkills(): Promise<void> {
         slug: skill.slug,
         description: skill.description,
         icon: skill.icon ?? null,
+        categoryIds: skill.categoryIds,
         isActive: true,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),

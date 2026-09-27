@@ -63,6 +63,10 @@ patodo/
   - `firebase deploy --only firestore:indexes` → tras tocar `firestore.indexes.json`.
   - No desplegar el índice a la par del código puede romper consultas con
     `where + orderBy` (error `FAILED_PRECONDITION: The query requires an index`).
+- **Frontend web** se publica por Firebase Hosting (`https://pa-todo.web.app`):
+  el procedimiento exacto está en `docs/web-actualizacion.md`. Cuando el equipo
+  pida "actualiza la web", seguir ese documento (build local + deploy hostelado;
+  probar primero con un canal de vista previa si se requiere).
 - Un error de la app móvil no implica necesariamente un deploy desactualizado:
   verificar en orden → (1) índice Firestore, (2) reglas Firestore, (3) `api/`
   en Render, (4) estatus del request (cold start de Render en plan gratuito).

@@ -102,7 +102,7 @@ Proyecto `pa-todo`, base `(default)`, edición Standard, región `nam5`.
 |---|---|---|
 | API REST | Render (plan gratuito) | `https://patodo.onrender.com`; variables de entorno del servicio |
 | Reglas e índices | Firebase | `firebase deploy --only firestore:rules,firestore:indexes` |
-| Frontend web | Firebase Hosting (`frontend-web/dist`) | build de Vite + deploy |
+| Frontend web | Firebase Hosting (`frontend-web/dist`) | build de Vite + deploy ([`docs/web-actualizacion.md`](web-actualizacion.md)) |
 | App móvil | Play Store / App Store | build de Flutter |
 | Cloud Functions | **No se usan** | Su código está archivado en `docs/functions-legacy/` |
 
