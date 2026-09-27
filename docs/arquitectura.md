@@ -116,5 +116,6 @@ Si no hay credenciales ni emuladores, la API **falla al arrancar** con un error 
 
 - Cómo levantar los servicios: [`docs/ejecucion.md`](ejecucion.md)
 - Conexión de los frontends: [`docs/api-conexion.md`](api-conexion.md)
+- Autenticación con Google en la web (fallos conocidos y soluciones): [`docs/auth-google.md`](auth-google.md)
 - Pruebas locales y emuladores: [`docs/api-emulador.md`](api-emulador.md)
 - Reglas de seguridad: [`docs/reglas-firebase.md`](reglas-firebase.md)

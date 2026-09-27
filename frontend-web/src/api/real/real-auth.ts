@@ -9,7 +9,7 @@ import type { User } from '@/types/user.types';
 import type { AuthResponse, LoginRequest, RegisterRequest } from '../auth.service';
 import { mapUser } from '../mappers';
 import { auth } from '../firebase/init';
-import { ensureBackendUser } from '../firebase/fs';
+import { ensureBackendUser, readUser } from '../firebase/fs';
 import { apiPost } from '../firebase/rest';
 import { setToken } from '../axiosClient';
 
@@ -102,23 +102,29 @@ export const realAuth = {
     const email = userCredential.user.email ?? '';
     const displayName = userCredential.user.displayName ?? '';
 
-    try {
-      await apiPost('/createUser', {
-        uid,
-        email,
-        role,
-        profile: {
-          firstName: displayName.split(' ')[0] ?? '',
-          lastName: displayName.split(' ').slice(1).join(' ') ?? '',
-          avatarUrl: userCredential.user.photoURL ?? null,
-          bio: '',
-        },
-        contact: { phone: '' },
-      });
-    } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response?.status;
-      if (status !== 409) {
-        throw error instanceof Error ? error : new Error('No se pudo crear el perfil');
+    // DEV: Si el perfil ya existe en Firestore no se vuelve a crear; se evita
+    // enviar phone vacío (la API lo exige y respondería 400 aunque el 409
+    // exista). El createUser solo aplica a uids nuevos.
+    const existing = await readUser(uid);
+    if (!existing) {
+      try {
+        await apiPost('/createUser', {
+          uid,
+          email,
+          role,
+          profile: {
+            firstName: displayName.split(' ')[0] ?? '',
+            lastName: displayName.split(' ').slice(1).join(' ') ?? '',
+            avatarUrl: userCredential.user.photoURL ?? null,
+            bio: '',
+          },
+          contact: { phone: userCredential.user.phoneNumber ?? '' },
+        });
+      } catch (error) {
+        const status = (error as { response?: { status?: number } })?.response?.status;
+        if (status !== 409) {
+          throw error instanceof Error ? error : new Error('No se pudo crear el perfil');
+        }
       }
     }
 

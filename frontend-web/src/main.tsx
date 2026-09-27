@@ -8,7 +8,7 @@ import './index.css';
 // Client ID de Google OAuth (proyecto pa-todo). Sobreescribible con VITE_GOOGLE_CLIENT_ID.
 const GOOGLE_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-  '776267790053-32dbbrdnbr7g5vm2q448suhbf2hsa5e8.apps.googleusercontent.com';
+  '377828600122-r6kc7b5surfos5ha27fbs4lb9ue7672t.apps.googleusercontent.com';
 
 async function bootstrap() {
   if (getApiMode() === 'auto') {
