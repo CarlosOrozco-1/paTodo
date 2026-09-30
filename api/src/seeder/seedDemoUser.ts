@@ -5,15 +5,15 @@ import { auth, db } from "../shared/admin";
 /**
  * Seed de un USUARIO DEMO (rol worker) con su vehículo ya registrado.
  *
- * Pensado para el EMULADOR local (validar el flujo de registro de vehículos
- * sin crear datos en producción). Por eso aborta si no se detectan los hosts
- * de emulador en las variables de entorno.
+ * Con las credenciales del service account escribe en PRODUCCIÓN. Por eso
+ * requiere una bandera explícita para no correr por accidente.
  *
  * Uso:
+ *   # Emulador local:
  *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8081 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 npm run seed:demo-user
  *
- * Y en api/.env (modo emulador) o en el entorno del proceso. Si la API tiene
- * FIREBASE_SERVICE_ACCOUNT definida (producción) el script se NEGARÁ a correr.
+ *   # Producción (SOLO cuando el equipo lo pida, p. ej. para validar un flujo):
+ *   npm run seed:demo-user -- --allow-prod
  */
 
 const DEMO_EMAIL = "demo.trabajador@patodo.com";
@@ -44,12 +44,16 @@ function guardAgainstProduction(): void {
   const usingEmulator = Boolean(
     process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST,
   );
-  if (process.env.FIREBASE_SERVICE_ACCOUNT && !usingEmulator) {
+  const allowProd = process.argv.includes("--allow-prod");
+  if (!usingEmulator && !allowProd) {
     throw new Error(
-      "seed-demo-user está pensado SOLO para el emulador local. " +
-        "Detecté FIREBASE_SERVICE_ACCOUNT (producción) sin FIRESTORE_EMULATOR_HOST " +
-        "/ FIREBASE_AUTH_EMULATOR_HOST. Abortando para no ensuciar el proyecto real.",
+      "seed-demo-user escribe en el Firestore al que apunte api/.env. " +
+        "Sin --allow-prod solo se permite con FIRESTORE_EMULATOR_HOST / " +
+        "FIREBASE_AUTH_EMULATOR_HOST. Abortando.",
     );
+  }
+  if (allowProd && process.env.FIREBASE_SERVICE_ACCOUNT) {
+    console.warn("⚠️  CORRIENDO CONTRA PRODUCCIÓN (--allow-prod). Confirmado a pedido del equipo.");
   }
 }
 
