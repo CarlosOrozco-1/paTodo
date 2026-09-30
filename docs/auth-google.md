@@ -116,11 +116,38 @@ perfil (el `signInWithCredential` ya se ejecutó).
    desde el perfil de Google) y recién ahí llamar a `/createUser`. Es el
    equivalente web del `CompleteProfileScreen` de `frontend-mobile/`
    (`auth_repository.dart`), que ya pide el teléfono después del Google Sign-In.
-3. Recordar que tras `POST /createUser` el cliente debe refrescar el token
+3. Ese mismo modal debe incluir la selección de **tipo de perfil con la opción
+   `both`**, para solventar de paso el rol por defecto (ver §Rol por defecto en
+   cuentas nuevas).
+4. Recordar que tras `POST /createUser` el cliente debe refrescar el token
    (`getIdToken(true)`) para que llegue el Custom Claim `role`.
 
 Puntos de referencia: `spec/openapi.yaml` (`/createUser`, `contact.phone`
-obligatorio), `frontend-mobile/lib/src/features/auth/presentation/complete_profile_screen.dart`.
+obligatorio, `role` con enum `[client, worker, both]`),
+`frontend-mobile/lib/src/features/auth/presentation/complete_profile_screen.dart`.
+
+### Rol por defecto en cuentas nuevas de Google
+
+Validado en web: la cuenta creada con Google queda como **`client` por defecto**.
+Causas:
+
+- `real-auth.ts:90` define `loginWithGoogle(idToken, role: 'client' | 'worker' = 'client')`
+  y `LoginPage.tsx:102` llama `loginWithGoogle(credential)` **sin pasar `role`**,
+  así que un usuario nuevo nacido del botón de Google en el login siempre es
+  `client`.
+- El registro (`RegisterPage.tsx:25`) solo admite `type Role = 'client' | 'worker'`
+  y su selector (líneas 178-205) solo muestra **Cliente / Profesional**; no hay
+  opción **Ambos**.
+
+Estado del backend: **no es problema del servidor**. La API
+(`api/src/routes/user.ts:74`) ya valida y acepta `role: "both"`, y el spec
+(`openapi.yaml:169`) incluye `both` en el enum. Solo el frontend web limita el
+rol a dos valores y no propaga el rol desde el login.
+
+Propuesta: al resolver el modal "Completa tu perfil", incluir ahí la elección
+de rol con las tres opciones (`client`, `worker`, `both`) y usarla como el
+`role` que se envía a `/createUser`; y ampliar el `type Role` de
+`RegisterPage.tsx` para admitir `'both'`. (Solución final a cargo del equipo web.)
 
 ## Ruido inofensivo en la consola
 

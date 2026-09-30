@@ -1,14 +1,16 @@
 # Mejoras propuestas para el backend (análisis)
 
 Propuestas de evolución para la API REST (`api/`) de PaTodo, ordenadas por
-prioridad de negocio. **Es solo análisis y plan: nada de esto está implementado.**
+prioridad de negocio. **Análisis y plan; varias ya se implementaron**, otras
+siguen pendientes (cada sección indica su estado con ✔/pendiente).
 
-Cada propuesta indica el problema, la solución, el esfuerzo, la complejidad y los
-riesgos. Se implementarán siguiendo el flujo SDD (primero `spec/`, luego `api/`).
+Las implementadas siguen el flujo SDD (primero `spec/`, luego `api/`).
 
 ---
 
-## 1. Búsqueda de trabajos cercanos (geo) — PRIORIDAD 1
+## 1. Búsqueda de trabajos cercanos (geo) — PRIORIDAD 1 — ✔ implementado
+> **Estado:** implementado como `GET /jobs/nearby` (ver `spec/openapi.yaml` y
+> `docs/api-conexion.md` §5.2). El texto siguiente es el análisis original.
 
 ### Problema
 El core de PaTodo es "clientes publican trabajos, trabajadores cercanos ven los
@@ -118,7 +120,11 @@ Además, limitar `computeRoute` en `index.ts`: solo `worker`/`both` con
 
 ---
 
-## 3. Rate limiter robusto (multi-instancia + por usuario) — PRIORIDAD 3
+## 3. Rate limiter robusto (multi-instancia + por usuario) — PRIORIDAD 3 — parcial
+> **Estado:** el rate limit **en memoria por IP** ya está implementado
+> (`api/src/index.ts`, configurable con `RATE_LIMIT_MAX`/`RATE_LIMIT_WINDOW_MS`).
+> Pendiente: límite **por uid** y backend compartido para multi-instancia (hoy
+> es suficiente con una instancia en el plan gratuito de Render).
 
 ### Problema
 `index.ts` usa un `Map` en memoria por IP y ventana fija. En Render con varias
@@ -144,7 +150,11 @@ limitar por IP no frena a un mismo usuario abusando desde una IP dinámica.
 
 ---
 
-## 4. Notificaciones push (FCM) en transiciones — PRIORIDAD 4
+## 4. Notificaciones push (FCM) en transiciones — PRIORIDAD 4 — ✔ implementado
+> **Estado:** implementado. `shared/notifications.ts` crea el documento en
+> `notifications` **y** dispara el push por FCM con
+> `firebase-admin/messaging` (`sendEachForMulticast`) de forma best-effort desde
+> `acceptOffer`, `cancelJob`, `completeJob` y `createReview`.
 
 ### Problema
 `sendNotificationSafely` crea documentos en `notifications` (Firestore) pero **no

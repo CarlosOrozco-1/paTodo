@@ -128,8 +128,13 @@ Los roles se asignan mediante **Custom Claims** en Firebase Auth (claim `role`) 
 
 - Fase 0-1 completadas (estructura del repo y modelos de datos).
 - Migración a Firebase completada (Auth, Firestore, reglas e índices).
-- Fase 2 en curso: configuración del proyecto Firebase y autenticación.
-- API REST transaccional (`api/`) implementada y desplegada en Render; `firestore.rules` endurecido con autorización por rol y por propiedad del recurso.
+- Firebase correctamente configurado (Auth Email/Password + Google, Firestore,
+  catálogo sembrado: 8 categorías / 12 skills).
+- API REST transaccional (`api/`) implementada y desplegada en Render;
+  `firestore.rules` endurecido con autorización por rol y por propiedad del recurso.
+- Frontend web publicado en `https://pa-todo.web.app` (ver `docs/web-actualizacion.md`).
+- Contexto consolidado para redactar documentación (DERCAS):
+  `docs/contexto-agente.md`.
 
 ## Integración de los frontends (equipos web y móvil)
 

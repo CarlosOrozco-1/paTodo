@@ -38,7 +38,9 @@ const firebaseConfig = {
 - Android/iOS: descargar desde la consola `google-services.json` /
   `GoogleService-Info.plist` y colocarlos en `android/app/` e `ios/Runner/`.
 - Web Flutter: usar el `firebaseConfig` de arriba.
-- Autenticación habilitada: **Email/Password**.
+- Autenticación habilitada: **Email/Password** (y **Google Sign-In** en la web:
+  `client_id` `377828600122-r6kc7b5surfos5ha27fbs4lb9ue7672t.apps.googleusercontent.com`;
+  ver `docs/auth-google.md`).
 
 ## 3. URLs por entorno
 

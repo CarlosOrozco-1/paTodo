@@ -7,7 +7,7 @@ Plataforma de servicios bajo demanda que conecta a clientes con trabajadores cer
 **Tecnologías principales:** *(actualizadas a la arquitectura vigente; ver `docs/arquitectura.md`)*
 - Backend gestionado: **Firebase** (Auth, Firestore, FCM, Realtime Database, Storage)
 - API transaccional: **Express 5 + TypeScript** (`api/`), desplegada en **Render**
-- Autenticación: **Firebase Authentication** (Email/Password); la API verifica el ID token con el Admin SDK
+- Autenticación: **Firebase Authentication** (Email/Password **y Google Sign-In**); la API verifica el ID token con el Admin SDK
 - Autorización: **`firestore.rules`** para las escrituras directas del cliente
 - Tiempo real: **listeners de Firestore** + **Realtime Database** para el historial de ubicaciones
 - API Docs: **OpenAPI 3** en `spec/openapi.yaml` (sin Swagger UI)
@@ -123,15 +123,15 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 
 ---
 
-### Fase 7: Frontend React (Web App)
-- [ ] Generar cliente TypeScript con openapi-generator desde `spec/openapi.yaml`
-- [ ] Configurar React + Vite + TypeScript + TanStack Query (React Query)
-- [ ] Configurar Zustand/Redux Toolkit para estado global
-- [ ] Implementar autenticación (login, register, token refresh, protected routes)
-- [ ] Pantallas: Dashboard, Job List/Map, Job Detail, Create Job, My Offers, Chat, Profile, Notifications
-- [ ] Consumir actualizaciones en tiempo real con los SDKs de Firebase (`firebase/firestore` `onSnapshot`, `firebase/auth`)
-- [ ] Mapas con `react-leaflet` + OpenStreetMap (gratis) o Google Maps
-- [ ] Responsive design (mobile-first) con Tailwind CSS
+### Fase 7: Frontend React (Web App) 🔄
+- [x] Integrar la app web del equipo (React + Vite + TypeScript + Tailwind); publicada en Firebase Hosting (`https://pa-todo.web.app`)
+- [ ] Generar cliente TypeScript con openapi-generator desde `spec/openapi.yaml` (se consume la API con `axios` + tipado manual en `frontend-web/src/api/`)
+- [x] Configurar Zustand para estado global (autenticación, jobs, ofertas)
+- [x] Implementar autenticación (login, register, Google Sign-In, token refresh, rutas protegidas)
+- [x] Pantallas: Dashboard, Job List/Map, Job Detail, Create Job, My Offers, Chat, Profile, Notifications
+- [x] Consumir actualizaciones en tiempo real con los SDKs de Firebase (`firebase/firestore` `onSnapshot`, `firebase/auth`)
+- [~] Mapas con `react-leaflet` + OpenStreetMap o Google Maps (parcial)
+- [x] Responsive design (mobile-first) con Tailwind CSS
 
 **Entregable:** Aplicación Web React funcional.
 
@@ -178,7 +178,7 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 
 ### Fase 11: Despliegue
 - [x] Desplegar la API Express en Render (plan gratuito): `https://patodo.onrender.com`
-- [ ] Servir el frontend web (build estático de Vite) con Firebase Hosting
+- [x] Servir el frontend web (build estático de Vite) con Firebase Hosting: `https://pa-todo.web.app` (procedimiento en `docs/web-actualizacion.md`)
 - [x] Desplegar `firestore.rules` e índices con `firebase deploy`
 - [ ] Publicar app Android (Play Store) y iOS (App Store / TestFlight)
 - [ ] Configurar variables de entorno de producción (`FIREBASE_SERVICE_ACCOUNT`, `CORS_ORIGINS`, `PORT`)
@@ -249,7 +249,7 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 
 | Colección | Estado | Cambios clave |
 |-----------|--------|---------------|
-| `skills` | ✅ Nueva | Catálogo maestro (5 skills) |
+| `skills` | ✅ Nueva | Catálogo maestro (**12 skills**, 8 categorías) con `categoryIds`; IDs estables = slug, sembrado vía `npm run seed:catalog` |
 | `users` | ✅ Migrado | `skills[]` → `skillIds[]`, `serviceArea.center`, `notificationSettings` |
 | `categories` | ✅ Migrado | `skills[]` → `skillIds[]`, +UI fields, `parentId` |
 | `jobs` | ✅ Migrado | `category` → `categoryId`, `skillsRequired` → `skillIds`, +timestamps |
