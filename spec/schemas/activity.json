@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Activity",
+  "description": "Documento de log de actividad en Firestore. Registra las acciones administrativas (promover/revocar admin, cambiar rol, suspender, reactivar, verificar) que alimentan el feed del dashboard admin (GET /admin/activityLog). Solo la API escribe aquí (reglas: allow write: if false). El ID del documento es generado por Firestore.",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string",
+      "title": "Actor",
+      "description": "UID del administrador que realizó la acción (referencia al documento en la colección users)."
+    },
+    "userName": {
+      "type": "string",
+      "title": "Nombre del actor",
+      "description": "Nombre o correo del administrador que ejecutó la acción. Se guarda para no hacer consultas adicionales al renderizar el feed."
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "make_admin",
+        "remove_admin",
+        "change_role",
+        "suspend_user",
+        "activate_user",
+        "verify_worker",
+        "unverify_worker"
+      ],
+      "title": "Acción",
+      "description": "Identificador de la acción administrativa ejecutada."
+    },
+    "entityType": {
+      "type": "string",
+      "title": "Tipo de entidad",
+      "description": "Tipo de recurso afectado (por ejemplo, user)."
+    },
+    "entityId": {
+      "type": "string",
+      "title": "Entidad afectada",
+      "description": "ID del recurso sobre el que se ejecutó la acción (por ejemplo, el UID del usuario afectado)."
+    },
+    "description": {
+      "type": "string",
+      "title": "Descripción",
+      "description": "Texto legible que resume la acción para mostrarlo en el feed."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Fecha de creación",
+      "description": "Momento en que se ejecutó la acción administrativa."
+    }
+  },
+  "required": ["userId", "userName", "action", "entityType", "entityId", "description"],
+  "additionalProperties": true
+}

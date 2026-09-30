@@ -1033,8 +1033,8 @@ paths:
           name: status
           schema:
             type: string
-            enum: [pending, published, assigned, in_progress, completed, cancelled]
-          description: Filtrar por estado del trabajo.
+            enum: [pending, accepted, in_progress, completed, cancelled]
+          description: Filtrar por estado del trabajo (enum de job.json).
         - in: query
           name: page
           schema:
