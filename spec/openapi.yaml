@@ -14,11 +14,19 @@ info:
     `GET /` (health check), exigen el header
     `Authorization: Bearer <idToken>`; la API lo verifica con el Admin SDK.
 
-    Roles: cada usuario tiene un rol (`client`, `worker` o `both`) que se guarda
-    en su documento de `users` y como **Custom Claim** `role` en Firebase Auth.
-    Las reglas de seguridad de Firestore (`firestore.rules`) usan ese claim para
-    autorizar las escrituras directas del cliente.
-  version: 0.4.0
+    Roles: cada usuario tiene un rol (`client`, `worker`, `both` o `admin`) que
+    se guarda en su documento de `users` y como **Custom Claim** `role` en
+    Firebase Auth. Las reglas de seguridad de Firestore (`firestore.rules`) usan
+    ese claim para autorizar las escrituras directas del cliente.
+
+    El rol `admin` es un **super usuario**: solo administra el sistema (gestiona
+    catálogos `categories`/`skills`, promueve o revoca administradores y revisa
+    usuarios), no participa en trabajos. **No se autoconcede**: `POST /createUser`
+    lo rechaza. Se asigna únicamente con el script `npm run create-admin` (primer
+    admin) o por otro admin vía `POST /admin/makeAdmin`. El claim `admin` viaja
+    en el token; tras promover/revocar, el usuario afectado debe refrescar su
+    sesión (`getIdToken(true)`).
+  version: 0.5.0
 servers:
   - url: https://patodo.onrender.com
     description: Producción (Render)
@@ -39,6 +47,8 @@ tags:
     description: Creación de reseñas y actualización de reputación
   - name: routes
     description: Cálculo y almacenamiento de rutas
+  - name: admin
+    description: Panel de administración (solo rol `admin`)
 
 components:
   securitySchemes:
@@ -167,6 +177,7 @@ paths:
                 role:
                   type: string
                   enum: [client, worker, both]
+                  description: Rol del usuario. `admin` NO es autoasignable; se asigna con `npm run create-admin` o `POST /admin/makeAdmin`.
                 profile:
                   type: object
                   properties:
@@ -578,3 +589,94 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  # ===================== ADMIN =====================
+  /admin/makeAdmin:
+    post:
+      tags: [admin]
+      summary: Promover un usuario a administrador
+      description: |
+        Asigna el rol `admin` a un usuario existente: actualiza su documento
+        `users/{uid}.role` y publica el Custom Claim `role: admin`.
+
+        Solo un usuario con rol `admin` puede llamar este endpoint. El admin
+        promovido debe refrescar su token (`getIdToken(true)`) para que el claim
+        viaje en su ID token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                uid:
+                  type: string
+                  description: UID del usuario que será promovido a admin.
+              required: [uid]
+      responses:
+        '200':
+          description: Usuario promovido a administrador.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: UID del usuario promovido.
+                  role:
+                    type: string
+                    example: admin
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/removeAdmin:
+    post:
+      tags: [admin]
+      summary: Revocar el rol administrador de un usuario
+      description: |
+        Convierte a un usuario `admin` de vuelta en un usuario con rol `client`.
+        Actualiza `users/{uid}.role` y el Custom Claim `role`.
+
+        Solo un usuario con rol `admin` puede llamar este endpoint. No se permite
+        revocarse a sí mismo. El usuario rebajado debe refrescar su token
+        (`getIdToken(true)`) para que el claim viaje en su ID token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                uid:
+                  type: string
+                  description: UID del administrador al que se le revocará el rol.
+              required: [uid]
+      responses:
+        '200':
+          description: Rol de administrador revocado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: UID del usuario rebajado.
+                  role:
+                    type: string
+                    example: client
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'

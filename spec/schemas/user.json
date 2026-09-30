@@ -17,9 +17,9 @@
     },
     "role": {
       "type": "string",
-      "enum": ["client", "worker", "both"],
+      "enum": ["client", "worker", "both", "admin"],
       "title": "Rol del usuario",
-      "description": "Define el comportamiento del usuario: client (publica trabajos), worker (envía ofertas), both (puede actuar como ambos)."
+      "description": "Define el comportamiento del usuario: client (publica trabajos), worker (envía ofertas), both (puede actuar como ambos), admin (super usuario que solo administra el sistema: gestiona catálogos y usuarios; no participa en trabajos)."
     },
     "profile": {
       "type": "object",
