@@ -36,6 +36,16 @@ export const adminService = {
     return realAdmin.activateUser(id);
   },
 
+  async makeAdmin(id: string): Promise<void> {
+    if (isDemoMode()) return demoAdmin.makeAdmin(id);
+    return realAdmin.makeAdmin(id);
+  },
+
+  async removeAdmin(id: string): Promise<void> {
+    if (isDemoMode()) return demoAdmin.removeAdmin(id);
+    return realAdmin.removeAdmin(id);
+  },
+
   async getAllJobs(params?: QueryParams): Promise<PaginatedResponse<Job>> {
     if (isDemoMode()) return demoAdmin.getAllJobs(params);
     return realAdmin.getAllJobs(params);
@@ -53,6 +63,6 @@ export const adminService = {
 
   async getActivityLog(params?: QueryParams): Promise<PaginatedResponse<ActivityLog>> {
     if (isDemoMode()) return demoAdmin.getActivityLog(params);
-    return realAdmin.getActivityLog();
+    return realAdmin.getActivityLog(params);
   },
 };

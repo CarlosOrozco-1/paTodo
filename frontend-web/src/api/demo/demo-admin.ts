@@ -135,6 +135,24 @@ export const demoAdmin = {
     saveDb(d);
   },
 
+  async makeAdmin(id: string): Promise<void> {
+    await sleep(120);
+    const d = db();
+    const user = d.users.find((u) => u.id === id);
+    if (!user) throw new Error('Usuario no encontrado');
+    user.role = 'admin';
+    saveDb(d);
+  },
+
+  async removeAdmin(id: string): Promise<void> {
+    await sleep(120);
+    const d = db();
+    const user = d.users.find((u) => u.id === id);
+    if (!user) throw new Error('Usuario no encontrado');
+    user.role = 'client';
+    saveDb(d);
+  },
+
   async getAllJobs(params?: QueryParams): Promise<PaginatedResponse<Job>> {
     await sleep(120);
     let items = db().jobs;

@@ -95,6 +95,36 @@ export function UsersManagement() {
     setDetailOpen(true);
   };
 
+  const handleMakeAdmin = async (user: UserAdminView) => {
+    try {
+      await adminService.makeAdmin(user.id);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, role: 'admin' } : u)),
+      );
+      if (selectedUser?.id === user.id) {
+        setSelectedUser({ ...selectedUser, role: 'admin' });
+      }
+      toast('success', `${user.profile.firstName} ahora es administrador`);
+    } catch (error) {
+      toast('error', getErrorMessage(error));
+    }
+  };
+
+  const handleRemoveAdmin = async (user: UserAdminView) => {
+    try {
+      await adminService.removeAdmin(user.id);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, role: 'client' } : u)),
+      );
+      if (selectedUser?.id === user.id) {
+        setSelectedUser({ ...selectedUser, role: 'client' });
+      }
+      toast('success', `Rol de administrador revocado a ${user.profile.firstName}`);
+    } catch (error) {
+      toast('error', getErrorMessage(error));
+    }
+  };
+
   if (loading) return <Spinner label="Cargando listado de usuarios..." />;
 
   // Cálculo de paginación
@@ -218,12 +248,18 @@ export function UsersManagement() {
                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
                   <Badge
                     className={
-                      selectedUser.role === 'worker'
-                        ? 'bg-purple-50 text-purple-700 border border-purple-200/60 font-semibold'
-                        : 'bg-blue-50 text-blue-700 border border-blue-200/60 font-semibold'
+                      selectedUser.role === 'admin'
+                        ? 'bg-gray-800 text-white border border-gray-900/20 font-semibold'
+                        : selectedUser.role === 'worker'
+                          ? 'bg-purple-50 text-purple-700 border border-purple-200/60 font-semibold'
+                          : 'bg-blue-50 text-blue-700 border border-blue-200/60 font-semibold'
                     }
                   >
-                    {selectedUser.role === 'worker' ? 'Profesional' : 'Cliente'}
+                    {selectedUser.role === 'admin'
+                      ? 'Administrador'
+                      : selectedUser.role === 'worker'
+                        ? 'Profesional'
+                        : 'Cliente'}
                   </Badge>
 
                   {selectedUser.account.verified ? (
@@ -283,6 +319,31 @@ export function UsersManagement() {
             </div>
 
             <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
+              {selectedUser.role === 'admin' ? (
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => {
+                    handleRemoveAdmin(selectedUser);
+                    setDetailOpen(false);
+                  }}
+                >
+                  <ShieldCheck className="mr-2 h-4 w-4" />
+                  Quitar rol de admin
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  className="rounded-xl"
+                  onClick={() => {
+                    handleMakeAdmin(selectedUser);
+                    setDetailOpen(false);
+                  }}
+                >
+                  <ShieldCheck className="mr-2 h-4 w-4" />
+                  Hacer administrador
+                </Button>
+              )}
               {selectedUser.status === 'active' ? (
                 <Button
                   variant="danger"

@@ -16,12 +16,12 @@ export const categoriesService = {
 
   async create(data: CreateCategoryDto): Promise<Category> {
     if (isDemoMode()) return demoCategories.create(data);
-    return realCategories.create();
+    return realCategories.create(data);
   },
 
   async update(id: string, data: Partial<CreateCategoryDto>): Promise<Category> {
     if (isDemoMode()) return demoCategories.update(id, data);
-    return realCategories.update();
+    return realCategories.update(id, data);
   },
 };
 
@@ -38,6 +38,6 @@ export const skillsService = {
 
   async create(data: CreateSkillDto): Promise<Skill> {
     if (isDemoMode()) return demoSKills.create(data);
-    return realSkills.create();
+    return realSkills.create(data);
   },
 };
