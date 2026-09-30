@@ -17,6 +17,15 @@ service cloud.firestore {
       return signedIn() && request.auth.token.get('role', '') in roles;
     }
 
+    // El usuario no está suspendido. Un admin puede suspender la cuenta de un
+    // usuario (status: suspended vía POST /admin/suspendUser); la regla bloquea
+    // sus escrituras. Los usuarios previos al campo status se tratan como active.
+    function notSuspended() {
+      return signedIn()
+             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+                  .get('status', 'active') != 'suspended';
+    }
+
     // El documento de entrada no excede 128 KiB (protección DoS).
     function smallEnough() {
       return request.resource.data.size() <= 131072;
@@ -28,9 +37,11 @@ service cloud.firestore {
       allow read: if signedIn();
 
       // El usuario puede editar su perfil/contacto/ubicación/dispositivos, pero
-      // nunca campos que controla la API: uid, email, role, stats, createdAt.
+      // nunca campos que controla la API: uid, email, role, verified, status,
+      // stats, createdAt. Un usuario suspendido tampoco puede editar su perfil.
       allow update: if signedIn()
                     && request.auth.uid == userId
+                    && notSuspended()
                     && smallEnough()
                     && request.resource.data.diff(resource.data).affectedKeys()
                         .hasOnly(['profile', 'contact', 'location', 'fcmTokens',
@@ -48,6 +59,7 @@ service cloud.firestore {
       // Solo un cliente (role client/both) puede publicar un trabajo,
       // asignándose como dueño. Nace siempre en estado pending.
       allow create: if hasRole(['client', 'both'])
+                    && notSuspended()
                     && smallEnough()
                     && request.resource.data.clientId == request.auth.uid
                     && request.resource.data.status == 'pending'
@@ -59,6 +71,7 @@ service cloud.firestore {
       // /completeJob. Así el cliente no puede autocompletar ni autocancelar un
       // trabajo saltándose las transacciones.
       allow update: if signedIn()
+                    && notSuspended()
                     && smallEnough()
                     && resource.data.clientId == request.auth.uid
                     && request.resource.data.diff(resource.data).affectedKeys()
@@ -67,6 +80,7 @@ service cloud.firestore {
       // Solo se elimina un trabajo propio que siga pendiente (sin trabajador
       // asignado ni ofertas aceptadas). Para el resto se usa /cancelJob.
       allow delete: if signedIn()
+                    && notSuspended()
                     && resource.data.clientId == request.auth.uid
                     && resource.data.status == 'pending';
     }
@@ -82,6 +96,7 @@ service cloud.firestore {
       // Solo un trabajador (role worker/both) puede ofertar un trabajo ajeno que
       // siga pendiente. Nace siempre en estado pending y con los campos mínimos.
       allow create: if hasRole(['worker', 'both'])
+                    && notSuspended()
                     && smallEnough()
                     && request.resource.data.workerId == request.auth.uid
                     && request.resource.data.status == 'pending'
@@ -93,6 +108,7 @@ service cloud.firestore {
       // (pending -> withdrawn). No puede auto-aceptarse la oferta (eso lo hace
       // el cliente vía /acceptOffer) ni cambiar a qué trabajo pertenece.
       allow update: if signedIn()
+                    && notSuspended()
                     && smallEnough()
                     && resource.data.workerId == request.auth.uid
                     && request.resource.data.diff(resource.data).affectedKeys()
@@ -132,11 +148,13 @@ service cloud.firestore {
 
       // Solo el trabajador dueño puede crear un vehículo, asignándose como ownerId.
       allow create: if hasRole(['worker', 'both'])
+                    && notSuspended()
                     && smallEnough()
                     && request.resource.data.ownerId == request.auth.uid;
 
       // Solo el dueño puede actualizar o eliminar su vehículo.
       allow update, delete: if signedIn()
+                            && notSuspended()
                             && smallEnough()
                             && resource.data.ownerId == request.auth.uid;
     }
@@ -149,6 +167,14 @@ service cloud.firestore {
       // Las reseñas son transaccionales: solo se crean desde la API (POST /createReview),
       // que valida autor, trabajo completado, 1 reseña por trabajo y recalcula stats.
       allow create, update, delete: if false;
+    }
+
+    // ===================== activity =====================
+    match /activity/{activityId} {
+      // Solo el rol admin puede leer el log de actividad (dashboard).
+      allow read: if hasRole(['admin']);
+      // El log lo escribe exclusivamente la API (Admin SDK ignora estas reglas).
+      allow write: if false;
     }
 
     // ===================== notifications =====================
