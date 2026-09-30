@@ -110,8 +110,9 @@ service cloud.firestore {
       // Cualquiera puede leer el catálogo de habilidades.
       allow read: if true;
 
-      // La escritura se maneja desde la API.
-      allow write: if false;
+      // Solo el rol admin (super usuario) mantiene el catálogo: crea, edita o
+      // desactiva habilidades. Los seed scripts usan el Admin SDK (ignoran reglas).
+      allow create, update, delete: if hasRole(['admin']) && smallEnough();
     }
 
     // ===================== categories =====================
@@ -119,8 +120,9 @@ service cloud.firestore {
       // Cualquiera puede leer el catálogo de categorías.
       allow read: if true;
 
-      // La escritura se maneja desde la API.
-      allow write: if false;
+      // Solo el rol admin (super usuario) mantiene el catálogo: crea, edita o
+      // desactiva categorías. Los seed scripts usan el Admin SDK (ignoran reglas).
+      allow create, update, delete: if hasRole(['admin']) && smallEnough();
     }
 
     // ===================== vehicles =====================
