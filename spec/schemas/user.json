@@ -21,6 +21,17 @@
       "title": "Rol del usuario",
       "description": "Define el comportamiento del usuario: client (publica trabajos), worker (envía ofertas), both (puede actuar como ambos), admin (super usuario que solo administra el sistema: gestiona catálogos y usuarios; no participa en trabajos)."
     },
+    "verified": {
+      "type": "boolean",
+      "title": "Perfil verificado",
+      "description": "Indica si el trabajador fue verificado por un administrador. Solo aplica a roles worker o both. El administrador lo cambia con POST /admin/verifyWorker."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "suspended"],
+      "title": "Estado de la cuenta",
+      "description": "Estado de la cuenta: active (operación normal) o suspended (suspendida por un administrador; se deniegan las escrituras). El administrador lo controla con POST /admin/suspendUser y POST /admin/activateUser."
+    },
     "profile": {
       "type": "object",
       "title": "Perfil personal",

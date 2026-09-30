@@ -680,3 +680,453 @@ paths:
           $ref: '#/components/responses/PermissionDenied'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /admin/stats:
+    get:
+      tags: [admin]
+      summary: Estadísticas del panel de administración
+      description: |
+        Devuelve un resumen agregado de la plataforma para el dashboard admin:
+        conteos de usuarios por rol, trabajos por estado, ofertas, calificación
+        promedio y actividad reciente (usuarios/trabajos nuevos esta semana).
+
+        Solo un usuario con rol `admin` puede llamar este endpoint.
+      responses:
+        '200':
+          description: Estadísticas agregadas.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalUsers:
+                    type: integer
+                  totalClients:
+                    type: integer
+                  totalWorkers:
+                    type: integer
+                  totalAdmins:
+                    type: integer
+                  totalJobs:
+                    type: integer
+                  activeJobs:
+                    type: integer
+                  pendingJobs:
+                    type: integer
+                  completedJobs:
+                    type: integer
+                  cancelledJobs:
+                    type: integer
+                  totalOffers:
+                    type: integer
+                  pendingOffers:
+                    type: integer
+                  acceptedOffers:
+                    type: integer
+                  averageRating:
+                    type: number
+                  totalRevenue:
+                    type: number
+                  currency:
+                    type: string
+                    example: GTQ
+                  activeUsersToday:
+                    type: integer
+                  newUsersThisWeek:
+                    type: integer
+                  newJobsThisWeek:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+
+  /admin/users:
+    get:
+      tags: [admin]
+      summary: Listar usuarios (vista de administración)
+      description: |
+        Lista los usuarios del sistema con filtros y paginación. Devuelve la
+        vista que consume el módulo de gestión de usuarios del panel admin.
+
+        Solo un usuario con rol `admin` puede llamar este endpoint.
+      parameters:
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [client, worker, both, admin]
+          description: Filtrar por rol.
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Buscar por nombre o correo (subcadena, sin distinguir mayúsculas).
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, suspended]
+          description: Filtrar por estado de la cuenta.
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Lista paginada de usuarios.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        email:
+                          type: string
+                        firstName:
+                          type: string
+                        lastName:
+                          type: string
+                        avatarUrl:
+                          type: string
+                          nullable: true
+                        role:
+                          type: string
+                        status:
+                          type: string
+                          enum: [active, suspended]
+                        verified:
+                          type: boolean
+                        phone:
+                          type: string
+                        rating:
+                          type: number
+                        ratingCount:
+                          type: integer
+                        completedJobs:
+                          type: integer
+                        createdAt:
+                          type: string
+                          format: date-time
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  totalPages:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+
+  /admin/users/{uid}/role:
+    patch:
+      tags: [admin]
+      summary: Cambiar el rol de un usuario
+      description: |
+        Actualiza `users/{uid}.role` y el Custom Claim `role` a un rol permitido
+        (`client`, `worker` o `both`). Nota: para promover/revocar el rol `admin`
+        usa `POST /admin/makeAdmin` y `POST /admin/removeAdmin`.
+
+        Solo un usuario con rol `admin` puede llamar este endpoint. El usuario
+        afectado debe refrescar su token (`getIdToken(true)`).
+      parameters:
+        - in: path
+          name: uid
+          required: true
+          schema:
+            type: string
+          description: UID del usuario.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [client, worker, both]
+                  description: Nuevo rol del usuario (no admin; eso se hace con makeAdmin/removeAdmin).
+              required: [role]
+      responses:
+        '200':
+          description: Rol actualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  role:
+                    type: string
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/suspendUser:
+    post:
+      tags: [admin]
+      summary: Suspender un usuario
+      description: |
+        Marca la cuenta de un usuario como `status: suspended`. Las reglas de
+        Firestore deniegan las escrituras de cuentas suspendidas (ver helper
+        `notSuspended()` en `firestore.rules`).
+
+        Solo un usuario con rol `admin` puede llamar este endpoint. No se puede
+        suspender a un admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                uid:
+                  type: string
+                  description: UID del usuario a suspender.
+              required: [uid]
+      responses:
+        '200':
+          description: Usuario suspendido.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+                    example: suspended
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/activateUser:
+    post:
+      tags: [admin]
+      summary: Reactivar un usuario suspendido
+      description: |
+        Devuelve la cuenta de un usuario a `status: active`, restaurando su
+        capacidad de escritura en Firestore.
+
+        Solo un usuario con rol `admin` puede llamar este endpoint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                uid:
+                  type: string
+                  description: UID del usuario a reactivar.
+              required: [uid]
+      responses:
+        '200':
+          description: Usuario reactivado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+                    example: active
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/verifyWorker:
+    post:
+      tags: [admin]
+      summary: Verificar o rechazar la verificación de un trabajador
+      description: |
+        Marca `verified: true/false` en el documento del trabajador. Se usa para
+        el flujo de verificación de profesionales del panel admin.
+
+        Solo un usuario con rol `admin` puede llamar este endpoint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                workerId:
+                  type: string
+                  description: UID del trabajador a verificar.
+                approve:
+                  type: boolean
+                  description: true para verificar, false para rechazar.
+              required: [workerId, approve]
+      responses:
+        '200':
+          description: Estado de verificación actualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  verified:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/jobs:
+    get:
+      tags: [admin]
+      summary: Listar todos los trabajos (vista admin)
+      description: |
+        Lista los trabajos con filtros y paginación para el módulo "Todos los
+        Trabajos" del panel admin.
+
+        Solo un usuario con rol `admin` puede llamar este endpoint.
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, published, assigned, in_progress, completed, cancelled]
+          description: Filtrar por estado del trabajo.
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Lista paginada de trabajos.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    description: Cada trabajo usa el schema `job.json` (colección jobs).
+                    items:
+                      allOf:
+                        - $ref: './schemas/job.json'
+                      properties:
+                        id:
+                          type: string
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  totalPages:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+
+  /admin/activityLog:
+    get:
+      tags: [admin]
+      summary: Log de actividad reciente
+      description: |
+        Devuelve las acciones administrativas y eventos recientes de la plataforma
+        (registros, trabajos, ofertas, promociones, suspensiones) para el feed de
+        actividad del dashboard admin.
+
+        Solo un usuario con rol `admin` puede llamar este endpoint.
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Eventos de actividad reciente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        userId:
+                          type: string
+                        userName:
+                          type: string
+                        action:
+                          type: string
+                        entityType:
+                          type: string
+                        entityId:
+                          type: string
+                        description:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
