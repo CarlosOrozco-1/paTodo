@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Payment",
+  "description": "Documento de pago en Firestore. Registro de un pago SIMULADO (demo) de un cliente a un trabajador por un trabajo. No usa pasarela real: el flujo replica el resultado final de una pasarela (pago confirmado) con comisión de plataforma y pago neto al trabajador. El campo `isDemo: true` marca explícitamente que no hubo dinero real. El ID del documento es generado por Firestore o la API.",
+  "type": "object",
+  "properties": {
+    "jobId": {
+      "type": "string",
+      "title": "Trabajo",
+      "description": "ID del trabajo pagado (referencia a la colección jobs)."
+    },
+    "clientId": {
+      "type": "string",
+      "title": "Cliente que paga",
+      "description": "UID del cliente que realiza el pago (referencia a users)."
+    },
+    "workerId": {
+      "type": "string",
+      "title": "Trabajador cobrador",
+      "description": "UID del trabajador que recibe el pago (referencia a users)."
+    },
+    "amount": {
+      "type": "number",
+      "minimum": 0,
+      "title": "Monto total",
+      "description": "Monto total cobrado al cliente, equivalente al precio de la oferta aceptada."
+    },
+    "currency": {
+      "type": "string",
+      "default": "GTQ",
+      "title": "Moneda",
+      "description": "Moneda del pago (por defecto, quetzales guatemaltecos)."
+    },
+    "method": {
+      "type": "string",
+      "enum": ["demo_card", "demo_cash", "demo_bank"],
+      "title": "Método de pago",
+      "description": "Cómo se simula el pago: `demo_card` (tarjeta), `demo_cash` (efectivo) o `demo_bank` (transferencia). Todos son demostrativos."
+    },
+    "isDemo": {
+      "type": "boolean",
+      "const": true,
+      "title": "Pago demostrativo",
+      "description": "Siempre true: este pago es una simulación, no involucra dinero real ni pasarela."
+    },
+    "feePercent": {
+      "type": "number",
+      "minimum": 0,
+      "title": "Comisión (%)",
+      "description": "Porcentaje de comisión que retiene la plataforma sobre el monto."
+    },
+    "platformFee": {
+      "type": "number",
+      "minimum": 0,
+      "title": "Comisión de la plataforma",
+      "description": "Monto en la moneda del pago que retiene la plataforma."
+    },
+    "workerPayout": {
+      "type": "number",
+      "minimum": 0,
+      "title": "Pago neto al trabajador",
+      "description": "Monto final que recibe el trabajador (amount - platformFee)."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["paid"],
+      "title": "Estado del pago",
+      "description": "Estado del pago. En el demo el pago se registra directamente como `paid` (una pasarela real pasaría por pending → confirmed)."
+    },
+    "paidAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Fecha de pago",
+      "description": "Momento en que se confirmó el pago."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Fecha de creación",
+      "description": "Momento en que se registró el pago."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Última actualización",
+      "description": "Momento del último cambio en el documento."
+    }
+  },
+  "required": ["jobId", "clientId", "workerId", "amount", "isDemo", "status"],
+  "additionalProperties": true
+}

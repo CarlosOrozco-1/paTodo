@@ -9,7 +9,8 @@ export type NotificationType =
   | "job_started"
   | "job_completed"
   | "job_cancelled"
-  | "new_review";
+  | "new_review"
+  | "payment_received";
 
 export interface NotificationPayload {
   userId: string;

@@ -19,7 +19,8 @@
         "job_started",
         "job_completed",
         "job_cancelled",
-        "new_review"
+        "new_review",
+        "payment_received"
       ],
       "title": "Tipo de notificación",
       "description": "Clasifica el evento que originó la notificación."

@@ -169,6 +169,19 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // ===================== payments =====================
+    match /payments/{paymentId} {
+      // Solo el cliente que pagó o el trabajador cobrador pueden leer el pago.
+      allow read: if signedIn()
+                  && (resource.data.clientId == request.auth.uid
+                      || resource.data.workerId == request.auth.uid);
+
+      // Los pagos son transaccionales y de la API (POST /createPayment), que
+      // valida al dueño del trabajo, calcula comisión y escribe job.payment.
+      // El módulo es demo (isDemo: true), sin dinero real.
+      allow create, update, delete: if false;
+    }
+
     // ===================== activity =====================
     match /activity/{activityId} {
       // Solo el rol admin puede leer el log de actividad (dashboard).

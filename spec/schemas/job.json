@@ -165,6 +165,63 @@
       "title": "Fecha de completado",
       "description": "Momento en que el trabajo fue marcado como completado. Null mientras el trabajo no esté completado."
     },
+    "payment": {
+      "type": ["object", "null"],
+      "title": "Pago (demo)",
+      "description": "Información del pago del trabajo cuando el cliente lo pagó. Null mientras no haya pago. Lo escribe exclusivamente la API (POST /createPayment) mediante Admin SDK, nunca el cliente. Este módulo es metodológico/demo: no involucra dinero real.",
+      "properties": {
+        "paymentId": {
+          "type": "string",
+          "title": "ID del pago",
+          "description": "ID del documento en la colección payments (referencia a payments)."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["paid"],
+          "title": "Estado",
+          "description": "Estado del pago del trabajo. Siempre `paid` en el demo."
+        },
+        "amount": {
+          "type": "number",
+          "minimum": 0,
+          "title": "Monto",
+          "description": "Monto total pagado, equivalente al precio de la oferta aceptada."
+        },
+        "currency": {
+          "type": "string",
+          "default": "GTQ",
+          "title": "Moneda"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["demo_card", "demo_cash", "demo_bank"],
+          "title": "Método de pago"
+        },
+        "platformFee": {
+          "type": "number",
+          "minimum": 0,
+          "title": "Comisión de la plataforma",
+          "description": "Monto que retiene la plataforma (demo)."
+        },
+        "workerPayout": {
+          "type": "number",
+          "minimum": 0,
+          "title": "Pago neto al trabajador",
+          "description": "Monto final que recibe el trabajador (amount - platformFee)."
+        },
+        "paidAt": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Fecha de pago"
+        },
+        "isDemo": {
+          "type": "boolean",
+          "const": true,
+          "title": "Pago demostrativo"
+        }
+      },
+      "required": ["paymentId", "status", "amount", "method"]
+    },
     "route": {
       "type": ["object", "null"],
       "title": "Ruta calculada",
