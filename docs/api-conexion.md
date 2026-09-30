@@ -73,6 +73,8 @@ La fuente de verdad está en `firestore.rules` (ya desplegado y endurecido).
 | Mensajes (`conversations.messages`) | **Firestore SDK directo** | Cliente (participante, `senderId == uid`) |
 | Leer conversaciones/notificaciones propias | **Firestore SDK directo** | Cliente |
 | `users.role/stats`, `notifications`, `conversations`, `reviews` | **Solo la API** | API (roles/stats/estados) |
+| `users.status` (suspender/activar), `users.verified`, `users.role` (admin) | **`POST /admin/suspendUser`**, `activateUser`, `verifyWorker`, `makeAdmin`, `removeAdmin`, `PATCH /admin/users/{uid}/role` | Admin (token con claim `role: admin`) |
+| `categories` / `skills` (crear/editar) | **Firestore SDK directo** | Admin (`hasRole(['admin'])` en las reglas) |
 
 > Las reseñas, notificaciones y conversaciones **solo** se crean desde la API;
 > las reglas bloquean la escritura directa del cliente. No implementar
@@ -107,6 +109,16 @@ Contrato:
 | `POST /createReview` | `{jobId, rating(1-5), comment?}` | `201` review |
 | `POST /computeRoute` | `{jobId}` | `200` trazo de ruta (con `geometry`, `distance`, `duration`, `legs`; ver §5.1) |
 | `GET /jobs/nearby` | query: `lat`, `lng`, `radiusKm`(≤50), `categoryId?`, `limit?` | `200 {items}` trabajos `pending` ordenados por `distanceKm` (ver §5.2) |
+| `GET /admin/stats` | — | `200` resumen agregado del panel admin (dashboard) |
+| `GET /admin/users` | query: `role?`, `status?`, `search?`, `page?`, `limit?` | `200 {items,total,page,limit,totalPages}` lista paginada de usuarios |
+| `GET /admin/users/{uid}/role` → **`PATCH`** | `{role}` con `client`/`worker`/`both` | `200 {id, role}` |
+| `POST /admin/makeAdmin` | `{uid}` | `200 {id, role:"admin"}` |
+| `POST /admin/removeAdmin` | `{uid}` | `200 {id, role:"client"}` |
+| `POST /admin/suspendUser` | `{uid}` | `200 {id, status:"suspended"}` |
+| `POST /admin/activateUser` | `{uid}` | `200 {id, status:"active"}` |
+| `POST /admin/verifyWorker` | `{workerId, approve}` | `200 {id, verified}` |
+| `GET /admin/jobs` | query: `status?`, `page?`, `limit?` | `200 {items,total,page,limit,totalPages}` todos los trabajos |
+| `GET /admin/activityLog` | query: `limit?` (≤100) | `200 {items}` log de acciones administrativas |
 | `GET /` | — | `200 {"status":"ok"}` (health) |
 
 Formato de error: `{ error: string, code: string }` con el status HTTP real
@@ -231,6 +243,32 @@ recta.
 **Errores**: `400 invalid-argument` (parámetros inválidos o `radiusKm > 50`),
 `403 permission-denied` (rol cliente), `401 unauthenticated` (sin token).
 
+## 5.3 Panel administrativo (endpoints `/admin/*`)
+
+Rol **admin** (super usuario): además de los permisos de cliente/trabajador, un
+admin puede administrar cuentas, catálogo y el log de actividad. Este rol es el
+Custom Claim `role=admin` y el campo `users/{uid}.role=admin`.
+
+- **Primer admin:** se crea con `npm run create-admin` en `api/` (fuera de la
+  API). Los siguientes se promueven con `POST /admin/makeAdmin` (requiere token
+  con claim `admin`).
+- **Catálogo (`categories`/`skills`):** el admin los gestiona por **Firestore SDK
+  directo** (las reglas permiten `create/update/delete` solo con `hasRole(['admin'])`),
+  respetando los campos de `spec/schemas/categories.json` y `skills.json`
+  (ID determinista = `slug`, upsert con `merge`, timestamps). El frontend web ya
+  lo hace en `real-categories.ts`.
+- **Suspensión:** `POST /admin/suspendUser` marca `status:"suspended"` y las
+  reglas bloquean todas sus escrituras (`notSuspended()`). Un admin no puede ser
+  suspendido ni auto-rebajar su rol (`removeAdmin` se rechaza si `uid == admin`).
+- **Verificación de profesionales:** `POST /admin/verifyWorker` marca
+  `verified: true/false`, que alimenta "Profesionales pendientes" en el panel.
+- **Log de actividad:** cada acción admin se registra en la colección `activity`
+  (solo la API escribe; las reglas permiten lectura solo a `admin`). Se lee con
+  `GET /admin/activityLog`.
+- **Refresco de token:** tras `makeAdmin`/`removeAdmin`/cambio de rol, el usuario
+  afectado debe refrescar su token con `getIdToken(true)` para que las reglas
+  reconozcan el nuevo claim.
+
 ## 6. Desarrollo local (emuladores)
 
 Levantar emuladores de Auth y Firestore desde la raíz:
@@ -258,13 +296,13 @@ Guía completa de pruebas: `docs/api-emulador.md`. Pruebas automatizadas:
 `api/tests/e2e.sh` (flujo completo) y `api/tests/security.sh` (autorización y reglas).
 
 > **Catálogo de categorías y skills:** las colecciones `categories` y `skills`
-> son catálogos maestros (reglas: lectura pública, escritura bloqueada) y se
-> pueblan solo con seed/API. Para cargar el catálogo semilla (mecánica,
-> plomería, electricidad, etc.) contra el emulador o producción:
-> `cd api && npm run seed:catalog`. Es no destructivo (upsert por `slug`) y usa
-> IDs deterministas (`categoryId` = slug), así los trabajos publicados con esas
-> categorías mantienen referencias estables. El script `npm run seed` **borra
-> todos los datos** y solo sirve para el emulador.
+> son catálogos maestros (reglas: lectura pública, escritura **solo admin**) y se
+> pueblan con seed/API o desde el panel admin (rol `admin`). Para cargar el
+> catálogo semilla (mecánica, plomería, electricidad, etc.) contra el emulador o
+> producción: `cd api && npm run seed:catalog`. Es no destructivo (upsert por
+> `slug`) y usa IDs deterministas (`categoryId` = slug), así los trabajos
+> publicados con esas categorías mantienen referencias estables. El script
+> `npm run seed` **borra todos los datos** y solo sirve para el emulador.
 
 ## 7. Pruebas con Postman
 

@@ -116,12 +116,14 @@ trabajo local ni generar conflictos a ciegas. Documentación detallada en
 - `client`: publica trabajos.
 - `worker`: envía ofertas a trabajos.
 - `both`: puede actuar como cliente y trabajador.
+- `admin`: super usuario (panel admin, suspender/activar cuentas, promover
+  admins, verificar profesionales, mantener el catálogo). Ver `docs/admin.md`.
 
-Los roles se asignan mediante **Custom Claims** en Firebase Auth (claim `role`) y se replican en el campo `users/{uid}.role`. Las reglas de Firestore leen `request.auth.token.role`, así que el cliente debe refrescar el ID token (`getIdToken(true)`) tras crear el perfil o cambiar de rol. Lo asigna `POST /createUser`; para usuarios previos existe `npm run sync-claims` en `api/`.
+Los roles se asignan mediante **Custom Claims** en Firebase Auth (claim `role`) y se replican en el campo `users/{uid}.role`. Las reglas de Firestore leen `request.auth.token.role`, así que el cliente debe refrescar el ID token (`getIdToken(true)`) tras crear el perfil o cambiar de rol. Lo asigna `POST /createUser`; para usuarios previos existe `npm run sync-claims` en `api/`. El claim `admin` lo asigna `npm run create-admin` (primer admin) y `POST /admin/makeAdmin` (los siguientes); `POST /admin/removeAdmin` lo revoca y **no puede usarse sobre uno mismo**.
 
 ## Colecciones principales
 
-- `users`, `vehicles`, `skills`, `categories`, `jobs`, `offers`, `reviews`, `notifications`, `conversations` (con subcolección `messages`).
+- `users`, `vehicles`, `skills`, `categories`, `jobs`, `offers`, `reviews`, `notifications`, `conversations` (con subcolección `messages`), `activity` (log de acciones administrativas; escritura solo la API, lectura solo admin).
 - El historial de ubicaciones se maneja en **Firebase Realtime Database**, no en Firestore.
 
 ## Estado actual del proyecto
@@ -132,6 +134,11 @@ Los roles se asignan mediante **Custom Claims** en Firebase Auth (claim `role`) 
   catálogo sembrado: 8 categorías / 12 skills).
 - API REST transaccional (`api/`) implementada y desplegada en Render;
   `firestore.rules` endurecido con autorización por rol y por propiedad del recurso.
+- Fase admin completada: spec con endpoints `/admin/*`, API implementada y
+  validada contra producción, reglas con suspensión de cuentas
+  (`notSuspended()`) y log `activity`, panel web conectado al API
+  (dashboard, usuarios, verificación, trabajos, promover/revocar admin) y
+  catálogo `categories`/`skills` editable solo por admin (ver `docs/admin.md`).
 - Frontend web publicado en `https://pa-todo.web.app` (ver `docs/web-actualizacion.md`).
 - Contexto consolidado para redactar documentación (DERCAS):
   `docs/contexto-agente.md`.
@@ -159,11 +166,14 @@ refrescar el token (`getIdToken(true)`) antes de escribir en Firestore.
 ## Catálogo de categorías y skills
 
 - Las colecciones `categories` y `skills` son **catálogos maestros**: lectura
-  pública (reglas `allow read: if true`) y escritura **bloqueada** (reglas
-  `allow write: if false`), se poblan solo vía seed/API, nunca desde el cliente.
+  pública (reglas `allow read: if true`) y escritura **solo rol `admin`**
+  (reglas `allow create, update, delete: if hasRole(['admin'])`); nunca desde
+  un cliente/trabajador.
 - El schema vive en `spec/schemas/categories.json` y `spec/schemas/skills.json`.
 - Catálogo semilla: `npm run seed:catalog` en `api/` (script no destructivo,
   upsert con IDs deterministas = `slug`, deja `isActive: true` y timestamps).
+- El admin web mantiene el catálogo por **SDK de Firestore directo**
+  (`frontend-web/src/api/real/real-categories.ts`) respetando esos campos.
 - El seed de pruebas `npm run seed` (`api/src/seeder/seed.ts`) **borra todos los
   datos** (users, auth, jobs, ofertas…) y solo crea 1 categoría; sirve para el
   emulador, **jamás** contra producción.

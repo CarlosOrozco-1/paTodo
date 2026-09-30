@@ -47,8 +47,10 @@ Flujo core (happy path):
 ## 3. Autenticación y roles
 
 - **Firebase Authentication**: Email/Password **y Google Sign-In**.
-- Roles: **`client`**, **`worker`**, **`both`**. Viven en `users/{uid}.role` y
-  como **Custom Claim** `role` en el ID token (lo asigna `POST /createUser`).
+- Roles: **`client`**, **`worker`**, **`both`** y **`admin`** (super usuario).
+  Viven en `users/{uid}.role` y como **Custom Claim** `role` en el ID token (lo
+  asigna `POST /createUser`; el admin además via `POST /admin/makeAdmin` /
+  `npm run create-admin`).
 - Las reglas de Firestore leen `request.auth.token.role`; por eso después de
   crear el perfil / cambiar de rol hay que refrescar el token
   (`getIdToken(true)`).
@@ -71,6 +73,16 @@ Flujo core (happy path):
 | POST | `/createReview` | Participante de un trabajo completado |
 | POST | `/computeRoute` | Cliente dueño o trabajador asignado (preview para no asignados) |
 | GET | `/jobs/nearby` | Trabajador / `both` (geo-búsqueda por geohash + haversine) |
+| GET | `/admin/stats` | Admin (dashboard: conteos, rating, actividad semanal) |
+| GET | `/admin/users` | Admin (lista paginada; `role?`, `status?`, `search?`) |
+| PATCH | `/admin/users/{uid}/role` | Admin (cambia a client/worker/both) |
+| POST | `/admin/makeAdmin` | Admin (promueve a `admin`) |
+| POST | `/admin/removeAdmin` | Admin (revierte a `client`; no auto-revocable) |
+| POST | `/admin/suspendUser` | Admin (marca `status: suspended`) |
+| POST | `/admin/activateUser` | Admin (marca `status: active`) |
+| POST | `/admin/verifyWorker` | Admin (marca `verified` true/false) |
+| GET | `/admin/jobs` | Admin (todos los trabajos; `status?`) |
+| GET | `/admin/activityLog` | Admin (log de acciones; `limit?`) |
 
 Contrato detallado en `spec/openapi.yaml` y `docs/api-conexion.md`. Formato de
 error uniforme: `{ error: string, code: string }` con status HTTP real (400/401/
@@ -79,11 +91,16 @@ error uniforme: `{ error: string, code: string }` con status HTTP real (400/401/
 ## 5. Modelo de datos (Cloud Firestore)
 
 Colecciones: `users`, `vehicles`, `skills`, `categories`, `jobs`, `offers`,
-`reviews`, `notifications`, `conversations` (+ subcolección `messages`).
+`reviews`, `notifications`, `conversations` (+ subcolección `messages`) y
+`activity` (log de acciones administrativas, escritura solo API).
 
 - **Catálogos maestros** `categories` y `skills`: lectura pública, escritura
-  bloqueada; se pueblan con `npm run seed:catalog` (no destructivo, upsert por
-  `slug`). **8 categorías y 12 skills** vigentes; `skills` tienen `categoryIds`.
+  **solo rol `admin`**; se pueblan con `npm run seed:catalog` (no destructivo,
+  upsert por `slug`) o desde el panel web. **8 categorías y 12 skills**
+  vigentes; `skills` tienen `categoryIds`.
+- **Suspensión de cuentas:** el campo `users/{uid}.status` (`active`/
+  `suspended`) lo controla la API (`/admin/suspendUser`); un usuario suspendido
+  conserva lectura pero pierde todas sus escrituras (regla `notSuspended()`).
 - **Historial de ubicaciones** vive en **Firebase Realtime Database** (no en
   Firestore). La ruta calculada se guarda en `jobs/{jobId}.route`.
 - Geopoints con campo `geohash` (geofire-common) para búsquedas por proximidad.
@@ -126,7 +143,9 @@ Schemas completos: `spec/schemas/*.json`. Reglas: `docs/reglas-firebase.md` +
 Completado: Firebase (Auth, Firestore, reglas, índices), API REST en Render,
 catálogo sembrado (8 categorías / 12 skills), frontend web publicado, login
 Google + CORS + `/createUser` operativos, skills del profesional persisten y
-web documentada.
+web documentada, **módulo admin completo** (spec, API con endpoints `/admin/*`,
+reglas con `notSuspended()` y colección `activity`, panel web conectado al API,
+promover/revocar admin y CRUD de catálogo por SDK).
 
 Pendientes para el equipo web (ya reportados):
 - Modal "Completa tu perfil" tras Google Sign-In para usuarios nuevos
@@ -147,4 +166,6 @@ Pendientes para el equipo web (ya reportados):
 | `docs/diagramas/*.md` | Diagramas de casos de uso y módulos |
 | `docs/web-actualizacion.md` | Ciclo de publicación de la web (build + deploy) |
 | `docs/ejecucion.md` / `docs/api-emulador.md` | Levantar servicios localmente y pruebas |
+| `docs/admin.md` | Rol admin: crear primer admin, promover/revocar, suspender, verificar, catálogo, log activity |
+| `docs/segunda-maquina.md` | Checklist para levantar el repo completo en una máquina nueva |
 | `spec/openapi.yaml` + `spec/schemas/` | Contratos de API y modelos (fuente de verdad) |

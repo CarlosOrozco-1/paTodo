@@ -32,16 +32,18 @@ le negarán la escritura. Para usuarios creados antes de este cambio existe
 | `signedIn()` | Hay sesión (`request.auth != null`). |
 | `hasRole(roles)` | El token tiene un claim `role` incluido en la lista. |
 | `smallEnough()` | El documento no supera **128 KiB** (protección contra DoS por payload). |
+| `notSuspended()` | El usuario autenticado no está suspendido: lee `users/{request.auth.uid}.status`
+  (los usuarios previos al campo se tratan como `active`). |
 
 ---
 
 ## Colección `users`
 
-- **Lectura**: solo el propio usuario autenticado (`userId == request.auth.uid`).
-- **Actualización**: solo el propio usuario, y únicamente sobre estos campos:
-  `profile`, `contact`, `location`, `fcmTokens`, `skills`, `vehicleIds`, `availability`, `updatedAt`.
-  Los campos `uid`, `email`, `role`, `stats` y `createdAt` están **prohibidos** para el cliente
-  (solo los modifica la API).
+- **Lectura**: cualquier usuario autenticado (`signedIn()`). El panel admin además lee por la API.
+- **Actualización**: solo el propio usuario **y que no esté suspendido**, y únicamente sobre estos
+  campos: `profile`, `contact`, `location`, `fcmTokens`, `skills`, `vehicleIds`, `availability`,
+  `updatedAt`. Los campos `uid`, `email`, `role`, `stats`, `verified` y `status` están **prohibidos**
+  para el cliente (solo los modifica la API).
 - **Creación / eliminación**: bloqueadas. Se hacen desde `POST /createUser` / la API.
 
 ---
@@ -49,15 +51,16 @@ le negarán la escritura. Para usuarios creados antes de este cambio existe
 ## Colección `jobs`
 
 - **Lectura**: cualquier usuario autenticado.
-- **Creación**: solo con rol `client` o `both`, asignándose como dueño (`clientId == uid`), en
-  estado `pending` y con los campos mínimos `clientId`, `details`, `location`, `pricing`, `status`.
-- **Actualización**: solo el cliente dueño, y únicamente los campos
+- **Creación**: solo con rol `client` o `both`, **no suspendido**, asignándose como dueño
+  (`clientId == uid`), en estado `pending` y con los campos mínimos `clientId`, `details`,
+  `location`, `pricing`, `status`.
+- **Actualización**: solo el cliente dueño **y no suspendido**, y únicamente los campos
   `details`, `pricing`, `location`, `updatedAt`. **El cliente no puede cambiar `status`,
   `workerId`, `acceptedOfferId`, `route`, `completedAt` ni `cancelReason`**: esos cambios los hacen
   las transacciones de la API (`/acceptOffer`, `/cancelJob`, `/completeJob`). Esto evita que un
   cliente marque su propio trabajo como completado y luego se fabrique reseñas.
-- **Eliminación**: solo el cliente dueño y solo si el trabajo sigue en `pending`. Para el resto se
-  usa `POST /cancelJob` (que además rechaza las ofertas y notifica).
+- **Eliminación**: solo el cliente dueño, **no suspendido** y solo si el trabajo sigue en `pending`.
+  Para el resto se usa `POST /cancelJob` (que además rechaza las ofertas y notifica).
 
 ---
 
@@ -65,11 +68,11 @@ le negarán la escritura. Para usuarios creados antes de este cambio existe
 
 - **Lectura**: el trabajador que la creó (`workerId == uid`) y el cliente dueño del trabajo
   referenciado (se lee `jobs/{jobId}` con `get()`).
-- **Creación**: solo con rol `worker` o `both`, asignándose como `workerId`, en estado `pending`,
-  con los campos mínimos `jobId`, `workerId`, `price`, `estimatedTime`, `status`, y **solo si el
-  trabajo está en `pending` y no es propio** (`jobs/{jobId}.clientId != uid`). Así nadie oferta su
-  propio trabajo ni trabajos ya cerrados.
-- **Actualización**: solo el trabajador dueño, sobre
+- **Creación**: solo con rol `worker` o `both`, **no suspendido**, asignándose como `workerId`, en
+  estado `pending`, con los campos mínimos `jobId`, `workerId`, `price`, `estimatedTime`, `status`,
+  y **solo si el trabajo está en `pending` y no es propio** (`jobs/{jobId}.clientId != uid`). Así
+  nadie oferta su propio trabajo ni trabajos ya cerrados.
+- **Actualización**: solo el trabajador dueño **y no suspendido**, sobre
   `price`, `message`, `estimatedTime`, `currency`, `status`, `updatedAt`. El `status` solo puede
   pasar de `pending` a `withdrawn` (retirar la oferta); **no** se puede auto-aceptar. Tampoco se
   puede cambiar `jobId` ni `workerId`.
@@ -80,15 +83,24 @@ le negarán la escritura. Para usuarios creados antes de este cambio existe
 ## Colección `skills` y `categories`
 
 - **Lectura**: pública (incluso sin autenticarse).
-- **Escritura**: bloqueada. Son catálogos maestros que gestiona la API.
+- **Escritura**: solo el rol **admin** (super usuario) puede crear, editar o desactivar categorías
+  y habilidades. Los seed scripts (`npm run seed:catalog`) usan el Admin SDK y omiten las reglas.
+
+---
+
+## Colección `activity`
+
+- **Lectura**: solo el rol **admin** (alimenta el dashboard y el log del panel).
+- **Escritura**: bloqueada. El log lo escribe exclusivamente la API (`POST /admin/*` y
+  `PATCH /admin/users/{uid}/role`) con el Admin SDK.
 
 ---
 
 ## Colección `vehicles`
 
 - **Lectura**: cualquier usuario autenticado.
-- **Creación**: rol `worker` o `both`, asignándose como `ownerId`.
-- **Actualización / eliminación**: solo el dueño (`ownerId == uid`).
+- **Creación**: rol `worker` o `both`, **no suspendido**, asignándose como `ownerId`.
+- **Actualización / eliminación**: solo el dueño (`ownerId == uid`) **y no suspendido**.
 
 ---
 
@@ -131,13 +143,15 @@ le negarán la escritura. Para usuarios creados antes de este cambio existe
 
 | Colección | Campos requeridos | Uso en la regla |
 |---|---|---|
-| `users` | `role` (también como Custom Claim) | Autorización por rol vía `hasRole()` |
+| `users` | `role` (también como Custom Claim), `status` (activo/suspendido) | Autorización por rol vía `hasRole()` y bloqueo por suspensión vía `notSuspended()` |
 | `jobs` | `clientId`, `details`, `location`, `pricing`, `status` | Dueño, estado inicial y forma mínima |
 | `offers` | `jobId`, `workerId`, `price`, `estimatedTime`, `status` | Autor, trabajo asociado y estado |
 | `vehicles` | `ownerId` | Dueño |
 | `notifications` | `userId` | Destinatario |
 | `conversations` | `participants` (array) | Acceso |
 | `conversations/{id}/messages` | `senderId` | Emisor |
+| `categories` / `skills` | `slug` (ID), `name`, `isActive` | Catálogo maestro (solo admin escribe) |
+| `activity` | `userId`, `action`, `entityType`, `entityId` | Log administrativo (solo admin lee, solo API escribe) |
 
 ---
 
@@ -145,6 +159,9 @@ le negarán la escritura. Para usuarios creados antes de este cambio existe
 
 - La colección `locations_history` no se rige por estas reglas porque se maneja en Firebase
   Realtime Database, no en Firestore.
+- Un usuario **suspendido** (`status: "suspended"` vía `POST /admin/suspendUser`) conserva el
+  acceso de lectura (puede ver trabajos), pero **pierde toda escritura** (publicar, ofertar,
+  editar perfil, etc.). Un admin no puede ser suspendido.
 - Las reglas siguen el principio de **mínimo privilegio**: nadie tiene más acceso del necesario.
 - Si más adelante se agregan campos o colecciones, las reglas deben actualizarse en el mismo commit.
 - Desplegar cambios de reglas: `firebase deploy --only firestore:rules,firestore:indexes`.
