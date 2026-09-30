@@ -16,7 +16,7 @@ import { auth, db } from "../shared/admin";
  * (getIdToken(true) en el SDK, o volver a iniciar sesión) para que el claim
  * llegue al ID token.
  */
-const VALID_ROLES = ["client", "worker", "both"];
+const VALID_ROLES = ["client", "worker", "both", "admin"];
 
 async function main(): Promise<void> {
   const snapshot = await db.collection("users").get();

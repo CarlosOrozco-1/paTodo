@@ -8,6 +8,7 @@ import { jobsRouter } from "./routes/jobs";
 import { reviewsRouter } from "./routes/reviews";
 import { routesRouter } from "./routes/routes";
 import userRouter from "./routes/user";
+import adminRouter from "./routes/admin";
 import { handleError } from "./shared/errors";
 
 const app = express();
@@ -98,6 +99,7 @@ app.use(jobsRouter);
 app.use(reviewsRouter);
 app.use(routesRouter);
 app.use(userRouter);
+app.use(adminRouter);
 
 // Manejo de rutas no encontradas.
 app.use((_req, res) => {
