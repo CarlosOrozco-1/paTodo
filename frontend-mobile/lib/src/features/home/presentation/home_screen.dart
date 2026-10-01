@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,6 +10,8 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/user_avatar.dart';
+import '../../services/data/firebase_service.dart';
+import '../../tracking/presentation/screens/live_tracking_screen.dart';
 
 /// Pantalla de inicio unificada:
 /// - Lee el rol del Custom Claim (`client`/`worker`/`both`).
@@ -36,7 +40,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadRoleAndData() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final user = FirebaseAuth.instance.currentUser;
       final tokenResult = await user?.getIdTokenResult(true);
@@ -46,10 +53,16 @@ class _HomeScreenState extends State<HomeScreen> {
       String? photo = user?.photoURL;
       if (user != null) {
         try {
-          final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+          final doc =
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .get();
           final data = doc.data();
           final profile = data?['profile'] as Map<String, dynamic>?;
-          final fullName = '${profile?['firstName'] ?? ''} ${profile?['lastName'] ?? ''}'.trim();
+          final fullName =
+              '${profile?['firstName'] ?? ''} ${profile?['lastName'] ?? ''}'
+                  .trim();
           if (fullName.isNotEmpty) {
             name = fullName;
           }
@@ -73,17 +86,24 @@ class _HomeScreenState extends State<HomeScreen> {
         await _loadNearby();
       }
     } catch (e) {
-      if (mounted) setState(() { _error = 'No se pudo cargar el inicio.'; _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = 'No se pudo cargar el inicio.';
+          _loading = false;
+        });
     }
   }
 
   Future<void> _loadNearby() async {
     try {
-      final res = await _api.dio.get('/jobs/nearby', queryParameters: {
-        'lat': 14.6349, // TODO: reemplazar con Geolocator
-        'lng': -90.5069,
-        'radiusKm': 10,
-      });
+      final res = await _api.dio.get(
+        '/jobs/nearby',
+        queryParameters: {
+          'lat': 14.6349, // TODO: reemplazar con Geolocator
+          'lng': -90.5069,
+          'radiusKm': 10,
+        },
+      );
       if (!mounted) return;
       setState(() {
         _nearby = List<Map<String, dynamic>>.from(res.data['items'] ?? []);
@@ -92,12 +112,23 @@ class _HomeScreenState extends State<HomeScreen> {
     } on DioException catch (e) {
       if (!mounted) return;
       if (e.response?.statusCode == 403) {
-        setState(() { _role = 'client'; _loading = false; });
+        setState(() {
+          _role = 'client';
+          _loading = false;
+        });
       } else {
-        setState(() { _error = 'No pudimos conectar. Revisa tu internet e inténtalo de nuevo.'; _loading = false; });
+        setState(() {
+          _error =
+              'No pudimos conectar. Revisa tu internet e inténtalo de nuevo.';
+          _loading = false;
+        });
       }
     } catch (_) {
-      if (mounted) setState(() { _error = 'Ocurrió un error inesperado.'; _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = 'Ocurrió un error inesperado.';
+          _loading = false;
+        });
     }
   }
 
@@ -105,11 +136,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final email = user?.email ?? '';
-    final displayName = (_displayName != null && _displayName!.isNotEmpty)
-        ? _displayName!
-        : (user?.displayName != null && user!.displayName!.isNotEmpty
-            ? user.displayName!
-            : (email.isNotEmpty ? email.split('@').first : 'Usuario'));
+    final displayName =
+        (_displayName != null && _displayName!.isNotEmpty)
+            ? _displayName!
+            : (user?.displayName != null && user!.displayName!.isNotEmpty
+                ? user.displayName!
+                : (email.isNotEmpty ? email.split('@').first : 'Usuario'));
 
     final isClient = _role == 'client';
     final showTabs = _role == 'both' || _role == 'worker';
@@ -127,9 +159,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return RefreshIndicator(
       color: AppTheme.primaryGreen,
-      onRefresh: _role == 'client' ? _loadRoleAndData : () async {
-        await _loadRoleAndData();
-      },
+      onRefresh:
+          _role == 'client'
+              ? _loadRoleAndData
+              : () async {
+                await _loadRoleAndData();
+              },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
@@ -171,17 +206,30 @@ class _HomeScreenState extends State<HomeScreen> {
                             }
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.primaryGreen.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
                               children: const [
-                                Icon(Icons.refresh, size: 14, color: AppTheme.primaryGreen),
+                                Icon(
+                                  Icons.refresh,
+                                  size: 14,
+                                  color: AppTheme.primaryGreen,
+                                ),
                                 SizedBox(width: 4),
-                                Text('Actualizar',
-                                    style: TextStyle(fontSize: 12, color: AppTheme.primaryGreen, fontWeight: FontWeight.w600)),
+                                Text(
+                                  'Actualizar',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.primaryGreen,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -204,13 +252,27 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: GestureDetector(
                               onTap: () => setState(() => _bothTab = 0),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 9,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: _bothTab == 0 ? Colors.white : Colors.transparent,
+                                  color:
+                                      _bothTab == 0
+                                          ? Colors.white
+                                          : Colors.transparent,
                                   borderRadius: BorderRadius.circular(10),
-                                  boxShadow: _bothTab == 0
-                                      ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
-                                      : null,
+                                  boxShadow:
+                                      _bothTab == 0
+                                          ? [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                0.06,
+                                              ),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ]
+                                          : null,
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -218,15 +280,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                     Icon(
                                       Icons.explore_outlined,
                                       size: 16,
-                                      color: _bothTab == 0 ? AppTheme.primaryGreen : Colors.grey[600],
+                                      color:
+                                          _bothTab == 0
+                                              ? AppTheme.primaryGreen
+                                              : Colors.grey[600],
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
                                       'Trabajos Cercanos',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        fontWeight: _bothTab == 0 ? FontWeight.bold : FontWeight.w500,
-                                        color: _bothTab == 0 ? AppTheme.primaryGreen : Colors.grey[700],
+                                        fontWeight:
+                                            _bothTab == 0
+                                                ? FontWeight.bold
+                                                : FontWeight.w500,
+                                        color:
+                                            _bothTab == 0
+                                                ? AppTheme.primaryGreen
+                                                : Colors.grey[700],
                                       ),
                                     ),
                                   ],
@@ -238,13 +309,27 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: GestureDetector(
                               onTap: () => setState(() => _bothTab = 1),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 9,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: _bothTab == 1 ? Colors.white : Colors.transparent,
+                                  color:
+                                      _bothTab == 1
+                                          ? Colors.white
+                                          : Colors.transparent,
                                   borderRadius: BorderRadius.circular(10),
-                                  boxShadow: _bothTab == 1
-                                      ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
-                                      : null,
+                                  boxShadow:
+                                      _bothTab == 1
+                                          ? [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                0.06,
+                                              ),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ]
+                                          : null,
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -252,15 +337,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                     Icon(
                                       Icons.travel_explore,
                                       size: 16,
-                                      color: _bothTab == 1 ? AppTheme.primaryGreen : Colors.grey[600],
+                                      color:
+                                          _bothTab == 1
+                                              ? AppTheme.primaryGreen
+                                              : Colors.grey[600],
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
                                       'Más Publicaciones',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        fontWeight: _bothTab == 1 ? FontWeight.bold : FontWeight.w500,
-                                        color: _bothTab == 1 ? AppTheme.primaryGreen : Colors.grey[700],
+                                        fontWeight:
+                                            _bothTab == 1
+                                                ? FontWeight.bold
+                                                : FontWeight.w500,
+                                        color:
+                                            _bothTab == 1
+                                                ? AppTheme.primaryGreen
+                                                : Colors.grey[700],
                                       ),
                                     ),
                                   ],
@@ -324,21 +418,25 @@ class _HeroBanner extends StatelessWidget {
     final isBoth = role == 'both';
     final isClient = role == 'client';
 
-    final IconData modeIcon = isBoth
-        ? Icons.swap_horiz_rounded
-        : (isClient ? Icons.work_outline : Icons.construction_outlined);
+    final IconData modeIcon =
+        isBoth
+            ? Icons.swap_horiz_rounded
+            : (isClient ? Icons.work_outline : Icons.construction_outlined);
 
-    final String modeTitle = isBoth
-        ? 'Cliente y Trabajador'
-        : (isClient ? 'Modo Cliente' : 'Modo Trabajador');
+    final String modeTitle =
+        isBoth
+            ? 'Cliente y Trabajador'
+            : (isClient ? 'Modo Cliente' : 'Modo Trabajador');
 
-    final String modeSubtitle = isBoth
-        ? 'Publica servicios o postúlate a trabajos'
-        : (isClient ? 'Publica y gestiona tus trabajos' : 'Encuentra trabajos cerca de ti');
+    final String modeSubtitle =
+        isBoth
+            ? 'Publica servicios o postúlate a trabajos'
+            : (isClient
+                ? 'Publica y gestiona tus trabajos'
+                : 'Encuentra trabajos cerca de ti');
 
-    final String badgeText = isBoth
-        ? 'Ambos'
-        : (isClient ? 'Cliente' : 'Trabajador');
+    final String badgeText =
+        isBoth ? 'Ambos' : (isClient ? 'Cliente' : 'Trabajador');
 
     return Container(
       width: double.infinity,
@@ -367,11 +465,21 @@ class _HeroBanner extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_greeting(), style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                        Text(
+                          _greeting(),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
                         const SizedBox(height: 2),
                         Text(
                           displayName,
-                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -383,7 +491,12 @@ class _HeroBanner extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2.5),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8)],
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                        ),
+                      ],
                     ),
                     child: UserAvatar(
                       photoUrl: profileImageUrl,
@@ -398,7 +511,10 @@ class _HeroBanner extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.18),
                   borderRadius: BorderRadius.circular(16),
@@ -419,11 +535,7 @@ class _HeroBanner extends StatelessWidget {
                         color: Colors.white.withOpacity(0.25),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
-                        modeIcon,
-                        color: Colors.white,
-                        size: 22,
-                      ),
+                      child: Icon(modeIcon, color: Colors.white, size: 22),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -450,7 +562,10 @@ class _HeroBanner extends StatelessWidget {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
@@ -466,7 +581,11 @@ class _HeroBanner extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (isBoth) ...[
-                            const Icon(Icons.people_alt, size: 12, color: AppTheme.primaryGreen),
+                            const Icon(
+                              Icons.people_alt,
+                              size: 12,
+                              color: AppTheme.primaryGreen,
+                            ),
                             const SizedBox(width: 4),
                           ],
                           Text(
@@ -509,32 +628,43 @@ class _ShimmerCard extends StatefulWidget {
   State<_ShimmerCard> createState() => _ShimmerCardState();
 }
 
-class _ShimmerCardState extends State<_ShimmerCard> with SingleTickerProviderStateMixin {
+class _ShimmerCardState extends State<_ShimmerCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(duration: const Duration(milliseconds: 1200), vsync: this)..repeat(reverse: true);
+    _ctrl = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat(reverse: true);
     _anim = Tween<double>(begin: 0.4, end: 0.9).animate(_ctrl);
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) => Opacity(
-        opacity: _anim.value,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 14),
-          height: 80,
-          decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(20)),
-        ),
-      ),
+      builder:
+          (_, __) => Opacity(
+            opacity: _anim.value,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+          ),
     );
   }
 }
@@ -559,16 +689,26 @@ class _ErrorState extends StatelessWidget {
                 color: Colors.red.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(50),
               ),
-              child: const Icon(Icons.wifi_off_rounded, size: 40, color: Colors.redAccent),
+              child: const Icon(
+                Icons.wifi_off_rounded,
+                size: 40,
+                color: Colors.redAccent,
+              ),
             ),
             const SizedBox(height: 16),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textLight)),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppTheme.textLight),
+            ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
               label: const Text('Reintentar'),
-              style: FilledButton.styleFrom(backgroundColor: AppTheme.primaryGreen),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primaryGreen,
+              ),
             ),
           ],
         ),
@@ -583,7 +723,11 @@ class _EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  const _EmptyState({required this.icon, required this.title, required this.subtitle});
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -598,12 +742,27 @@ class _EmptyState extends StatelessWidget {
                 color: AppTheme.primaryGreen.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(50),
               ),
-              child: Icon(icon, size: 48, color: AppTheme.primaryGreen.withOpacity(0.6)),
+              child: Icon(
+                icon,
+                size: 48,
+                color: AppTheme.primaryGreen.withOpacity(0.6),
+              ),
             ),
             const SizedBox(height: 16),
-            Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppTheme.textDark)),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textDark,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: AppTheme.textLight)),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14, color: AppTheme.textLight),
+            ),
           ],
         ),
       ),
@@ -621,10 +780,18 @@ class _ClientJobsList extends StatelessWidget {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const Center(child: Text('Sesión no válida.'));
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('jobs').where('clientId', isEqualTo: uid).snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('jobs')
+              .where('clientId', isEqualTo: uid)
+              .snapshots(),
       builder: (_, snap) {
-        if (snap.connectionState == ConnectionState.waiting) return const _LoadingShimmer();
-        if (snap.hasError) return const Center(child: Text('No se pudieron cargar tus trabajos.'));
+        if (snap.connectionState == ConnectionState.waiting)
+          return const _LoadingShimmer();
+        if (snap.hasError)
+          return const Center(
+            child: Text('No se pudieron cargar tus trabajos.'),
+          );
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {
           return const _EmptyState(
@@ -634,10 +801,11 @@ class _ClientJobsList extends StatelessWidget {
           );
         }
         return Column(
-          children: docs.map((doc) {
-            final d = doc.data() as Map<String, dynamic>;
-            return ModernJobCard(jobData: d, jobId: doc.id);
-          }).toList(),
+          children:
+              docs.map((doc) {
+                final d = doc.data() as Map<String, dynamic>;
+                return ModernJobCard(jobData: d, jobId: doc.id);
+              }).toList(),
         );
       },
     );
@@ -656,11 +824,18 @@ class _NearbyList extends StatelessWidget {
       return const _EmptyState(
         icon: Icons.location_searching,
         title: 'Sin trabajos cercanos',
-        subtitle: 'No encontramos trabajos en tu área.\nDesliza para actualizar.',
+        subtitle:
+            'No encontramos trabajos en tu área.\nDesliza para actualizar.',
       );
     }
     return Column(
-      children: items.map((j) => ModernJobCard(jobData: j, jobId: j['id'] as String? ?? '')).toList(),
+      children:
+          items
+              .map(
+                (j) =>
+                    ModernJobCard(jobData: j, jobId: j['id'] as String? ?? ''),
+              )
+              .toList(),
     );
   }
 }
@@ -677,62 +852,80 @@ class _MoreJobsList extends StatelessWidget {
     const distanceCalc = Distance();
 
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('jobs')
-          .where('status', isEqualTo: 'pending')
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('jobs')
+              .where('status', isEqualTo: 'pending')
+              .snapshots(),
       builder: (_, snap) {
-        if (snap.connectionState == ConnectionState.waiting) return const _LoadingShimmer();
+        if (snap.connectionState == ConnectionState.waiting)
+          return const _LoadingShimmer();
         if (snap.hasError) {
-          return const Center(child: Text('No se pudieron cargar más publicaciones.'));
+          return const Center(
+            child: Text('No se pudieron cargar más publicaciones.'),
+          );
         }
 
         final docs = snap.data?.docs ?? [];
         // Filtrar aquellas publicaciones que NO estén en la lista de cercanas
-        final distantDocs = docs.where((d) => !nearbyJobIds.contains(d.id)).toList();
+        final distantDocs =
+            docs.where((d) => !nearbyJobIds.contains(d.id)).toList();
 
         if (distantDocs.isEmpty) {
           return const _EmptyState(
             icon: Icons.public_off_outlined,
             title: 'Sin más publicaciones',
-            subtitle: 'Todas las publicaciones activas se encuentran en tu radio cercano o no hay más en otras zonas.',
+            subtitle:
+                'Todas las publicaciones activas se encuentran en tu radio cercano o no hay más en otras zonas.',
           );
         }
 
         return Column(
-          children: distantDocs.map((doc) {
-            final data = Map<String, dynamic>.from(doc.data() as Map<String, dynamic>);
-            data['id'] = doc.id;
+          children:
+              distantDocs.map((doc) {
+                final data = Map<String, dynamic>.from(
+                  doc.data() as Map<String, dynamic>,
+                );
+                data['id'] = doc.id;
 
-            // Calcular distancia aproximada si no viene en el documento
-            if (data['distanceKm'] == null) {
-              final loc = data['location'] as Map<String, dynamic>? ?? {};
-              final rawGeo = loc['geopoint'];
-              if (rawGeo != null) {
-                double? lat;
-                double? lng;
-                if (rawGeo.runtimeType.toString() == 'GeoPoint') {
-                  lat = (rawGeo as dynamic).latitude as double?;
-                  lng = (rawGeo as dynamic).longitude as double?;
-                } else if (rawGeo is Map) {
-                  lat = (rawGeo['latitude'] ?? rawGeo['_latitude'])?.toDouble();
-                  lng = (rawGeo['longitude'] ?? rawGeo['_longitude'])?.toDouble();
+                // Calcular distancia aproximada si no viene en el documento
+                if (data['distanceKm'] == null) {
+                  final loc = data['location'] as Map<String, dynamic>? ?? {};
+                  final rawGeo = loc['geopoint'];
+                  if (rawGeo != null) {
+                    double? lat;
+                    double? lng;
+                    if (rawGeo.runtimeType.toString() == 'GeoPoint') {
+                      lat = (rawGeo as dynamic).latitude as double?;
+                      lng = (rawGeo as dynamic).longitude as double?;
+                    } else if (rawGeo is Map) {
+                      lat =
+                          (rawGeo['latitude'] ?? rawGeo['_latitude'])
+                              ?.toDouble();
+                      lng =
+                          (rawGeo['longitude'] ?? rawGeo['_longitude'])
+                              ?.toDouble();
+                    }
+                    if (lat != null && lng != null) {
+                      final distMeters = distanceCalc.as(
+                        LengthUnit.Meter,
+                        userLocation,
+                        LatLng(lat, lng),
+                      );
+                      data['distanceKm'] = (distMeters / 1000).toStringAsFixed(
+                        1,
+                      );
+                    }
+                  }
                 }
-                if (lat != null && lng != null) {
-                  final distMeters = distanceCalc.as(LengthUnit.Meter, userLocation, LatLng(lat, lng));
-                  data['distanceKm'] = (distMeters / 1000).toStringAsFixed(1);
-                }
-              }
-            }
 
-            return ModernJobCard(jobData: data, jobId: doc.id);
-          }).toList(),
+                return ModernJobCard(jobData: data, jobId: doc.id);
+              }).toList(),
         );
       },
     );
   }
 }
-
 
 // ─────────────────────────── Tarjeta de Trabajo ───────────────────────────
 
@@ -775,7 +968,9 @@ class ModernJobCard extends StatelessWidget {
   void _openDetail(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => JobDetailScreen(jobData: jobData, jobId: jobId)),
+      MaterialPageRoute(
+        builder: (_) => JobDetailScreen(jobData: jobData, jobId: jobId),
+      ),
     );
   }
 
@@ -785,16 +980,30 @@ class ModernJobCard extends StatelessWidget {
     final pricing = jobData['pricing'] as Map<String, dynamic>? ?? {};
     final location = jobData['location'] as Map<String, dynamic>? ?? {};
 
-    final title = (details['title'] ?? jobData['title'] ?? 'Sin título').toString();
-    final description = (details['description'] ?? jobData['description'] ?? '').toString();
-    final categoryId = (details['categoryId'] ?? jobData['categoryId'] ?? 'general').toString().toLowerCase();
+    final title =
+        (details['title'] ?? jobData['title'] ?? 'Sin título').toString();
+    final description =
+        (details['description'] ?? jobData['description'] ?? '').toString();
+    final categoryId =
+        (details['categoryId'] ?? jobData['categoryId'] ?? 'general')
+            .toString()
+            .toLowerCase();
     final status = (jobData['status'] ?? 'pending').toString();
-    
-    final priceRaw = pricing['proposedPrice'] ?? jobData['proposedPrice'] ?? jobData['price'] ?? 0.0;
-    final price = priceRaw is num ? priceRaw : (double.tryParse(priceRaw.toString()) ?? 0.0);
-    
-    final currency = (pricing['currency'] ?? jobData['currency'] ?? 'Q').toString();
-    final address = (location['address'] ?? jobData['address'] ?? '').toString();
+
+    final priceRaw =
+        pricing['proposedPrice'] ??
+        jobData['proposedPrice'] ??
+        jobData['price'] ??
+        0.0;
+    final price =
+        priceRaw is num
+            ? priceRaw
+            : (double.tryParse(priceRaw.toString()) ?? 0.0);
+
+    final currency =
+        (pricing['currency'] ?? jobData['currency'] ?? 'Q').toString();
+    final address =
+        (location['address'] ?? jobData['address'] ?? '').toString();
 
     // Extraer distancia de forma segura sin importar si viene como double, int o String
     final rawDistance = jobData['distanceKm'];
@@ -804,7 +1013,8 @@ class ModernJobCard extends StatelessWidget {
         distanceKm = rawDistance.toStringAsFixed(1);
       } else {
         final parsed = double.tryParse(rawDistance.toString());
-        distanceKm = parsed != null ? parsed.toStringAsFixed(1) : rawDistance.toString();
+        distanceKm =
+            parsed != null ? parsed.toStringAsFixed(1) : rawDistance.toString();
       }
     }
     final clientName = jobData['clientName']?.toString();
@@ -837,7 +1047,10 @@ class ModernJobCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.15), width: 1),
+        border: Border.all(
+          color: Colors.grey.withValues(alpha: 0.15),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: catColor.withValues(alpha: 0.08),
@@ -868,7 +1081,10 @@ class ModernJobCard extends StatelessWidget {
                   children: [
                     // Chip de Categoría
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: catColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
@@ -891,11 +1107,17 @@ class ModernJobCard extends StatelessWidget {
                     ),
                     // Badge de Estado
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: statusColor.withValues(alpha: 0.25), width: 1),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.25),
+                          width: 1,
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -962,7 +1184,11 @@ class ModernJobCard extends StatelessWidget {
                           if (clientName != null && clientName.isNotEmpty) ...[
                             Row(
                               children: [
-                                const Icon(Icons.person_outline_rounded, size: 14, color: AppTheme.textLight),
+                                const Icon(
+                                  Icons.person_outline_rounded,
+                                  size: 14,
+                                  color: AppTheme.textLight,
+                                ),
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
@@ -983,20 +1209,33 @@ class ModernJobCard extends StatelessWidget {
                           Row(
                             children: [
                               Icon(
-                                distanceKm != null ? Icons.near_me_rounded : Icons.location_on_outlined,
+                                distanceKm != null
+                                    ? Icons.near_me_rounded
+                                    : Icons.location_on_outlined,
                                 size: 14,
-                                color: distanceKm != null ? AppTheme.primaryGreen : AppTheme.textLight,
+                                color:
+                                    distanceKm != null
+                                        ? AppTheme.primaryGreen
+                                        : AppTheme.textLight,
                               ),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
                                   distanceKm != null
                                       ? 'A $distanceKm km de ti'
-                                      : (address.isNotEmpty ? address : 'Ubicación no especificada'),
+                                      : (address.isNotEmpty
+                                          ? address
+                                          : 'Ubicación no especificada'),
                                   style: TextStyle(
                                     fontSize: 12,
-                                    fontWeight: distanceKm != null ? FontWeight.w700 : FontWeight.w500,
-                                    color: distanceKm != null ? AppTheme.primaryGreen : AppTheme.textLight,
+                                    fontWeight:
+                                        distanceKm != null
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                    color:
+                                        distanceKm != null
+                                            ? AppTheme.primaryGreen
+                                            : AppTheme.textLight,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -1011,7 +1250,10 @@ class ModernJobCard extends StatelessWidget {
 
                     // Etiqueta de Precio / Presupuesto
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
@@ -1021,7 +1263,9 @@ class ModernJobCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF1B5E20).withValues(alpha: 0.25),
+                            color: const Color(
+                              0xFF1B5E20,
+                            ).withValues(alpha: 0.25),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -1078,6 +1322,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   // Estado del botón de oferta
   bool _sendingOffer = false;
+  String? _ownOfferStatus;
+  bool _checkingOwnOfferStatus = true;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+  _ownOfferSubscription;
 
   // Rol del usuario actual
   String? _currentUserRole;
@@ -1086,17 +1334,96 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   void initState() {
     super.initState();
     _loadParticipants();
+    _loadOwnOfferStatus();
+    _listenForOwnOfferStatus();
   }
 
-  String _extractName(Map<String, dynamic>? data, {required String defaultFallback}) {
+  Future<void> _loadOwnOfferStatus() async {
+    try {
+      final status = await FirebaseService().ownOfferStatus(widget.jobId);
+      if (mounted && status != null) {
+        setState(() => _ownOfferStatus = status);
+      }
+    } catch (error) {
+      debugPrint('OFFER_STATUS_LOAD_ERROR: $error');
+    } finally {
+      if (mounted) setState(() => _checkingOwnOfferStatus = false);
+    }
+  }
+
+  void _listenForOwnOfferStatus() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    _ownOfferSubscription = FirebaseFirestore.instance
+        .collection('offers')
+        .where('workerId', isEqualTo: user.uid)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            String? nextStatus;
+            for (final offer in snapshot.docs) {
+              final data = offer.data();
+              if (data['jobId'] == widget.jobId) {
+                nextStatus = data['status'] as String?;
+                break;
+              }
+            }
+            if (nextStatus == null ||
+                !mounted ||
+                nextStatus == _ownOfferStatus) {
+              return;
+            }
+            final previousStatus = _ownOfferStatus;
+            setState(() => _ownOfferStatus = nextStatus);
+            if (previousStatus == 'pending') {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    nextStatus == 'accepted'
+                        ? 'Â¡Tu solicitud fue aceptada! Ya puedes iniciar el seguimiento.'
+                        : 'Tu solicitud fue rechazada.',
+                  ),
+                  backgroundColor:
+                      nextStatus == 'accepted'
+                          ? AppTheme.primaryGreen
+                          : Colors.blueGrey,
+                ),
+              );
+            }
+          },
+          onError: (Object error) {
+            debugPrint('OFFER_STATUS_LISTEN_ERROR: $error');
+          },
+        );
+  }
+
+  @override
+  void dispose() {
+    _ownOfferSubscription?.cancel();
+    super.dispose();
+  }
+
+  String _extractName(
+    Map<String, dynamic>? data, {
+    required String defaultFallback,
+  }) {
     if (data == null) return defaultFallback;
     final profile = (data['profile'] as Map<String, dynamic>?) ?? {};
-    final firstName = (profile['firstName'] as String? ?? data['firstName'] as String? ?? '').trim();
-    final lastName = (profile['lastName'] as String? ?? data['lastName'] as String? ?? '').trim();
+    final firstName =
+        (profile['firstName'] as String? ?? data['firstName'] as String? ?? '')
+            .trim();
+    final lastName =
+        (profile['lastName'] as String? ?? data['lastName'] as String? ?? '')
+            .trim();
     final fullName = '$firstName $lastName'.trim();
     if (fullName.isNotEmpty) return fullName;
 
-    final displayName = (profile['displayName'] as String? ?? data['displayName'] as String? ?? data['name'] as String? ?? '').trim();
+    final displayName =
+        (profile['displayName'] as String? ??
+                data['displayName'] as String? ??
+                data['name'] as String? ??
+                '')
+            .trim();
     if (displayName.isNotEmpty) return displayName;
 
     final email = (data['email'] as String? ?? '').trim();
@@ -1115,28 +1442,48 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     try {
       final tokenResult = await currentUser?.getIdTokenResult(false);
       if (mounted) {
-        setState(() => _currentUserRole = (tokenResult?.claims?['role'] as String?) ?? 'client');
+        setState(
+          () =>
+              _currentUserRole =
+                  (tokenResult?.claims?['role'] as String?) ?? 'client',
+        );
       }
     } catch (_) {}
 
-    final clientId = (widget.jobData['clientId'] ?? widget.jobData['uid'])?.toString();
-    final isOwner = currentUser?.uid != null && clientId != null && currentUser!.uid == clientId;
+    final clientId =
+        (widget.jobData['clientId'] ?? widget.jobData['uid'])?.toString();
+    final isOwner =
+        currentUser?.uid != null &&
+        clientId != null &&
+        currentUser!.uid == clientId;
 
     // Nombre y avatar iniciales tomados directamente de los datos del trabajo (si vienen adjuntos)
-    final jobClientName = (widget.jobData['clientName'] ?? widget.jobData['client'] ?? widget.jobData['creatorName'])?.toString();
-    final jobClientAvatar = (widget.jobData['clientAvatarUrl'] ?? widget.jobData['avatarUrl'])?.toString();
+    final jobClientName =
+        (widget.jobData['clientName'] ??
+                widget.jobData['client'] ??
+                widget.jobData['creatorName'])
+            ?.toString();
+    final jobClientAvatar =
+        (widget.jobData['clientAvatarUrl'] ?? widget.jobData['avatarUrl'])
+            ?.toString();
 
-    String initialClientName = (jobClientName != null && jobClientName.trim().isNotEmpty)
-        ? jobClientName.trim()
-        : 'Cliente';
-    String? initialAvatar = (jobClientAvatar != null && jobClientAvatar.trim().isNotEmpty)
-        ? jobClientAvatar.trim()
-        : null;
+    String initialClientName =
+        (jobClientName != null && jobClientName.trim().isNotEmpty)
+            ? jobClientName.trim()
+            : 'Cliente';
+    String? initialAvatar =
+        (jobClientAvatar != null && jobClientAvatar.trim().isNotEmpty)
+            ? jobClientAvatar.trim()
+            : null;
 
     // Si el usuario actual es el dueño, intentamos obtener su propio perfil desde Firestore (siempre permitido)
     if (isOwner) {
       try {
-        final ownDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+        final ownDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
         if (ownDoc.exists) {
           final ownData = ownDoc.data();
           final profile = (ownData?['profile'] as Map<String, dynamic>?) ?? {};
@@ -1144,16 +1491,22 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           if (extracted.isNotEmpty) {
             initialClientName = extracted;
           }
-          initialAvatar = profile['avatarUrl'] as String? ?? ownData?['avatarUrl'] as String? ?? currentUser.photoURL ?? initialAvatar;
+          initialAvatar =
+              profile['avatarUrl'] as String? ??
+              ownData?['avatarUrl'] as String? ??
+              currentUser.photoURL ??
+              initialAvatar;
         }
       } catch (e) {
         debugPrint('DEV: Error al cargar perfil propio del cliente: $e');
       }
 
       if (initialClientName == 'Cliente') {
-        if (currentUser.displayName != null && currentUser.displayName!.trim().isNotEmpty) {
+        if (currentUser.displayName != null &&
+            currentUser.displayName!.trim().isNotEmpty) {
           initialClientName = currentUser.displayName!.trim();
-        } else if (currentUser.email != null && currentUser.email!.trim().isNotEmpty) {
+        } else if (currentUser.email != null &&
+            currentUser.email!.trim().isNotEmpty) {
           initialClientName = currentUser.email!.trim().split('@').first;
         } else {
           initialClientName = 'Tú';
@@ -1164,12 +1517,19 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     // Cargar perfil del cliente que publicó desde Firestore
     if (clientId != null && clientId.isNotEmpty) {
       try {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(clientId).get();
+        final doc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(clientId)
+                .get();
         if (doc.exists) {
           final data = doc.data();
           final profile = (data?['profile'] as Map<String, dynamic>?) ?? {};
           final name = _extractName(data, defaultFallback: initialClientName);
-          final avatar = profile['avatarUrl'] as String? ?? data?['avatarUrl'] as String? ?? initialAvatar;
+          final avatar =
+              profile['avatarUrl'] as String? ??
+              data?['avatarUrl'] as String? ??
+              initialAvatar;
           if (mounted) {
             setState(() {
               _clientName = name;
@@ -1178,14 +1538,29 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             });
           }
         } else {
-          if (mounted) setState(() { _clientName = initialClientName; _clientAvatarUrl = initialAvatar; _loadingClient = false; });
+          if (mounted)
+            setState(() {
+              _clientName = initialClientName;
+              _clientAvatarUrl = initialAvatar;
+              _loadingClient = false;
+            });
         }
       } catch (e) {
         debugPrint('DEV: Error al cargar perfil de cliente: $e');
-        if (mounted) setState(() { _clientName = initialClientName; _clientAvatarUrl = initialAvatar; _loadingClient = false; });
+        if (mounted)
+          setState(() {
+            _clientName = initialClientName;
+            _clientAvatarUrl = initialAvatar;
+            _loadingClient = false;
+          });
       }
     } else {
-      if (mounted) setState(() { _clientName = initialClientName; _clientAvatarUrl = initialAvatar; _loadingClient = false; });
+      if (mounted)
+        setState(() {
+          _clientName = initialClientName;
+          _clientAvatarUrl = initialAvatar;
+          _loadingClient = false;
+        });
     }
 
     // Cargar perfil del trabajador asignado si existe desde Firestore
@@ -1193,12 +1568,17 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     if (workerId != null) {
       if (mounted) setState(() => _loadingWorker = true);
       try {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(workerId).get();
+        final doc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(workerId)
+                .get();
         if (doc.exists) {
           final data = doc.data();
           final profile = (data?['profile'] as Map<String, dynamic>?) ?? {};
           final name = _extractName(data, defaultFallback: 'Trabajador');
-          final avatar = profile['avatarUrl'] as String? ?? data?['avatarUrl'] as String?;
+          final avatar =
+              profile['avatarUrl'] as String? ?? data?['avatarUrl'] as String?;
           if (mounted) {
             setState(() {
               _workerName = name;
@@ -1207,11 +1587,19 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             });
           }
         } else {
-          if (mounted) setState(() { _workerName = 'Trabajador'; _loadingWorker = false; });
+          if (mounted)
+            setState(() {
+              _workerName = 'Trabajador';
+              _loadingWorker = false;
+            });
         }
       } catch (e) {
         debugPrint('DEV: Error al cargar perfil de trabajador: $e');
-        if (mounted) setState(() { _workerName = 'Trabajador'; _loadingWorker = false; });
+        if (mounted)
+          setState(() {
+            _workerName = 'Trabajador';
+            _loadingWorker = false;
+          });
       }
     }
   }
@@ -1219,159 +1607,233 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   void _showSendOfferDialog(BuildContext context) {
     final priceCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
-    final currency = (widget.jobData['pricing'] as Map<String, dynamic>?)?['currency'] ?? 'Q';
+    final currency =
+        (widget.jobData['pricing'] as Map<String, dynamic>?)?['currency'] ??
+        'Q';
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
-                ),
+      builder:
+          (_) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               ),
-              const SizedBox(height: 20),
-              const Text(
-                'Enviar oferta',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textDark),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'El cliente revisará tu propuesta y decidirá si te contrata.',
-                style: TextStyle(color: AppTheme.textLight, fontSize: 13),
-              ),
-              const SizedBox(height: 20),
-              // Precio propuesto
-              TextField(
-                controller: priceCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: 'Tu precio ($currency)',
-                  prefixIcon: const Icon(Icons.attach_money, color: AppTheme.primaryGreen),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              // Nota opcional
-              TextField(
-                controller: noteCtrl,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Mensaje al cliente (opcional)',
-                  alignLabelWithHint: true,
-                  prefixIcon: const Padding(
-                    padding: EdgeInsets.only(bottom: 40),
-                    child: Icon(Icons.chat_bubble_outline, color: AppTheme.primaryGreen),
-                  ),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: StatefulBuilder(
-                  builder: (ctx, setSheetState) => FilledButton.icon(
-                    onPressed: _sendingOffer
-                        ? null
-                        : () async {
-                            final priceText = priceCtrl.text.trim();
-                            if (priceText.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Ingresa el precio de tu oferta.')),
-                              );
-                              return;
-                            }
-                            final offerPrice = double.tryParse(priceText);
-                            if (offerPrice == null || offerPrice <= 0) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Ingresa un precio válido.')),
-                              );
-                              return;
-                            }
-
-                            setSheetState(() {});
-                            setState(() => _sendingOffer = true);
-                            Navigator.pop(context); // cerrar sheet
-
-                            try {
-                              final uid = FirebaseAuth.instance.currentUser?.uid;
-                              if (uid == null) throw Exception('Sin sesión');
-
-                              // DEV: Escritura directa a Firestore — las offers son creadas por el worker/both.
-                              await FirebaseFirestore.instance
-                                  .collection('jobs')
-                                  .doc(widget.jobId)
-                                  .collection('offers')
-                                  .add({
-                                'workerId': uid,
-                                'jobId': widget.jobId,
-                                'proposedPrice': offerPrice,
-                                'currency': currency,
-                                'note': noteCtrl.text.trim(),
-                                'status': 'pending',
-                                'createdAt': FieldValue.serverTimestamp(),
-                              });
-
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('¡Oferta enviada! El cliente la revisará pronto.'),
-                                    backgroundColor: AppTheme.primaryGreen,
-                                  ),
-                                );
-                              }
-                            } catch (_) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('No pudimos enviar tu oferta. Inténtalo de nuevo.'),
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                );
-                              }
-                            } finally {
-                              if (mounted) setState(() => _sendingOffer = false);
-                            }
-                          },
-                    icon: _sendingOffer
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.send_rounded),
-                    label: Text(_sendingOffer ? 'Enviando…' : 'Enviar oferta'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppTheme.primaryGreen,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Enviar oferta',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'El cliente revisará tu propuesta y decidirá si te contrata.',
+                    style: TextStyle(color: AppTheme.textLight, fontSize: 13),
+                  ),
+                  const SizedBox(height: 20),
+                  // Precio propuesto
+                  TextField(
+                    controller: priceCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Tu precio ($currency)',
+                      prefixIcon: const Icon(
+                        Icons.attach_money,
+                        color: AppTheme.primaryGreen,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: AppTheme.primaryGreen,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  // Nota opcional
+                  TextField(
+                    controller: noteCtrl,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: 'Mensaje al cliente (opcional)',
+                      alignLabelWithHint: true,
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.only(bottom: 40),
+                        child: Icon(
+                          Icons.chat_bubble_outline,
+                          color: AppTheme.primaryGreen,
+                        ),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: AppTheme.primaryGreen,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: StatefulBuilder(
+                      builder:
+                          (ctx, setSheetState) => FilledButton.icon(
+                            onPressed:
+                                _sendingOffer
+                                    ? null
+                                    : () async {
+                                      final priceText = priceCtrl.text.trim();
+                                      if (priceText.isEmpty) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Ingresa el precio de tu oferta.',
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      final offerPrice = double.tryParse(
+                                        priceText,
+                                      );
+                                      if (offerPrice == null ||
+                                          offerPrice <= 0) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Ingresa un precio válido.',
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+
+                                      setSheetState(() {});
+                                      setState(() => _sendingOffer = true);
+                                      Navigator.pop(context); // cerrar sheet
+
+                                      try {
+                                        final uid =
+                                            FirebaseAuth
+                                                .instance
+                                                .currentUser
+                                                ?.uid;
+                                        if (uid == null)
+                                          throw Exception('Sin sesión');
+
+                                        // DEV: Escritura directa a Firestore — las offers son creadas por el worker/both.
+                                        await FirebaseService().createOffer(
+                                          widget.jobId,
+                                          offerPrice,
+                                          'Por confirmar',
+                                          noteCtrl.text.trim(),
+                                        );
+
+                                        if (mounted) {
+                                          setState(
+                                            () => _ownOfferStatus = 'pending',
+                                          );
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                '¡Oferta enviada! El cliente la revisará pronto.',
+                                              ),
+                                              backgroundColor:
+                                                  AppTheme.primaryGreen,
+                                            ),
+                                          );
+                                        }
+                                      } catch (_) {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'No pudimos enviar tu oferta. Inténtalo de nuevo.',
+                                              ),
+                                              backgroundColor: Colors.redAccent,
+                                            ),
+                                          );
+                                        }
+                                      } finally {
+                                        if (mounted)
+                                          setState(() => _sendingOffer = false);
+                                      }
+                                    },
+                            icon:
+                                _sendingOffer
+                                    ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                    : const Icon(Icons.send_rounded),
+                            label: Text(
+                              _sendingOffer ? 'Enviando…' : 'Enviar oferta',
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppTheme.primaryGreen,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -1384,7 +1846,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
     final title = details['title'] as String? ?? 'Sin título';
     final desc = details['description'] as String? ?? 'Sin descripción';
-    final categoryId = (details['categoryId'] as String? ?? 'general').toLowerCase();
+    final categoryId =
+        (details['categoryId'] as String? ?? 'general').toLowerCase();
     final price = (pricing['proposedPrice'] ?? 0.0) as num;
     final currency = pricing['currency'] as String? ?? 'Q';
     final status = jobData['status'] as String? ?? 'pending';
@@ -1394,8 +1857,31 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
 
     final isOwner = currentUid == clientId;
-    final isWorkerRole = _currentUserRole == 'worker' || _currentUserRole == 'both';
-    final canSendOffer = !isOwner && isWorkerRole && status == 'pending';
+    final isWorkerRole =
+        _currentUserRole == 'worker' || _currentUserRole == 'both';
+    final canSendOffer =
+        !isOwner &&
+        isWorkerRole &&
+        status == 'pending' &&
+        !_checkingOwnOfferStatus &&
+        _ownOfferStatus == null;
+    void openRoute() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (_) => LiveTrackingScreen(
+                jobId: widget.jobId,
+                jobTitle: title,
+                otherUserName:
+                    isOwner
+                        ? (_workerName ?? 'Trabajador')
+                        : (_clientName ?? 'Cliente'),
+                otherUserRole: isOwner ? 'Trabajador' : 'Cliente',
+              ),
+        ),
+      );
+    }
 
     final rawGeo = loc['geopoint'];
     LatLng latLng = const LatLng(14.6349, -90.5069);
@@ -1407,8 +1893,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         latLng = LatLng(lat, lng);
       } else if (rawGeo is Map) {
         // DEV: Cuando viene como JSON desde la API REST.
-        final lat = (rawGeo['latitude'] ?? rawGeo['_latitude'] ?? 14.6349) as num;
-        final lng = (rawGeo['longitude'] ?? rawGeo['_longitude'] ?? -90.5069) as num;
+        final lat =
+            (rawGeo['latitude'] ?? rawGeo['_latitude'] ?? 14.6349) as num;
+        final lng =
+            (rawGeo['longitude'] ?? rawGeo['_longitude'] ?? -90.5069) as num;
         latLng = LatLng(lat.toDouble(), lng.toDouble());
       }
     }
@@ -1424,9 +1912,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         statusIcon = Icons.schedule_rounded;
         break;
       case 'accepted':
-        statusColor = const Color(0xFF1565C0);
-        statusLabel = 'Aceptado';
-        statusIcon = Icons.handshake_outlined;
+        final unavailable = !isOwner && currentUid != workerId;
+        statusColor =
+            unavailable ? const Color(0xFFE53935) : const Color(0xFF1565C0);
+        statusLabel = unavailable ? 'No disponible' : 'Aceptado';
+        statusIcon =
+            unavailable ? Icons.block_rounded : Icons.handshake_outlined;
         break;
       case 'completed':
         statusColor = const Color(0xFF2E7D32);
@@ -1463,20 +1954,62 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
-      floatingActionButton: canSendOffer
-          ? FloatingActionButton.extended(
-              onPressed: _sendingOffer ? null : () => _showSendOfferDialog(context),
-              backgroundColor: AppTheme.primaryGreen,
-              elevation: 6,
-              icon: _sendingOffer
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                  : const Icon(Icons.handshake_outlined, color: Colors.white),
-              label: Text(
-                _sendingOffer ? 'Enviando…' : 'Enviar oferta',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            )
-          : null,
+      floatingActionButton:
+          canSendOffer
+              ? FloatingActionButton.extended(
+                onPressed:
+                    _sendingOffer ? null : () => _showSendOfferDialog(context),
+                backgroundColor: AppTheme.primaryGreen,
+                elevation: 6,
+                icon:
+                    _sendingOffer
+                        ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                        : const Icon(
+                          Icons.handshake_outlined,
+                          color: Colors.white,
+                        ),
+                label: Text(
+                  _sendingOffer ? 'Enviando…' : 'Enviar oferta',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+              )
+              : (!isOwner && isWorkerRole && _ownOfferStatus != null)
+              ? FloatingActionButton.extended(
+                onPressed: null,
+                backgroundColor:
+                    _ownOfferStatus == 'accepted'
+                        ? AppTheme.primaryGreen
+                        : Colors.blueGrey,
+                icon: Icon(
+                  _ownOfferStatus == 'accepted'
+                      ? Icons.check_circle_rounded
+                      : Icons.mark_email_read_outlined,
+                  color: Colors.white,
+                ),
+                label: Text(
+                  _ownOfferStatus == 'accepted'
+                      ? 'Solicitud aceptada'
+                      : _ownOfferStatus == 'rejected'
+                      ? 'Solicitud rechazada'
+                      : 'Solicitud enviada',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              )
+              : null,
       body: CustomScrollView(
         slivers: [
           // ── Hero expandido ──
@@ -1487,7 +2020,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             backgroundColor: const Color(0xFF1B5E20),
             iconTheme: const IconThemeData(color: Colors.white),
             flexibleSpace: FlexibleSpaceBar(
-              stretchModes: const [StretchMode.zoomBackground, StretchMode.blurBackground],
+              stretchModes: const [
+                StretchMode.zoomBackground,
+                StretchMode.blurBackground,
+              ],
               titlePadding: const EdgeInsets.fromLTRB(56, 0, 16, 20),
               title: Text(
                 title,
@@ -1508,7 +2044,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Color(0xFF1B5E20), Color(0xFF2E7D32), Color(0xFF43A047)],
+                        colors: [
+                          Color(0xFF1B5E20),
+                          Color(0xFF2E7D32),
+                          Color(0xFF43A047),
+                        ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -1516,9 +2056,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   ),
                   // Patrón decorativo de círculos
                   Positioned(
-                    right: -30, top: -30,
+                    right: -30,
+                    top: -30,
                     child: Container(
-                      width: 160, height: 160,
+                      width: 160,
+                      height: 160,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white.withOpacity(0.06),
@@ -1526,9 +2068,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     ),
                   ),
                   Positioned(
-                    left: -20, bottom: 20,
+                    left: -20,
+                    bottom: 20,
                     child: Container(
-                      width: 100, height: 100,
+                      width: 100,
+                      height: 100,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white.withOpacity(0.05),
@@ -1537,13 +2081,16 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   ),
                   // Icono de categoría grande
                   Positioned(
-                    right: 24, top: 20,
+                    right: 24,
+                    top: 20,
                     child: Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: Colors.white.withOpacity(0.2)),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                        ),
                       ),
                       child: Icon(catIcon, color: Colors.white, size: 28),
                     ),
@@ -1553,7 +2100,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [Colors.transparent, Colors.black.withOpacity(0.4)],
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.4),
+                          ],
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                         ),
@@ -1571,8 +2121,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
                   // ── Tarjeta Hero: Precio + Estado + Categoría ──
+                  if (isOwner && status == 'pending') ...[
+                    _OffersForJob(jobId: widget.jobId),
+                    const SizedBox(height: 16),
+                  ],
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -1592,7 +2145,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           height: 5,
                           decoration: BoxDecoration(
                             color: catColor,
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(24),
+                            ),
                           ),
                         ),
                         Padding(
@@ -1607,7 +2162,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   children: [
                                     Text(
                                       'Presupuesto',
-                                      style: TextStyle(color: Colors.grey[500], fontSize: 11, letterSpacing: 0.5, fontWeight: FontWeight.w600),
+                                      style: TextStyle(
+                                        color: Colors.grey[500],
+                                        fontSize: 11,
+                                        letterSpacing: 0.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
@@ -1622,7 +2182,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                     const SizedBox(height: 10),
                                     // Chip de categoría
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 5,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: catColor.withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(20),
@@ -1630,11 +2193,19 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(catIcon, size: 13, color: catColor),
+                                          Icon(
+                                            catIcon,
+                                            size: 13,
+                                            color: catColor,
+                                          ),
                                           const SizedBox(width: 5),
                                           Text(
                                             categoryId,
-                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: catColor),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: catColor,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -1648,20 +2219,34 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: statusColor.withOpacity(0.08),
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: statusColor.withOpacity(0.25), width: 1.5),
+                                      border: Border.all(
+                                        color: statusColor.withOpacity(0.25),
+                                        width: 1.5,
+                                      ),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(statusIcon, size: 14, color: statusColor),
+                                        Icon(
+                                          statusIcon,
+                                          size: 14,
+                                          color: statusColor,
+                                        ),
                                         const SizedBox(width: 5),
                                         Text(
                                           statusLabel,
-                                          style: TextStyle(color: statusColor, fontWeight: FontWeight.w800, fontSize: 12),
+                                          style: TextStyle(
+                                            color: statusColor,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 12,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -1702,10 +2287,16 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   Container(
                                     padding: const EdgeInsets.all(6),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF1565C0).withOpacity(0.1),
+                                      color: const Color(
+                                        0xFF1565C0,
+                                      ).withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Icon(Icons.person_rounded, size: 14, color: Color(0xFF1565C0)),
+                                    child: const Icon(
+                                      Icons.person_rounded,
+                                      size: 14,
+                                      color: Color(0xFF1565C0),
+                                    ),
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
@@ -1723,17 +2314,27 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               _loadingClient
                                   ? const _MiniShimmer()
                                   : _ParticipantRow(
-                                      name: _clientName != null && _clientName!.isNotEmpty
-                                          ? (isOwner ? '$_clientName (Tú)' : _clientName!)
-                                          : (isOwner ? 'Tú' : 'Cliente'),
-                                      avatarUrl: _clientAvatarUrl,
-                                      badge: isOwner ? 'Tu publicación' : 'Cliente',
-                                      badgeColor: const Color(0xFF1565C0),
-                                    ),
+                                    name:
+                                        _clientName != null &&
+                                                _clientName!.isNotEmpty
+                                            ? (isOwner
+                                                ? '$_clientName (Tú)'
+                                                : _clientName!)
+                                            : (isOwner ? 'Tú' : 'Cliente'),
+                                    avatarUrl: _clientAvatarUrl,
+                                    badge:
+                                        isOwner ? 'Tu publicación' : 'Cliente',
+                                    badgeColor: const Color(0xFF1565C0),
+                                  ),
                             ],
                           ),
                         ),
-                        Divider(height: 1, color: Colors.grey[100], indent: 20, endIndent: 20),
+                        Divider(
+                          height: 1,
+                          color: Colors.grey[100],
+                          indent: 20,
+                          endIndent: 20,
+                        ),
                         // ── Quién lo realiza
                         Padding(
                           padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
@@ -1745,11 +2346,15 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   Container(
                                     padding: const EdgeInsets.all(6),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF1B5E20).withOpacity(0.1),
+                                      color: const Color(
+                                        0xFF1B5E20,
+                                      ).withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Icon(
-                                      workerId != null ? Icons.construction_rounded : Icons.hourglass_empty_rounded,
+                                      workerId != null
+                                          ? Icons.construction_rounded
+                                          : Icons.hourglass_empty_rounded,
                                       size: 14,
                                       color: const Color(0xFF1B5E20),
                                     ),
@@ -1770,18 +2375,24 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               _loadingWorker
                                   ? const _MiniShimmer()
                                   : workerId == null
-                                      ? _AssignmentStatus(
-                                          taken: false,
-                                          workerName: null,
-                                          workerAvatarUrl: null,
-                                          isCurrentUser: false,
-                                        )
-                                      : _AssignmentStatus(
-                                          taken: true,
-                                          workerName: currentUid == workerId ? 'Tú' : (_workerName ?? 'Trabajador'),
-                                          workerAvatarUrl: currentUid == workerId ? null : _workerAvatarUrl,
-                                          isCurrentUser: currentUid == workerId,
-                                        ),
+                                  ? _AssignmentStatus(
+                                    taken: false,
+                                    workerName: null,
+                                    workerAvatarUrl: null,
+                                    isCurrentUser: false,
+                                  )
+                                  : _AssignmentStatus(
+                                    taken: true,
+                                    workerName:
+                                        currentUid == workerId
+                                            ? 'Tú'
+                                            : (_workerName ?? 'Trabajador'),
+                                    workerAvatarUrl:
+                                        currentUid == workerId
+                                            ? null
+                                            : _workerAvatarUrl,
+                                    isCurrentUser: currentUid == workerId,
+                                  ),
                             ],
                           ),
                         ),
@@ -1829,15 +2440,23 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primaryGreen.withOpacity(0.12),
+                                  color: AppTheme.primaryGreen.withOpacity(
+                                    0.12,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.location_on_rounded, size: 14, color: AppTheme.primaryGreen),
+                                child: const Icon(
+                                  Icons.location_on_rounded,
+                                  size: 14,
+                                  color: AppTheme.primaryGreen,
+                                ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  address != null ? address.toUpperCase() : 'UBICACIÓN',
+                                  address != null
+                                      ? address.toUpperCase()
+                                      : 'UBICACIÓN',
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w800,
@@ -1852,35 +2471,76 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           ),
                         ),
                         ClipRRect(
-                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                          borderRadius: const BorderRadius.vertical(
+                            bottom: Radius.circular(24),
+                          ),
                           child: SizedBox(
                             height: 230,
-                            child: FlutterMap(
-                              options: MapOptions(initialCenter: latLng, initialZoom: 15),
+                            child: Stack(
                               children: [
-                                TileLayer(
-                                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                  userAgentPackageName: 'com.example.frontend',
-                                ),
-                                MarkerLayer(
-                                  markers: [
-                                    Marker(
-                                      point: latLng,
-                                      width: 52,
-                                      height: 52,
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryGreen,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: Colors.white, width: 3),
-                                          boxShadow: [
-                                            BoxShadow(color: AppTheme.primaryGreen.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4)),
-                                          ],
+                                FlutterMap(
+                                  options: MapOptions(
+                                    initialCenter: latLng,
+                                    initialZoom: 15,
+                                  ),
+                                  children: [
+                                    TileLayer(
+                                      urlTemplate:
+                                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                      userAgentPackageName:
+                                          'com.example.frontend',
+                                    ),
+                                    MarkerLayer(
+                                      markers: [
+                                        Marker(
+                                          point: latLng,
+                                          width: 52,
+                                          height: 52,
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.primaryGreen,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Colors.white,
+                                                width: 3,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: AppTheme.primaryGreen
+                                                      .withOpacity(0.5),
+                                                  blurRadius: 10,
+                                                  offset: const Offset(0, 4),
+                                                ),
+                                              ],
+                                            ),
+                                            child: const Icon(
+                                              Icons.place_rounded,
+                                              color: Colors.white,
+                                              size: 24,
+                                            ),
+                                          ),
                                         ),
-                                        child: const Icon(Icons.place_rounded, color: Colors.white, size: 24),
-                                      ),
+                                      ],
                                     ),
                                   ],
+                                ),
+                                Positioned.fill(
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.translucent,
+                                    onTap: openRoute,
+                                  ),
+                                ),
+                                Positioned(
+                                  right: 14,
+                                  bottom: 14,
+                                  child: FilledButton.icon(
+                                    onPressed: openRoute,
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: AppTheme.primaryGreen,
+                                    ),
+                                    icon: const Icon(Icons.route_rounded),
+                                    label: const Text('Ver ruta'),
+                                  ),
                                 ),
                               ],
                             ),
@@ -1905,6 +2565,227 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 // ─────────────────────────── Widgets auxiliares de detalle ───────────────────────────
 
 /// Card de detalle genérica con etiqueta, icono y contenido.
+class _OffersForJob extends StatefulWidget {
+  final String jobId;
+
+  const _OffersForJob({required this.jobId});
+
+  @override
+  State<_OffersForJob> createState() => _OffersForJobState();
+}
+
+class _OffersForJobState extends State<_OffersForJob> {
+  final _api = ApiClient.create();
+  String? _processingOfferId;
+
+  Future<void> _processOffer(String offerId, bool accept) async {
+    setState(() => _processingOfferId = offerId);
+    try {
+      await _api.dio.post(
+        accept ? '/acceptOffer' : '/rejectOffer',
+        data: {'jobId': widget.jobId, 'offerId': offerId},
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            accept
+                ? 'Propuesta aceptada. El seguimiento ya estÃ¡ activo.'
+                : 'Propuesta rechazada.',
+          ),
+          backgroundColor: accept ? AppTheme.primaryGreen : Colors.blueGrey,
+        ),
+      );
+    } on DioException catch (error) {
+      debugPrint(
+        'OFFER_PROCESS_ERROR: ${error.response?.data ?? error.message}',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No pudimos procesar la propuesta. IntÃ©ntalo de nuevo.',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _processingOfferId = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream:
+          FirebaseFirestore.instance
+              .collection('offers')
+              .where('jobId', isEqualTo: widget.jobId)
+              .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError || !snapshot.hasData)
+          return const SizedBox.shrink();
+        final offers =
+            snapshot.data!.docs
+                .where((doc) => doc.data()['status'] == 'pending')
+                .toList();
+        if (offers.isEmpty) return const SizedBox.shrink();
+
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEAF8EE),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppTheme.primaryGreen.withOpacity(.28)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.notifications_active_rounded,
+                    color: AppTheme.primaryGreen,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      offers.length == 1
+                          ? 'Nueva propuesta recibida'
+                          : '${offers.length} propuestas recibidas',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: AppTheme.textDark,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Elige a la persona que realizarÃ¡ tu trabajo.',
+                style: TextStyle(color: AppTheme.textLight, fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              ...offers.map((offer) {
+                final data = offer.data();
+                final price = (data['price'] as num?)?.toDouble() ?? 0;
+                final currency = data['currency'] as String? ?? 'GTQ';
+                final note = (data['note'] as String? ?? '').trim();
+                final time = (data['estimatedTime'] as String? ?? '').trim();
+                final busy = _processingOfferId == offer.id;
+                return Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 18,
+                            backgroundColor: Color(0xFFE2F4E7),
+                            child: Icon(
+                              Icons.person_rounded,
+                              color: AppTheme.primaryGreen,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Propuesta de un trabajador',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textDark,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '$currency ${price.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: AppTheme.primaryGreen,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (time.isNotEmpty || note.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        if (time.isNotEmpty)
+                          Text(
+                            'Tiempo estimado: $time',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        if (note.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Text(
+                              note,
+                              style: const TextStyle(
+                                color: AppTheme.textLight,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                      ],
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed:
+                                  busy
+                                      ? null
+                                      : () => _processOffer(offer.id, false),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.redAccent,
+                              ),
+                              child: const Text('Rechazar'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed:
+                                  busy
+                                      ? null
+                                      : () => _processOffer(offer.id, true),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppTheme.primaryGreen,
+                              ),
+                              child:
+                                  busy
+                                      ? const SizedBox(
+                                        height: 18,
+                                        width: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                      : const Text('Aceptar'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _DetailCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -1993,20 +2874,31 @@ class _ParticipantRow extends StatelessWidget {
             color: badgeColor.withOpacity(0.1),
             border: Border.all(color: badgeColor.withOpacity(0.3), width: 2),
           ),
-          child: avatarUrl != null && avatarUrl!.isNotEmpty
-              ? ClipOval(child: Image.network(avatarUrl!, fit: BoxFit.cover))
-              : Center(
-                  child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: badgeColor),
+          child:
+              avatarUrl != null && avatarUrl!.isNotEmpty
+                  ? ClipOval(
+                    child: Image.network(avatarUrl!, fit: BoxFit.cover),
+                  )
+                  : Center(
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: badgeColor,
+                      ),
+                    ),
                   ),
-                ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             name,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.textDark),
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textDark,
+            ),
           ),
         ),
         Container(
@@ -2018,7 +2910,11 @@ class _ParticipantRow extends StatelessWidget {
           ),
           child: Text(
             badge,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: badgeColor),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: badgeColor,
+            ),
           ),
         ),
       ],
@@ -2051,7 +2947,11 @@ class _AssignmentStatus extends StatelessWidget {
               color: Colors.orange.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.hourglass_empty_rounded, color: Colors.orange, size: 22),
+            child: const Icon(
+              Icons.hourglass_empty_rounded,
+              color: Colors.orange,
+              size: 22,
+            ),
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -2060,7 +2960,11 @@ class _AssignmentStatus extends StatelessWidget {
               children: [
                 Text(
                   'Disponible',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.textDark),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textDark,
+                  ),
                 ),
                 SizedBox(height: 2),
                 Text(
@@ -2079,7 +2983,11 @@ class _AssignmentStatus extends StatelessWidget {
             ),
             child: const Text(
               'Libre',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange,
+              ),
             ),
           ),
         ],
@@ -2098,16 +3006,26 @@ class _AssignmentStatus extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: workerBadgeColor.withOpacity(0.1),
-            border: Border.all(color: workerBadgeColor.withOpacity(0.3), width: 1.5),
+            border: Border.all(
+              color: workerBadgeColor.withOpacity(0.3),
+              width: 1.5,
+            ),
           ),
-          child: workerAvatarUrl != null && workerAvatarUrl!.isNotEmpty
-              ? ClipOval(child: Image.network(workerAvatarUrl!, fit: BoxFit.cover))
-              : Center(
-                  child: Text(
-                    displayName[0].toUpperCase(),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: workerBadgeColor),
+          child:
+              workerAvatarUrl != null && workerAvatarUrl!.isNotEmpty
+                  ? ClipOval(
+                    child: Image.network(workerAvatarUrl!, fit: BoxFit.cover),
+                  )
+                  : Center(
+                    child: Text(
+                      displayName[0].toUpperCase(),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: workerBadgeColor,
+                      ),
+                    ),
                   ),
-                ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -2116,11 +3034,17 @@ class _AssignmentStatus extends StatelessWidget {
             children: [
               Text(
                 displayName,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.textDark),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textDark,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
-                isCurrentUser ? 'Este trabajo es tuyo.' : 'Este trabajador ya aceptó el trabajo.',
+                isCurrentUser
+                    ? 'Este trabajo es tuyo.'
+                    : 'Este trabajador ya aceptó el trabajo.',
                 style: const TextStyle(fontSize: 12, color: AppTheme.textLight),
               ),
             ],
@@ -2135,7 +3059,11 @@ class _AssignmentStatus extends StatelessWidget {
           ),
           child: const Text(
             'En progreso',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: workerBadgeColor),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: workerBadgeColor,
+            ),
           ),
         ),
       ],
@@ -2150,35 +3078,56 @@ class _MiniShimmer extends StatefulWidget {
   State<_MiniShimmer> createState() => _MiniShimmerState();
 }
 
-class _MiniShimmerState extends State<_MiniShimmer> with SingleTickerProviderStateMixin {
+class _MiniShimmerState extends State<_MiniShimmer>
+    with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(duration: const Duration(milliseconds: 900), vsync: this)..repeat(reverse: true);
+    _ctrl = AnimationController(
+      duration: const Duration(milliseconds: 900),
+      vsync: this,
+    )..repeat(reverse: true);
     _anim = Tween<double>(begin: 0.3, end: 0.8).animate(_ctrl);
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) => Opacity(
-        opacity: _anim.value,
-        child: Row(
-          children: [
-            Container(width: 44, height: 44, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.grey[300])),
-            const SizedBox(width: 12),
-            Container(height: 16, width: 120, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(8))),
-          ],
-        ),
-      ),
+      builder:
+          (_, __) => Opacity(
+            opacity: _anim.value,
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey[300],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  height: 16,
+                  width: 120,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ],
+            ),
+          ),
     );
   }
 }
-

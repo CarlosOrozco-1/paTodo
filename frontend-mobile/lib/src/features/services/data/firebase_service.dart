@@ -1,11 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/utils/geohash_util.dart';
 import '../domain/service_model.dart';
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final ApiClient _api = ApiClient.create();
 
   /// Crea un trabajo en Firestore siguiendo el schema job.json y las reglas.
   /// El cliente debe traer el Custom Claim role (client/both): tras el
@@ -46,11 +49,20 @@ class FirebaseService {
       if (uDoc.exists) {
         final uData = uDoc.data();
         final profile = (uData?['profile'] as Map<String, dynamic>?) ?? {};
-        final fName = (profile['firstName'] as String? ?? uData?['firstName'] as String? ?? '').trim();
-        final lName = (profile['lastName'] as String? ?? uData?['lastName'] as String? ?? '').trim();
+        final fName =
+            (profile['firstName'] as String? ??
+                    uData?['firstName'] as String? ??
+                    '')
+                .trim();
+        final lName =
+            (profile['lastName'] as String? ??
+                    uData?['lastName'] as String? ??
+                    '')
+                .trim();
         final full = '$fName $lName'.trim();
         if (full.isNotEmpty) clientName = full;
-        clientAvatar = profile['avatarUrl'] as String? ?? uData?['avatarUrl'] as String?;
+        clientAvatar =
+            profile['avatarUrl'] as String? ?? uData?['avatarUrl'] as String?;
       }
     } catch (_) {}
 
@@ -82,25 +94,48 @@ class FirebaseService {
   }
 
   /// Oferta para un trabajo (rol worker/both, job ajeno y pendiente).
-  Future<void> createOffer(String jobId, double price, String estimatedTime) async {
+  Future<void> createOffer(
+    String jobId,
+    double price,
+    String estimatedTime,
+    String? note,
+  ) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('Usuario no autenticado');
 
-    final offerData = {
-      'jobId': jobId,
-      'workerId': user.uid,
-      'price': price,
-      'estimatedTime': estimatedTime,
-      'status': 'pending',
-      'currency': 'GTQ',
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
     try {
-      await _firestore.collection('offers').add(offerData);
-    } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') {
+      await _api.dio.post(
+        '/createOffer',
+        data: {
+          'jobId': jobId,
+          'price': price,
+          'estimatedTime': estimatedTime,
+          if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+        },
+      );
+    } on DioException catch (e) {
+      // Compatibilidad mientras la nueva ruta de API se despliega.
+      if (e.response?.statusCode == 404) {
+        final existingStatus = await ownOfferStatus(jobId);
+        if (existingStatus != null) {
+          throw Exception('Ya enviaste una solicitud para este trabajo.');
+        }
+        await _firestore.collection('offers').add({
+          'jobId': jobId,
+          'workerId': user.uid,
+          'price': price,
+          'estimatedTime': estimatedTime,
+          'status': 'pending',
+          'currency': 'GTQ',
+          if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+      rethrow;
+    } catch (e) {
+      if (e.toString().contains('permission-denied')) {
         throw Exception(
           'Permiso denegado: no puedes ofertar en tu propio trabajo o trabajo cerrado.',
         );
@@ -109,27 +144,48 @@ class FirebaseService {
     }
   }
 
+  Future<String?> ownOfferStatus(String jobId) async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    final snapshot =
+        await _firestore
+            .collection('offers')
+            .where('workerId', isEqualTo: user.uid)
+            .get();
+    for (final offer in snapshot.docs) {
+      final data = offer.data();
+      if (data['jobId'] == jobId) return data['status'] as String?;
+    }
+    return null;
+  }
+
   /// Jobs pendientes en tiempo real (vista trabajador).
   Stream<List<ServiceJob>> getPendingJobs() {
     return _firestore
         .collection('jobs')
         .where('status', isEqualTo: 'pending')
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ServiceJob.fromMap(doc.data(), doc.id))
-            .toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs
+                  .map((doc) => ServiceJob.fromMap(doc.data(), doc.id))
+                  .toList(),
+        );
   }
 
   /// Jobs pendientes una sola vez (para el mapa).
   Future<List<ServiceJob>> fetchPendingJobs() async {
-    final snapshot = await _firestore
-        .collection('jobs')
-        .where('status', isEqualTo: 'pending')
-        .orderBy('createdAt', descending: true)
-        .limit(50)
-        .get();
-    return snapshot.docs
-        .map((doc) => ServiceJob.fromMap(doc.data(), doc.id))
-        .toList();
+    final snapshot =
+        await _firestore
+            .collection('jobs')
+            .where('status', isEqualTo: 'pending')
+            .limit(100)
+            .get();
+    final jobs =
+        snapshot.docs
+            .map((doc) => ServiceJob.fromMap(doc.data(), doc.id))
+            .toList();
+    jobs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return jobs;
   }
 }
