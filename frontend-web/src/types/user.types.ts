@@ -1,6 +1,12 @@
 import type { GeoPoint, ObjectId } from './common.types';
 
-export type UserRole = 'client' | 'worker' | 'admin';
+export type UserRole = 'client' | 'worker' | 'both' | 'admin';
+
+/**
+ * Roles que se pueden elegir al registrarse. `admin` queda fuera: se promueve
+ * desde el panel o por consola, nunca desde el formulario público.
+ */
+export type RegisterRole = 'client' | 'worker' | 'both';
 
 export interface UserAccount {
   email: string;

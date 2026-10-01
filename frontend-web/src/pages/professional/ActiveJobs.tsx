@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { 
   CheckCircle2, 
@@ -6,7 +6,10 @@ import {
   Clock, 
   Calendar, 
   Briefcase, 
-  Sparkles 
+  Sparkles,
+  MessageSquare,
+  Star,
+  Navigation,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { offersService } from '@/api/offers.service';
@@ -31,6 +34,30 @@ import { cn } from '@/utils/cn';
 import { Modal } from '@/components/ui/Modal';
 import { ReviewForm } from '@/components/reviews/ReviewForm';
 import { reviewsService } from '@/api/reviews.service';
+import { InternalNavigator } from '@/components/ui/InternalNavigator';
+import { JobLocationMap } from '@/components/ui/JobLocationMap';
+import {
+  publishJobTrackingPosition,
+  type JobTrackingPosition,
+} from '@/api/firebase/jobTracking';
+
+interface PublishedPosition {
+  latitude: number;
+  longitude: number;
+  publishedAt: number;
+}
+
+function distanceMeters(first: PublishedPosition, next: JobTrackingPosition): number {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const deltaLatitude = radians(next.latitude - first.latitude);
+  const deltaLongitude = radians(next.longitude - first.longitude);
+  const latitude1 = radians(first.latitude);
+  const latitude2 = radians(next.latitude);
+  const haversine =
+    Math.sin(deltaLatitude / 2) ** 2 +
+    Math.cos(latitude1) * Math.cos(latitude2) * Math.sin(deltaLongitude / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
 
 export function ActiveJobs() {
   const { user, refreshProfile } = useAuthStore();
@@ -40,6 +67,52 @@ export function ActiveJobs() {
   const [loading, setLoading] = useState(true);
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [reviewJob, setReviewJob] = useState<Job | null>(null);
+  // Ids de los trabajos que este profesional ya reseñó. El backend rechaza con
+  // 409 una segunda reseña del mismo trabajo, así que el botón no debe
+  // ofrecerse cuando ya existe: salía siempre y el error llegaba al guardar.
+  const [reviewedJobIds, setReviewedJobIds] = useState<Set<string>>(new Set());
+  const [navigatingJobId, setNavigatingJobId] = useState<string | null>(null);
+  const lastPublishedPositions = useRef(new Map<string, PublishedPosition>());
+
+  const handlePositionUpdate = useCallback(async (jobId: string, position: JobTrackingPosition) => {
+    const now = Date.now();
+    const previous = lastPublishedPositions.current.get(jobId);
+    if (previous && now - previous.publishedAt < 10000 && distanceMeters(previous, position) < 20) {
+      return;
+    }
+
+    lastPublishedPositions.current.set(jobId, {
+      latitude: position.latitude,
+      longitude: position.longitude,
+      publishedAt: now,
+    });
+    try {
+      await publishJobTrackingPosition(jobId, position);
+    } catch (error) {
+      console.warn('No se pudo compartir la ubicación del trabajo:', error);
+      toast('error', 'No pudimos compartir tu ubicación. Revisa tu conexión.');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        // Se consulta el historial de reseñas del propio profesional: una sola
+        // lectura en vez de una por trabajo.
+        const mine = await reviewsService.getAllByUser(user.id);
+        if (cancelled) return;
+        setReviewedJobIds(new Set(mine.map((review) => review.jobId)));
+      } catch {
+        if (!cancelled) setReviewedJobIds(new Set());
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     const load = async () => {
@@ -87,6 +160,7 @@ export function ActiveJobs() {
     try {
       await reviewsService.create(reviewJob.id, { ...data, revieweeId: reviewJob.clientId });
       toast('success', 'Gracias por calificar al cliente');
+      setReviewedJobIds((prev) => new Set(prev).add(reviewJob.id));
       setReviewJob(null);
       await refreshProfile();
     } catch (error) {
@@ -189,6 +263,12 @@ export function ActiveJobs() {
             const myOffer = offers.find(
               (o) => o.jobId === job.id && (o.status === 'accepted' || o.status === 'countered'),
             );
+            const canNavigate =
+              job.workerId === user?.id &&
+              ['accepted', 'assigned', 'in_progress'].includes(job.status);
+            const workerCoordinates =
+              user?.location?.coordinates ??
+              user?.availability.serviceArea.center?.coordinates;
 
             return (
               <Card 
@@ -242,6 +322,58 @@ export function ActiveJobs() {
                       {job.details.description}
                     </p>
 
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-700">
+                          <Navigation className="h-4 w-4 text-emerald-700" />
+                          {navigatingJobId === job.id
+                            ? 'Navegación GPS en vivo'
+                            : canNavigate
+                              ? 'Ruta de desplazamiento'
+                              : 'Ubicación del trabajo'}
+                        </span>
+                        {canNavigate && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setNavigatingJobId((current) => current === job.id ? null : job.id)}
+                            className="h-8 shrink-0"
+                          >
+                            {navigatingJobId === job.id ? 'Ocultar navegador' : 'Empezar ruta'}
+                          </Button>
+                        )}
+                      </div>
+                      {navigatingJobId === job.id && canNavigate ? (
+                        <InternalNavigator
+                          destination={{
+                            latitude: job.location.coordinates[1],
+                            longitude: job.location.coordinates[0],
+                            label: job.location.address || 'Destino del trabajo',
+                          }}
+                          onPositionUpdate={(position) => {
+                            void handlePositionUpdate(job.id, position);
+                          }}
+                          className="h-80 w-full"
+                        />
+                      ) : (
+                        <JobLocationMap
+                          origin={{
+                            ...(workerCoordinates
+                              ? { lng: workerCoordinates[0], lat: workerCoordinates[1] }
+                              : { addressText: user?.contact.address?.city || 'Ciudad de Guatemala' }),
+                            label: 'Tu ubicación (Origen)',
+                          }}
+                          destination={{
+                            lng: job.location.coordinates[0],
+                            lat: job.location.coordinates[1],
+                            addressText: job.location.address,
+                            label: 'Domicilio del cliente (Destino)',
+                          }}
+                          className="h-44 w-full"
+                        />
+                      )}
+                    </div>
+
                     {/* Ficha Técnica: Ubicación y Fechas */}
                     <div className="grid gap-2 text-xs text-gray-500">
                       <div className="flex items-center gap-2 text-gray-700 font-medium">
@@ -268,7 +400,14 @@ export function ActiveJobs() {
                 {/* Pie con Acción de Finalizado */}
                 {['accepted', 'assigned', 'in_progress'].includes(job.status) ? (
                   <div className="p-5 pt-0">
-                    <div className="flex justify-end border-t border-gray-100 pt-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3">
+                      <Link
+                        to={`/mensajes?jobId=${job.id}`}
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 hover:text-brand-700"
+                      >
+                        <MessageSquare className="h-4 w-4 text-brand-600" />
+                        Contactar al cliente
+                      </Link>
                       <Button
                         onClick={() => handleComplete(job.id)}
                         loading={completingId === job.id}
@@ -281,14 +420,21 @@ export function ActiveJobs() {
                   </div>
                 ) : job.status === 'completed' ? (
                   <div className="p-5 pt-0">
-                    <div className="flex justify-end border-t border-gray-100 pt-3">
-                      <Button
-                        onClick={() => setReviewJob(job)}
-                        className="bg-brand-600 text-white hover:bg-brand-700 rounded-xl"
-                      >
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Calificar al cliente
-                      </Button>
+                    <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-3">
+                      {reviewedJobIds.has(job.id) ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Trabajo completado y calificado
+                        </span>
+                      ) : (
+                        <Button
+                          onClick={() => setReviewJob(job)}
+                          className="bg-brand-600 text-white hover:bg-brand-700 rounded-xl"
+                        >
+                          <Star className="mr-2 h-4 w-4" />
+                          Calificar al cliente
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ) : null}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BadgeCheck, Briefcase, Camera, CheckCircle2, Mail, MapPin, Phone, Power, ShieldCheck, UserCheck } from 'lucide-react';
+import { BadgeCheck, Briefcase, Camera, CheckCircle2, Loader2, Mail, MapPin, Phone, Power, ShieldCheck, Sparkles, UserCheck } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { skillsService } from '@/api/categories.service';
 import { usersService } from '@/api/users.service';
@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Avatar } from '@/components/ui/Avatar';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { StarRating } from '@/components/ui/StarRating';
+import { ReviewsList } from '@/components/reviews/ReviewsList';
 import { JobLocationMap } from '@/components/ui/JobLocationMap'; // IMPORTANTE
 import { fullName } from '@/utils/formatters';
 import { cn } from '@/utils/cn';
@@ -19,6 +20,7 @@ import type { Skill } from '@/types/category.types';
 export function ProProfile() {
   const { user, setUser } = useAuthStore();
   const [saving, setSaving] = useState(false);
+  const [togglingOnline, setTogglingOnline] = useState(false);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
 
@@ -102,6 +104,33 @@ export function ProProfile() {
   };
 
   const isOnline = user?.availability.isOnline;
+
+  /**
+   * El interruptor de disponibilidad se guardaba solo en el estado local: el
+   * valor nunca llegaba a Firestore, así que el perfil público de este mismo
+   * usuario seguía mostrando "desconectado" y el resto de la plataforma no se
+   * enteraba del cambio.
+   */
+  const handleToggleOnline = async () => {
+    if (!user) return;
+    const next = !user.availability.isOnline;
+    setTogglingOnline(true);
+    try {
+      const updated = await usersService.updateMe({
+        availability: {
+          isOnline: next,
+          serviceArea: user.availability.serviceArea,
+          workingHours: user.availability.workingHours,
+        },
+      });
+      setUser(updated);
+      toast('success', next ? 'Ahora estás disponible' : 'Te marcaste como no disponible');
+    } catch (error) {
+      toast('error', getErrorMessage(error));
+    } finally {
+      setTogglingOnline(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -333,23 +362,20 @@ export function ProProfile() {
               </label>
               <button
                 type="button"
-                onClick={() =>
-                  setUser({
-                    ...user!,
-                    availability: {
-                      ...user!.availability,
-                      isOnline: !user!.availability.isOnline,
-                    },
-                  })
-                }
+                onClick={handleToggleOnline}
+                disabled={togglingOnline}
                 className={cn(
-                  'flex items-center justify-center gap-2 w-full rounded-2xl border py-2.5 text-xs font-bold transition-all cursor-pointer shadow-xs',
+                  'flex items-center justify-center gap-2 w-full rounded-2xl border py-2.5 text-xs font-bold transition-all cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-60',
                   isOnline
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                     : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'
                 )}
               >
-                <Power className="h-4 w-4" />
+                {togglingOnline ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Power className="h-4 w-4" />
+                )}
                 {isOnline ? 'En línea' : 'Desconectado'}
               </button>
             </div>
@@ -375,6 +401,22 @@ export function ProProfile() {
             <Briefcase className="h-3.5 w-3.5" />
             Tu visibilidad determina si aparecerás en el mapa y en los filtros de búsqueda rápida de clientes.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Reseñas recibidas */}
+      <Card className="border border-gray-100 shadow-sm">
+        <CardHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-amber-500" />
+              Reseñas de tus clientes
+            </span>
+          }
+          subtitle="Valoraciones de trabajos que completaste"
+        />
+        <CardContent>
+          {user && <ReviewsList userId={user.id} />}
         </CardContent>
       </Card>
 

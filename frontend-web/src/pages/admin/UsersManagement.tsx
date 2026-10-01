@@ -16,6 +16,8 @@ import { StarRating } from '@/components/ui/StarRating';
 import { toast } from '@/stores/uiStore';
 import { getErrorMessage } from '@/api/axiosClient';
 import { formatDate } from '@/utils/formatters';
+import { isAdmin, isBoth, isWorker, ROLE_LABELS } from '@/utils/roles';
+import { cn } from '@/utils/cn';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -155,6 +157,7 @@ export function UsersManagement() {
                 { value: 'all', label: 'Todos los roles' },
                 { value: 'client', label: 'Clientes' },
                 { value: 'worker', label: 'Profesionales' },
+                { value: 'both', label: 'Cliente y Profesional' },
                 { value: 'admin', label: 'Administradores' },
               ]}
               value={roleFilter}
@@ -247,19 +250,18 @@ export function UsersManagement() {
 
                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
                   <Badge
-                    className={
-                      selectedUser.role === 'admin'
-                        ? 'bg-gray-800 text-white border border-gray-900/20 font-semibold'
-                        : selectedUser.role === 'worker'
-                          ? 'bg-purple-50 text-purple-700 border border-purple-200/60 font-semibold'
-                          : 'bg-blue-50 text-blue-700 border border-blue-200/60 font-semibold'
-                    }
+                    className={cn(
+                      'font-semibold',
+                      isAdmin(selectedUser.role)
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                        : isBoth(selectedUser.role)
+                          ? 'bg-brand-50 text-brand-700 border border-brand-200/60'
+                          : isWorker(selectedUser.role)
+                            ? 'bg-purple-50 text-purple-700 border border-purple-200/60'
+                            : 'bg-blue-50 text-blue-700 border border-blue-200/60',
+                    )}
                   >
-                    {selectedUser.role === 'admin'
-                      ? 'Administrador'
-                      : selectedUser.role === 'worker'
-                        ? 'Profesional'
-                        : 'Cliente'}
+                    {ROLE_LABELS[selectedUser.role]}
                   </Badge>
 
                   {selectedUser.account.verified ? (

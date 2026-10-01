@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { Send, MessageSquare } from 'lucide-react';
 import type { Message } from '@/types/message.types';
 import { MessageBubble } from './MessageBubble';
@@ -9,6 +10,7 @@ import { cn } from '@/utils/cn';
 interface ChatWindowProps {
   messages: Message[];
   currentUserId: string;
+  otherUserId?: string;
   otherUserName?: string;
   otherUserAvatar?: string;
   onSend: (content: string) => Promise<void>;
@@ -19,6 +21,7 @@ interface ChatWindowProps {
 export function ChatWindow({
   messages,
   currentUserId,
+  otherUserId,
   otherUserName,
   otherUserAvatar,
   onSend,
@@ -58,7 +61,16 @@ export function ChatWindow({
       {otherUserName && (
         <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-3">
           <Avatar name={otherUserName} src={otherUserAvatar} size="sm" />
-          <p className="text-sm font-semibold text-gray-900">{otherUserName}</p>
+          {otherUserId ? (
+            <Link
+              to={`/perfil/${otherUserId}`}
+              className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900 transition-colors hover:text-brand-600 hover:underline"
+            >
+              {otherUserName}
+            </Link>
+          ) : (
+            <p className="truncate text-sm font-semibold text-gray-900">{otherUserName}</p>
+          )}
         </div>
       )}
 

@@ -8,6 +8,7 @@ import type { Job } from '@/types/job.types';
 import type { User } from '@/types/user.types';
 import { sleep } from './index';
 import { db, nowIso, saveDb } from './demoDb';
+import { isAdmin, isClient, isWorker, ROLE_LABELS } from '@/utils/roles';
 
 function paginate<T>(items: T[], params?: QueryParams): PaginatedResponse<T> {
   const page = params?.page ? Number(params.page) : 1;
@@ -50,7 +51,7 @@ function toAdminView(user: User): UserAdminView {
     },
     status: suspended
       ? 'suspended'
-      : user.role === 'worker' && !user.account.verified
+      : isWorker(user.role) && !user.account.verified
         ? 'pending_verification'
         : 'active',
     createdAt: user.createdAt ?? '',
@@ -61,8 +62,10 @@ export const demoAdmin = {
   async getDashboardStats(): Promise<DashboardStats> {
     await sleep(150);
     const d = db();
-    const clients = d.users.filter((u) => u.role === 'client');
-    const workers = d.users.filter((u) => u.role === 'worker');
+    // Un usuario `both` cuenta en ambas columnas: es cliente y profesional a
+    // la vez, así que sumarlo en una sola inflaría el total en uno de los lados.
+    const clients = d.users.filter((u) => isClient(u.role));
+    const workers = d.users.filter((u) => isWorker(u.role));
     const offers = d.offers;
     const withRating = d.users.filter((u) => u.stats.ratingCount > 0);
     const averageRating = withRating.length
@@ -173,7 +176,7 @@ export const demoAdmin = {
   async getPendingWorkers(): Promise<User[]> {
     await sleep(120);
     return db().users.filter(
-      (u) => u.role === 'worker' && !u.account.verified,
+      (u) => isWorker(u.role) && !u.account.verified,
     );
   },
 
@@ -222,10 +225,10 @@ export const demoAdmin = {
     d.users.forEach((u) =>
       log(
         u.id,
-        u.role === 'worker' ? 'registro_pro' : u.role === 'admin' ? 'registro' : 'registro_cliente',
+        isAdmin(u.role) ? 'registro' : isWorker(u.role) ? 'registro_pro' : 'registro_cliente',
         'user',
         u.id,
-        `Se registró como ${u.role === 'worker' ? 'profesional' : u.role === 'admin' ? 'administrador' : 'cliente'}`,
+        `Se registró como ${ROLE_LABELS[u.role].toLowerCase()}`,
         u.createdAt ?? nowIso(),
       ),
     );

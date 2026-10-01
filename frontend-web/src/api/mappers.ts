@@ -1,10 +1,25 @@
 import type { Category, Skill } from '@/types/category.types';
 import type { PaginatedResponse } from '@/types/common.types';
 import type { Job, JobStatus } from '@/types/job.types';
-import type { Conversation, Message, Notification } from '@/types/message.types';
+import type {
+  Conversation,
+  Message,
+  Notification,
+  ParticipantSnapshot,
+} from '@/types/message.types';
 import type { Offer, OfferStatus } from '@/types/offer.types';
 import type { Review } from '@/types/review.types';
-import type { User } from '@/types/user.types';
+import type { User, UserRole } from '@/types/user.types';
+
+const VALID_ROLES: readonly UserRole[] = ['client', 'worker', 'both', 'admin'];
+
+/**
+ * Conserva `both`: colapsarlo a `client` es pérdida de información silenciosa,
+ * porque el rol llega intacto desde Firestore y desde el claim.
+ */
+function mapRole(value: string | undefined | null): UserRole {
+  return VALID_ROLES.includes(value as UserRole) ? (value as UserRole) : 'client';
+}
 
 // ---------------------------------------------------------------------------
 // Formas planas que devuelve el backend (Spring serializa los DTOs directo).
@@ -108,6 +123,10 @@ export interface BackendConversation {
   id: string;
   jobId: string;
   participantIds: string[];
+  participantsSnapshot?: Record<
+    string,
+    { name?: string; avatarUrl?: string | null }
+  >;
   lastMessage?: {
     content?: string;
     senderId?: string;
@@ -145,6 +164,7 @@ export interface BackendNotification {
   body?: string;
   data?: Record<string, unknown>;
   readAt?: string | null;
+  isRead?: boolean;
   createdAt: string;
 }
 
@@ -215,7 +235,7 @@ export function mapUser(user: BackendUser): User {
     user.coordinates && Array.isArray(user.coordinates) && user.coordinates.length === 2
       ? (user.coordinates as [number, number])
       : null;
-  const role = user.role === 'admin' ? 'admin' : user.role === 'worker' ? 'worker' : 'client';
+  const role: UserRole = mapRole(user.role);
   return {
     id: user.id,
     role,
@@ -344,7 +364,7 @@ export function mapNotification(notification: BackendNotification): Notification
     type: notification.type,
     title: notification.title ?? '',
     body: notification.body ?? '',
-    read: Boolean(notification.readAt),
+    read: Boolean(notification.readAt) || notification.isRead === true,
     data: notification.data,
     createdAt: notification.createdAt,
   };
@@ -399,11 +419,32 @@ export function toPageArray<T>(items: T[]): PaginatedResponse<T> {
   };
 }
 
+/**
+ * Normaliza el snapshot de participantes: Firestore puede guardar el nombre
+ * ausente y `avatarUrl` en `null`, así que se rellenan con valores seguros
+ * en vez de propagar `undefined` a un campo obligatorio.
+ */
+function mapParticipantsSnapshot(
+  raw: BackendConversation['participantsSnapshot'],
+): Record<string, ParticipantSnapshot> {
+  const out: Record<string, ParticipantSnapshot> = {};
+  for (const [uid, value] of Object.entries(raw ?? {})) {
+    out[uid] = {
+      name: value?.name ?? 'Participante',
+      avatarUrl: value?.avatarUrl ?? null,
+    };
+  }
+  return out;
+}
+
 export function mapConversation(conversation: BackendConversation): Conversation {
   return {
     id: conversation.id,
     jobId: conversation.jobId ?? undefined,
     participantIds: conversation.participantIds ?? [],
+    participantsSnapshot: mapParticipantsSnapshot(
+      conversation.participantsSnapshot,
+    ),
     lastMessage: conversation.lastMessage
       ? {
           content: conversation.lastMessage.content ?? '',

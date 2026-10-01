@@ -19,7 +19,14 @@ interface CreateUserBody {
     birthdate?: string | null;
   };
   contact: {
-    phone: string;
+    /**
+     * Opcional a propósito. Un alta con Google nunca trae `phoneNumber` (solo
+     * existe si la cuenta de Google tiene un teléfono), así que exigirlo
+     * devolvía 400 y bloqueaba el primer ingreso. El frontend lo pide en el
+     * onboarding con `PhoneOnboarding`; el registro con email+contraseña
+     * sigue exigiéndolo en el formulario.
+     */
+    phone?: string | null;
     alternatePhone?: string | null;
     address?: {
       street?: string;
@@ -79,9 +86,9 @@ router.post("/createUser", async (req, res) => {
       throw httpError(400, "invalid-argument", "profile.firstName y profile.lastName son obligatorios.");
     }
 
-    if (!body.contact.phone) {
-      throw httpError(400, "invalid-argument", "contact.phone es obligatorio.");
-    }
+    // `contact.phone` no se valida aquí a propósito: ver la nota en
+    // CreateUserBody.contact.phone. Se guarda como cadena vacía para que el
+    // documento tenga siempre la misma forma y el onboarding la pueda rellenar.
 
     // 3. Verificar que no exista ya el documento.
     const userRef = db.collection("users").doc(body.uid);
@@ -105,7 +112,7 @@ router.post("/createUser", async (req, res) => {
         birthdate: body.profile.birthdate ?? null,
       },
       contact: {
-        phone: body.contact.phone,
+        phone: body.contact.phone ?? "",
         alternatePhone: body.contact.alternatePhone ?? null,
         address: body.contact.address ?? null,
       },

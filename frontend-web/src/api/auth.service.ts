@@ -1,4 +1,4 @@
-import type { User } from '@/types/user.types';
+import type { RegisterRole, User } from '@/types/user.types';
 import { isDemoMode } from './demo';
 import { demoAuth } from './demo/demo-auth';
 import { realAuth } from './real';
@@ -14,12 +14,37 @@ export interface RegisterRequest {
   firstName: string;
   lastName: string;
   phone: string;
-  role: 'client' | 'worker';
+  role: RegisterRole;
 }
 
 export interface AuthResponse {
   token: string;
   user: User;
+}
+
+/**
+ * Datos que aporta Google al completar el alta, ya partidos en los campos que
+ * pide el perfil. Vienen todos rellenos salvo el teléfono, que Google solo
+ * entrega si el usuario lo tiene filled en su cuenta.
+ */
+export interface GoogleProfileDraft {
+  firstName: string;
+  lastName: string;
+  email: string;
+  avatarUrl?: string;
+  phone: string;
+}
+
+/**
+ * Resultado de `loginWithGoogle`. `needsProfile` distingue "entró una cuenta
+ * nueva" de "ya tenía documento": solo el primer caso redirige a la pantalla
+ * de completado.
+ */
+export interface GoogleLoginResult {
+  needsProfile: boolean;
+  token: string;
+  user: User;
+  draft: GoogleProfileDraft;
 }
 
 export const authService = {
@@ -28,9 +53,20 @@ export const authService = {
     return realAuth.login(data);
   },
 
-  async loginWithGoogle(idToken: string, role: 'client' | 'worker' = 'client'): Promise<AuthResponse> {
-    if (isDemoMode()) return demoAuth.loginWithGoogle(idToken, role);
-    return realAuth.loginWithGoogle(idToken, role);
+  async loginWithGoogle(idToken: string): Promise<GoogleLoginResult> {
+    if (isDemoMode()) return demoAuth.loginWithGoogle(idToken);
+    return realAuth.loginWithGoogle(idToken);
+  },
+
+  /**
+   * Crea el documento del usuario con los datos que confirmó en la pantalla de
+   * completado. Se invoca una sola vez, tras el login con Google.
+   */
+  async completeGoogleProfile(
+    draft: GoogleProfileDraft & { role: RegisterRole; phone: string },
+  ): Promise<AuthResponse> {
+    if (isDemoMode()) return demoAuth.completeGoogleProfile(draft);
+    return realAuth.completeGoogleProfile(draft);
   },
 
   async register(data: RegisterRequest): Promise<AuthResponse> {

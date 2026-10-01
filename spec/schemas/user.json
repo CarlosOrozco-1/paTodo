@@ -80,7 +80,7 @@
         "phone": {
           "type": "string",
           "title": "Teléfono principal",
-          "description": "Número de teléfono principal del usuario."
+          "description": "Número de teléfono principal del usuario. Puede quedar vacío en el documento cuando el alta viene de Google (que no entrega teléfono); el frontend lo pide en el onboarding y lo rellena con updateMe."
         },
         "alternatePhone": {
           "type": "string",
@@ -110,7 +110,7 @@
           }
         }
       },
-      "required": ["phone"]
+      "required": []
     },
     "location": {
       "type": "object",

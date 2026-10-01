@@ -1,3 +1,5 @@
+import type { UserRole } from './user.types';
+
 export interface DashboardStats {
   totalUsers: number;
   totalClients: number;
@@ -41,7 +43,7 @@ export interface UserAdminView {
     verified: boolean;
     lastLogin?: string | null;
   };
-  role: string;
+  role: UserRole;
   stats: {
     rating: number;
     ratingCount: number;

@@ -3,6 +3,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   updateDoc,
   where,
@@ -36,6 +37,28 @@ export const realUsers = {
     } catch {
       throw new Error('No se puede ver ese perfil');
     }
+  },
+
+  /**
+   * Observa un perfil en tiempo real.
+   *
+   * Sin esto, el estado "en línea" de un profesional solo se vería al abrir el
+   * perfil: si lo cambiaba en su propio panel, quien lo estuviera viendo se
+   * quedaría con el valor viejo hasta recargar.
+   */
+  subscribe(id: string, onData: (user: User) => void, onError?: (error: Error) => void): () => void {
+    return onSnapshot(
+      doc(db, 'users', id),
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          onError?.(new Error('Usuario no encontrado'));
+          return;
+        }
+        const user = userFromData({ ...snapshot.data(), id: snapshot.id });
+        if (user) onData(mapUser(user));
+      },
+      (error) => onError?.(error),
+    );
   },
 
   async getMe(): Promise<User> {

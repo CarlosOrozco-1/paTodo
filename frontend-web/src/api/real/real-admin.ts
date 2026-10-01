@@ -12,6 +12,7 @@ import { db } from '../firebase/init';
 import { jobFromData, toIso, userFromData } from '../firebase/fs';
 import type { BackendUser } from '../mappers';
 import { jobWithWorkerId, mapUser, toPageArray } from '../mappers';
+import { parseUserRole } from '@/utils/roles';
 
 type Any = Record<string, unknown>;
 
@@ -63,7 +64,7 @@ function userItemToView(item: ApiUserItem): UserAdminView {
       verified: item.verified,
       lastLogin: null,
     },
-    role: item.role,
+    role: parseUserRole(item.role),
     stats: {
       rating: item.rating,
       ratingCount: item.ratingCount,
@@ -99,7 +100,7 @@ function userBackendToView(uid: string, backend: BackendUser, firedata: Any): Us
       verified: firedata.verified === true,
       lastLogin: null,
     },
-    role: backend.role,
+    role: parseUserRole(backend.role),
     stats: {
       rating: backend.rating,
       ratingCount: backend.ratingCount,

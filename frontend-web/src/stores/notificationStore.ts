@@ -7,12 +7,15 @@ interface NotificationState {
   loading: boolean;
   lastFetchedAt: number;
   load: () => Promise<void>;
+  subscribe: () => () => void;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   reset: () => void;
 }
 
 const DEDUPE_MS = 3000;
+
+let unsubscribe: (() => void) | null = null;
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
@@ -28,6 +31,33 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     } catch {
       set({ notifications: [], loading: false, lastFetchedAt: Date.now() });
     }
+  },
+
+  /**
+   * Suscripción en tiempo real. Reemplaza al sondeo periódico: Firestore
+   * entrega los cambios y el listener se cierra al desmontar o al cambiar
+   * de usuario.
+   *
+   * Se envuelve en try/catch a propósito: si falta la sesión, `requireUid`
+   * lanza de forma síncrona y, al ejecutarse dentro de un efecto, el error
+   * desmontaría la aplicación entera. Perder la campana no puede costar más
+   * que un badge que se actualice al recargar.
+   */
+  subscribe: () => {
+    unsubscribe?.();
+    unsubscribe = null;
+    try {
+      unsubscribe = notificationsService.subscribe({
+        onData: (items) => set({ notifications: items, loading: false }),
+        onError: () => set({ loading: false }),
+      });
+    } catch {
+      set({ loading: false });
+    }
+    return () => {
+      unsubscribe?.();
+      unsubscribe = null;
+    };
   },
 
   markAsRead: async (id: string) => {
@@ -54,5 +84,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     }
   },
 
-  reset: () => set({ notifications: [], loading: false, lastFetchedAt: 0 }),
+  reset: () => {
+    unsubscribe?.();
+    unsubscribe = null;
+    set({ notifications: [], loading: false, lastFetchedAt: 0 });
+  },
 }));
