@@ -19,18 +19,34 @@ interface JobLocationMapProps {
 export function JobLocationMap({ origin, destination, className = 'h-64 w-full' }: JobLocationMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const mapUnavailable = !mapboxgl.accessToken;
+  const originLng = origin.lng;
+  const originLat = origin.lat;
+  const originAddressText = origin.addressText;
+  const originLabel = origin.label;
+  const destinationLng = destination?.lng;
+  const destinationLat = destination?.lat;
+  const destinationAddressText = destination?.addressText;
+  const destinationLabel = destination?.label;
+  const hasDestination = destination !== undefined;
 
   useEffect(() => {
     if (!mapContainer.current || !mapboxgl.accessToken) return;
 
-    map.current = new mapboxgl.Map({
+    let mounted = true;
+    const currentMap = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [-90.5069, 14.6349],
       zoom: 11,
     });
+    map.current = currentMap;
 
     const resolveCoords = async (loc: JobMapLocation): Promise<[number, number] | null> => {
+      if (loc.lng !== undefined && loc.lat !== undefined) {
+        return [loc.lng, loc.lat];
+      }
+
       if (loc.addressText && loc.addressText.trim().length > 0) {
         try {
           const query = encodeURIComponent(`${loc.addressText}, Guatemala`);
@@ -42,22 +58,32 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
             return data.features[0].center as [number, number];
           }
         } catch {
-          // Si falla la búsqueda, pasa a las coordenadas por defecto
+          // Si falla la búsqueda, conserva el punto de respaldo.
         }
       }
 
-      if (loc.lng !== undefined && loc.lat !== undefined) {
-        return [loc.lng, loc.lat];
-      }
-
-      return [-90.5069, 14.6349];
+      return null;
     };
 
     const setupMapData = async () => {
-      const originCoords = (await resolveCoords(origin)) || [-90.5069, 14.6349];
-      const destCoords = destination ? await resolveCoords(destination) : null;
+      const [originCoords, destCoords] = await Promise.all([
+        resolveCoords({
+          lng: originLng,
+          lat: originLat,
+          addressText: originAddressText,
+          label: originLabel,
+        }),
+        hasDestination
+          ? resolveCoords({
+              lng: destinationLng,
+              lat: destinationLat,
+              addressText: destinationAddressText,
+              label: destinationLabel,
+            })
+          : Promise.resolve(null),
+      ]);
 
-      if (!map.current) return;
+      if (!mounted || !originCoords) return;
 
       // Marcador A (Origen)
       const originEl = document.createElement('div');
@@ -67,8 +93,8 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
 
       new mapboxgl.Marker(originEl)
         .setLngLat(originCoords)
-        .setPopup(new mapboxgl.Popup().setHTML(`<b>${origin.label || 'Ubicación'}</b>`))
-        .addTo(map.current);
+        .setPopup(new mapboxgl.Popup().setText(originLabel || 'Ubicación'))
+        .addTo(currentMap);
 
       const bounds = new mapboxgl.LngLatBounds().extend(originCoords);
 
@@ -81,8 +107,8 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
 
         new mapboxgl.Marker(destEl)
           .setLngLat(destCoords)
-          .setPopup(new mapboxgl.Popup().setHTML(`<b>${destination?.label || 'Destino'}</b>`))
-          .addTo(map.current);
+          .setPopup(new mapboxgl.Popup().setText(destinationLabel || 'Destino'))
+          .addTo(currentMap);
 
         bounds.extend(destCoords);
 
@@ -95,10 +121,10 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
           if (directionsData.routes && directionsData.routes.length > 0) {
             const routeGeometry = directionsData.routes[0].geometry;
 
-            map.current.on('load', () => {
-              if (!map.current) return;
+            const addRoute = () => {
+              if (!mounted || !currentMap.isStyleLoaded()) return;
 
-              map.current.addSource('route', {
+              currentMap.addSource('route', {
                 type: 'geojson',
                 data: {
                   type: 'Feature',
@@ -107,7 +133,7 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
                 },
               });
 
-              map.current.addLayer({
+              currentMap.addLayer({
                 id: 'route',
                 type: 'line',
                 source: 'route',
@@ -121,26 +147,37 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
                   'line-opacity': 0.8,
                 },
               });
-            });
+            };
+
+            if (currentMap.isStyleLoaded()) addRoute();
+            else currentMap.once('load', addRoute);
           }
         } catch {
           // Si falla el trazado de la ruta, conserva los marcadores A y B
         }
       }
 
-      map.current.fitBounds(bounds, { padding: 60, maxZoom: 14 });
+      currentMap.fitBounds(bounds, { padding: 60, maxZoom: 14 });
     };
 
     setupMapData();
 
     return () => {
-      map.current?.remove();
+      mounted = false;
+      currentMap.remove();
+      map.current = null;
     };
-  }, [origin.addressText, origin.lat, origin.lng, destination?.addressText, destination?.lat, destination?.lng]);
+  }, [originAddressText, originLabel, originLat, originLng, hasDestination, destinationAddressText, destinationLabel, destinationLat, destinationLng]);
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-stone-200/80 shadow-xs">
-      <div ref={mapContainer} className={className} />
+      {mapUnavailable ? (
+        <div className={`flex items-center justify-center bg-gray-50 text-sm text-gray-500 ${className}`}>
+          El mapa no está disponible.
+        </div>
+      ) : (
+        <div ref={mapContainer} className={className} />
+      )}
     </div>
   );
 }

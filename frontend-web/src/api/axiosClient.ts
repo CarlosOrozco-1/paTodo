@@ -5,9 +5,11 @@ const TOKEN_KEY = 'paTodo_token';
 
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'https://patodo.onrender.com',
-  // DEV: Render (plan gratuito) tarda 20-50s en despertar en la primera
-  // petición; por eso el timeout es de 60s y no el default de axios.
-  timeout: 60000,
+  // Render (plan gratuito) tarda 20-50s en despertar y se apaga tras ~15 min
+  // sin tráfico. 60s quedaba corto para una ruta transaccional con arranque
+  // en frío, así que el margen sube a 120s. Las rutas que dependen de la API
+  // llaman antes a `ensureApiWarm` para no gastar este presupuesto.
+  timeout: 120000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -90,6 +92,15 @@ export function setToken(token: string | null): void {
 
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
+    // El mensaje de axios para un timeout no dice nada útil ("timeout of
+    // 120000ms exceeded"), y con Render eso casi siempre significa arranque
+    // en frío, no un fallo real.
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return 'El servidor tardó demasiado en responder. Espera un momento e inténtalo de nuevo.';
+    }
+    if (error.code === 'ERR_NETWORK') {
+      return 'No se pudo conectar con el servidor. Revisa tu conexión.';
+    }
     const data = error.response?.data as { error?: string; message?: string } | undefined;
     return data?.error || data?.message || error.message || 'Error de red';
   }

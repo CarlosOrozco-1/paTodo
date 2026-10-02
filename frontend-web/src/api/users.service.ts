@@ -10,6 +10,15 @@ export const usersService = {
     return realUsers.getById(id);
   },
 
+  /**
+   * Perfil en tiempo real. Se usa donde el dato cambia sin intervención de
+   * quien mira, como el estado de disponibilidad de un profesional.
+   */
+  subscribe(id: string, onData: (user: User) => void, onError?: (error: Error) => void): () => void {
+    if (isDemoMode()) return demoUsers.subscribe(id, onData, onError);
+    return realUsers.subscribe(id, onData, onError);
+  },
+
   async getMe(): Promise<User> {
     if (isDemoMode()) return demoUsers.getMe();
     return realUsers.getMe();

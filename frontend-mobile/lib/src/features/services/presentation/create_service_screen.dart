@@ -1,9 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../data/firebase_service.dart';
+import 'location_picker_screen.dart';
 
 class CreateServiceScreen extends StatefulWidget {
   const CreateServiceScreen({super.key});
@@ -23,6 +24,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
   bool _isLoading = false;
   GeoPoint? _location;
   String _address = '';
+  String _directions = '';
   List<String> _categories = ['general'];
 
   @override
@@ -47,28 +49,42 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
   }
 
   Future<void> _pickLocation() async {
-    try {
-      final pos = await Geolocator.getCurrentPosition();
-      if (!mounted) return;
-      setState(() {
-        _location = GeoPoint(pos.latitude, pos.longitude);
-        _address =
-            '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
-      });
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No pudimos obtener tu ubicación.')),
-        );
-      }
-    }
+    final selection = await Navigator.push<LocationSelection>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          initialLocation: _location == null
+              ? null
+              : LatLng(_location!.latitude, _location!.longitude),
+          initialAddress: _address,
+          initialDirections: _directions,
+        ),
+      ),
+    );
+    if (selection == null || !mounted) return;
+    setState(() {
+      _location = GeoPoint(
+        selection.point.latitude,
+        selection.point.longitude,
+      );
+      _address = selection.address;
+      _directions = selection.directions;
+    });
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    _priceController.dispose();
+    super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_location == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pulsa "Usar mi ubicación" antes de publicar.')),
+        const SnackBar(content: Text('Selecciona el lugar del trabajo antes de publicar.')),
       );
       return;
     }
@@ -81,7 +97,9 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         price: double.parse(_priceController.text),
         categoryId: _category,
         location: _location!,
-        address: _address,
+        address: _directions.isEmpty
+            ? _address
+            : '$_address · Indicaciones: $_directions',
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -99,6 +117,76 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Widget _buildLocationCard() {
+    final hasLocation = _location != null;
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: _pickLocation,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: hasLocation
+                  ? AppTheme.primaryGreen.withValues(alpha: 0.45)
+                  : const Color(0xFFE7EBE7),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.map_outlined,
+                  color: AppTheme.primaryGreen,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hasLocation ? 'Lugar del trabajo' : 'Agrega una ubicación',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      hasLocation
+                          ? (_directions.isEmpty
+                              ? _address
+                              : '$_address · $_directions')
+                          : 'Busca una dirección o mueve el punto en el mapa',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppTheme.textLight,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                hasLocation ? Icons.edit_location_alt_outlined : Icons.chevron_right,
+                color: AppTheme.primaryGreen,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   InputDecoration _dec(String label, {Widget? suffix}) => InputDecoration(
@@ -151,13 +239,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                 validator: (v) => double.tryParse(v!) == null ? 'Número inválido' : null,
               ),
               const SizedBox(height: 15),
-              OutlinedButton.icon(
-                onPressed: _pickLocation,
-                icon: const Icon(Icons.my_location, color: AppTheme.primaryGreen),
-                label: Text(_location == null
-                    ? 'Usar mi ubicación'
-                    : 'Ubicación: $_address'),
-              ),
+              _buildLocationCard(),
               const SizedBox(height: 30),
               SizedBox(
                 height: 52,

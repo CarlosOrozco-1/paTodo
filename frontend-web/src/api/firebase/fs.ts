@@ -242,6 +242,15 @@ export function conversationFromDoc(
   const data = snapshot.data();
   if (!data) return null;
   const participants = Array.isArray(data.participants) ? (data.participants as string[]) : [];
+  const rawSnapshot = (data.participantsSnapshot ?? {}) as Record<string, Any>;
+  const participantsSnapshot: Record<string, { name: string; avatarUrl: string | null }> = {};
+  Object.entries(rawSnapshot).forEach(([uid, value]) => {
+    if (!value || typeof value !== 'object') return;
+    participantsSnapshot[uid] = {
+      name: typeof value.name === 'string' ? value.name : '',
+      avatarUrl: typeof value.avatarUrl === 'string' ? value.avatarUrl : null,
+    };
+  });
   const lastMessage = (data.lastMessage ?? {}) as Any;
   const lastReadAt = (data.lastReadAt ?? {}) as Record<string, unknown>;
   const myReadAt = lastReadAt[myUid] ? toIso(lastReadAt[myUid]) : '';
@@ -256,6 +265,7 @@ export function conversationFromDoc(
     id: snapshot.id,
     jobId: typeof data.jobId === 'string' ? data.jobId : '',
     participantIds: participants,
+    participantsSnapshot,
     lastMessage:
       typeof lastMessage.content === 'string' && lastMessage.content
         ? {
@@ -310,6 +320,7 @@ export function notificationFromData(data: Any): BackendNotification | null {
         ? (data.data as Record<string, unknown>)
         : undefined,
     readAt: toIsoOrNull(data.readAt),
+    isRead: data.isRead === true,
     createdAt: data.createdAt ? toIso(data.createdAt) : new Date().toISOString(),
   };
 }
@@ -359,7 +370,11 @@ export function skillFromData(data: Any): BackendSkill | null {
     slug: typeof data.slug === 'string' ? data.slug : '',
     description: typeof data.description === 'string' ? data.description : undefined,
     icon: typeof data.icon === 'string' ? data.icon : undefined,
-    categoryIds: [],
+    // Firestore guarda `categoryIds` como array de strings y CreateJob
+    // filtra por él. Dejarlo en `[]` vaciaba el selector de habilidades.
+    categoryIds: Array.isArray(data.categoryIds)
+      ? data.categoryIds.filter((id: unknown): id is string => typeof id === 'string')
+      : [],
     isActive: data.isActive === undefined ? true : data.isActive === true,
     createdAt: data.createdAt ? toIso(data.createdAt) : new Date().toISOString(),
     updatedAt: data.updatedAt ? toIso(data.updatedAt) : new Date().toISOString(),

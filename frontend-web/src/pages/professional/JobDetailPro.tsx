@@ -7,6 +7,7 @@ import {
   Clock,
   HandCoins,
   MapPin,
+  MessageSquare,
   Tag,
   Wrench,
 } from 'lucide-react';
@@ -16,13 +17,14 @@ import { offersService } from '@/api/offers.service';
 import { useAuthStore } from '@/stores/authStore';
 import type { Category } from '@/types/category.types';
 import type { Job } from '@/types/job.types';
-import type { CreateOfferDto } from '@/types/offer.types';
+import type { CreateOfferDto, Offer } from '@/types/offer.types';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
 import { OfferForm } from '@/components/offers/OfferForm';
+import { CounterpartCard } from '@/components/jobs/CounterpartCard';
 import { JobLocationMap } from '@/components/ui/JobLocationMap'; // IMPORTANTE
 import { toast } from '@/stores/uiStore';
 import { getErrorMessage } from '@/api/axiosClient';
@@ -43,6 +45,7 @@ export function JobDetailPro() {
   const [offerOpen, setOfferOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [alreadyOffered, setAlreadyOffered] = useState(false);
+  const [myAcceptedOffer, setMyAcceptedOffer] = useState<Offer | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -71,6 +74,9 @@ export function JobDetailPro() {
         const user = useAuthStore.getState();
         const mine = offers.find((o) => o.workerId === user.user?.id);
         setAlreadyOffered(Boolean(mine && mine.status !== 'withdrawn'));
+        setMyAcceptedOffer(
+          mine && (mine.status === 'accepted' || mine.status === 'countered') ? mine : null,
+        );
       } catch {
         // ignorar
       }
@@ -172,6 +178,14 @@ export function JobDetailPro() {
                   </p>
                 </div>
 
+                {job.clientId && (
+                  <CounterpartCard
+                    userId={job.clientId}
+                    title="Cliente que publicó"
+                    jobId={job.id}
+                  />
+                )}
+
                 {/* SEGUIMIENTO DE UBICACIÓN Y MAPA */}
                 <div className="space-y-2">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-gray-600">
@@ -236,7 +250,31 @@ export function JobDetailPro() {
               </div>
 
               <div className="space-y-3 pt-4 border-t border-gray-100">
-                {alreadyOffered ? (
+                {myAcceptedOffer ? (
+                  <div className="space-y-2">
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-center space-y-2">
+                      <div className="flex items-center justify-center gap-2 text-emerald-700">
+                        <CheckCircle2 className="h-5 w-5 shrink-0" />
+                        <p className="font-bold text-xs uppercase tracking-wide">
+                          Oferta aceptada
+                        </p>
+                      </div>
+                      <p className="text-xs text-emerald-800 leading-relaxed">
+                        El cliente te contrató. Ya pueden comunicarse por aquí.
+                      </p>
+                    </div>
+                    <Link to={`/mensajes?jobId=${job.id}`} className="block">
+                      <Button
+                        fullWidth
+                        size="lg"
+                        className="shadow-md shadow-emerald-600/20 bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        <MessageSquare className="mr-2 h-5 w-5" />
+                        Contactar al cliente
+                      </Button>
+                    </Link>
+                  </div>
+                ) : alreadyOffered ? (
                   <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-center space-y-2">
                     <div className="flex items-center justify-center gap-2 text-emerald-700">
                       <CheckCircle2 className="h-5 w-5 shrink-0" />

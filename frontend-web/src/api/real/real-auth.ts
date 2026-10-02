@@ -5,11 +5,17 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import type { User } from '@/types/user.types';
-import type { AuthResponse, LoginRequest, RegisterRequest } from '../auth.service';
+import type { RegisterRole, User } from '@/types/user.types';
+import type {
+  AuthResponse,
+  GoogleLoginResult,
+  GoogleProfileDraft,
+  LoginRequest,
+  RegisterRequest,
+} from '../auth.service';
 import { mapUser } from '../mappers';
 import { auth } from '../firebase/init';
-import { ensureBackendUser, readUser } from '../firebase/fs';
+import { ensureBackendUser, fallbackBackendUser, readUser } from '../firebase/fs';
 import { apiPost } from '../firebase/rest';
 import { setToken } from '../axiosClient';
 
@@ -87,7 +93,15 @@ export const realAuth = {
     return { token: freshToken, user: mapUser(backend) };
   },
 
-  async loginWithGoogle(idToken: string, role: 'client' | 'worker' = 'client'): Promise<AuthResponse> {
+  /**
+   * Inicia sesión con Google y devuelve los datos que la cuenta de Google
+   * entrega, para que la pantalla de completado rellene el formulario.
+   *
+   * No crea el documento del usuario: se hace en `completeGoogleProfile`, una
+   * vez el usuario confirma. Así `POST /createUser` recibe siempre un teléfono
+   * real (Google no entrega `phoneNumber`), en lugar de fallar con 400.
+   */
+  async loginWithGoogle(idToken: string): Promise<GoogleLoginResult> {
     let userCredential;
     try {
       userCredential = await signInWithCredential(
@@ -98,40 +112,75 @@ export const realAuth = {
       throw new Error(firebaseAuthMessage(error));
     }
 
-    const uid = userCredential.user.uid;
-    const email = userCredential.user.email ?? '';
-    const displayName = userCredential.user.displayName ?? '';
+    const firebaseUser = userCredential.user;
+    const uid = firebaseUser.uid;
+    const email = firebaseUser.email ?? '';
+    const displayName = firebaseUser.displayName ?? '';
+    const parts = displayName.trim().split(/\s+/).filter(Boolean);
 
-    // DEV: Si el perfil ya existe en Firestore no se vuelve a crear; se evita
-    // enviar phone vacío (la API lo exige y respondería 400 aunque el 409
-    // exista). El createUser solo aplica a uids nuevos.
+    // El token viaja a la app para que la pantalla de completado pueda llamar a
+    // la API, pero el refresh se hace solo después de confirmar el perfil.
+    const token = await firebaseUser.getIdToken();
+    setToken(token);
+
+    // Si el documento ya existe no hay nada que completar: se entra directo.
     const existing = await readUser(uid);
-    if (!existing) {
-      try {
-        await apiPost('/createUser', {
-          uid,
-          email,
-          role,
-          profile: {
-            firstName: displayName.split(' ')[0] ?? '',
-            lastName: displayName.split(' ').slice(1).join(' ') ?? '',
-            avatarUrl: userCredential.user.photoURL ?? null,
-            bio: '',
-          },
-          contact: { phone: userCredential.user.phoneNumber ?? '' },
-        });
-      } catch (error) {
-        const status = (error as { response?: { status?: number } })?.response?.status;
-        if (status !== 409) {
-          throw error instanceof Error ? error : new Error('No se pudo crear el perfil');
-        }
+
+    return {
+      needsProfile: !existing,
+      token,
+      user: mapUser(existing ?? fallbackBackendUser(uid, email)),
+      draft: {
+        firstName: parts[0] ?? '',
+        lastName: parts.slice(1).join(' '),
+        email,
+        avatarUrl: firebaseUser.photoURL ?? undefined,
+        phone: firebaseUser.phoneNumber ?? '',
+      },
+    };
+  },
+
+  /**
+   * Crea el documento del usuario con los datos confirmados en la pantalla de
+   * completado. Se llama una sola vez, después del login con Google.
+   */
+  async completeGoogleProfile(
+    draft: GoogleProfileDraft & { role: RegisterRole; phone: string },
+  ): Promise<AuthResponse> {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) throw new Error('Sesión no válida. Vuelve a iniciar sesión.');
+
+    const email = draft.email.trim();
+    if (email.toLowerCase() !== (firebaseUser.email ?? '').toLowerCase()) {
+      throw new Error('El correo no coincide con el de tu cuenta de Google.');
+    }
+
+    try {
+      await apiPost('/createUser', {
+        uid: firebaseUser.uid,
+        email,
+        role: draft.role,
+        profile: {
+          firstName: draft.firstName.trim(),
+          lastName: draft.lastName.trim(),
+          avatarUrl: draft.avatarUrl ?? null,
+          bio: '',
+        },
+        contact: { phone: draft.phone.trim() },
+      });
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      // 409 = el documento ya existe (el usuario ya completó el perfil en una
+      // sesión anterior). No es un error: se sigue adelante.
+      if (status !== 409) {
+        throw error instanceof Error ? error : new Error('No se pudo crear el perfil');
       }
     }
 
-    // Refrescar el token para que llegue el Custom Claim del rol.
-    const freshToken = await userCredential.user.getIdToken(true);
+    // El rol viaja como Custom Claim, así que el token debe refrescarse.
+    const freshToken = await firebaseUser.getIdToken(true);
     setToken(freshToken);
-    const backend = await ensureBackendUser(uid, email);
+    const backend = await ensureBackendUser(firebaseUser.uid, email);
     return { token: freshToken, user: mapUser(backend) };
   },
 

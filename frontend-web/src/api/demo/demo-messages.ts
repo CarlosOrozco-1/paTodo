@@ -54,6 +54,7 @@ export const demoMessages = {
         id: uid('demo-conv'),
         jobId: data.jobId,
         participantIds: [me, data.receiverId],
+        participantsSnapshot: {},
         unreadCount: { [data.receiverId]: 0, [me]: 0 },
         isActive: true,
         createdAt: nowIso(),
