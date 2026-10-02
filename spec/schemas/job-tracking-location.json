@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "JobTrackingLocation",
+  "description": "Ubicacion actual de un trabajador asignado. Documento Firestore: jobs/{jobId}/tracking/current. Solo se comparte mientras el trabajo esta aceptado o en progreso y se elimina al completar o cancelar.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "workerId": {
+      "type": "string",
+      "description": "UID del trabajador asignado al trabajo."
+    },
+    "latitude": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90,
+      "description": "Latitud GPS actual."
+    },
+    "longitude": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180,
+      "description": "Longitud GPS actual."
+    },
+    "accuracyMeters": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10000,
+      "description": "Precision GPS reportada por el dispositivo."
+    },
+    "headingDegrees": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 360
+    },
+    "speedMetersPerSecond": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp del servidor de Firestore."
+    }
+  },
+  "required": ["workerId", "latitude", "longitude", "updatedAt"]
+}

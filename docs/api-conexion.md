@@ -70,6 +70,7 @@ La fuente de verdad está en `firestore.rules` (ya desplegado y endurecido).
 | Completar trabajo | **`POST /completeJob`** | Cliente (job o worker) |
 | Crear reseña | **`POST /createReview`** | Cliente (participante, job completado) |
 | Calcular ruta | **`POST /computeRoute`** | Cliente |
+| Compartir ubicación actual del trabajo (`jobs/{jobId}/tracking/current`) | **Firestore SDK directo** | Solo el trabajador asignado, mientras el trabajo está aceptado/en curso; lectura limitada al cliente dueño y trabajador asignado |
 | Mensajes (`conversations.messages`) | **Firestore SDK directo** | Cliente (participante, `senderId == uid`) |
 | Leer conversaciones/notificaciones propias | **Firestore SDK directo** | Cliente |
 | `users.role/stats`, `notifications`, `conversations`, `reviews` | **Solo la API** | API (roles/stats/estados) |
@@ -84,6 +85,12 @@ La fuente de verdad está en `firestore.rules` (ya desplegado y endurecido).
 > `role` del ID token. Las reglas de `jobs` y `offers` leen `request.auth.token.role`, por lo que
 > **hay que refrescar el token** (`getIdToken(true)`) después de `POST /createUser` o de cambiar de
 > rol. El cliente no puede modificar su propio `role` (la regla lo bloquea).
+
+La ubicación de seguimiento se guarda como un documento único en
+`jobs/{jobId}/tracking/current`; el cliente asignado la observa con un listener
+de Firestore. El documento no guarda historial y la API lo elimina al completar
+o cancelar el trabajo. No se debe publicar la ubicación precisa en el perfil
+global `users/{uid}` para este flujo.
 
 ## 5. Llamar a la API desde el cliente
 

@@ -46,6 +46,10 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
 
     // PRIORIDAD AL TEXTO DE LA DIRECCIÓN: Evita que coordenadas de prueba/mock idénticas arruinen el mapa
     const resolveCoords = async (loc: JobMapLocation): Promise<[number, number] | null> => {
+      if (loc.lng !== undefined && loc.lat !== undefined) {
+        return [loc.lng, loc.lat];
+      }
+
       if (loc.addressText && loc.addressText.trim().length > 0) {
         try {
           const query = encodeURIComponent(`${loc.addressText}, Guatemala`);

@@ -1,0 +1,16 @@
+{
+  "name": "patodo-rules-tests",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Pruebas de autorizacion de firestore.rules contra el emulador de Firestore",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 users.test.mjs reviews.test.mjs messages.test.mjs tracking.test.mjs",
+    "test:emulator": "firebase emulators:exec --config ../../firebase.test.json --only firestore --project demo-pa-todo \"npm test\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase": "^12.19.0",
+    "firebase-tools": "^14.0.0"
+  }
+}

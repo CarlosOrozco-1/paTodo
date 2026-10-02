@@ -181,6 +181,7 @@ jobsRouter.post("/cancelJob", async (request, response) => {
         cancelReason: body.reason ?? null,
         updatedAt: FieldValue.serverTimestamp(),
       });
+      transaction.delete(jobRef.collection("tracking").doc("current"));
 
       if (convDoc) {
         conversationIdToClose = convDoc.id;
@@ -287,6 +288,7 @@ jobsRouter.post("/completeJob", async (request, response) => {
         completedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
+      transaction.delete(jobRef.collection("tracking").doc("current"));
 
       convSnapshot.forEach((doc) => {
         transaction.update(doc.ref, {
