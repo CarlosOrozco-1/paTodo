@@ -30,6 +30,25 @@ export const demoUsers = {
     return user;
   },
 
+  /**
+   * El demo no tiene servidor ni tiempo real real, así que entrega el estado
+   * actual y se mantiene suscrito a los cambios de la base local para que el
+   * comportamiento de la UI sea equivalente.
+   */
+  subscribe(id: string, onData: (user: User) => void, onError?: (error: Error) => void): () => void {
+    const emit = () => {
+      const user = db().users.find((u) => u.id === id);
+      if (!user) {
+        onError?.(new Error('Usuario no encontrado'));
+        return;
+      }
+      onData(user);
+    };
+    emit();
+    const handler = setInterval(emit, 2000);
+    return () => clearInterval(handler);
+  },
+
   async getMe(): Promise<User> {
     await sleep(80);
     const id = currentUserId();

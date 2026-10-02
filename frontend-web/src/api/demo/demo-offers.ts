@@ -2,6 +2,7 @@ import type { CreateOfferDto, Offer, UpdateOfferDto } from '@/types/offer.types'
 import type { PaginatedResponse, QueryParams } from '@/types/common.types';
 import { currentUserId, sleep } from './index';
 import { db, nowIso, saveDb, uid } from './demoDb';
+import { isWorker } from '@/utils/roles';
 
 function paginate<T>(items: T[], params?: QueryParams): PaginatedResponse<T> {
   const page = params?.page ? Number(params.page) : 1;
@@ -70,7 +71,7 @@ export const demoOffers = {
     if (!workerId) throw new Error('Inicia sesión para enviar una oferta');
     const worker = db().users.find((u) => u.id === workerId);
     if (!worker) throw new Error('Profesional no encontrado');
-    if (worker.role !== 'worker') throw new Error('Solo los profesionales pueden ofertar');
+    if (!isWorker(worker.role)) throw new Error('Solo los profesionales pueden ofertar');
 
     const d = db();
     const duplicate = d.offers.find(

@@ -398,13 +398,15 @@ export function MyOffers() {
                               Ver detalle
                             </Link>
                           )}
-                          <Link
-                            to="/mensajes"
-                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold text-gray-600 transition-colors hover:bg-gray-50"
-                          >
-                            <Send className="h-3 w-3" />
-                            Enviar mensaje
-                          </Link>
+                          {offer.status === 'accepted' && (
+                            <Link
+                              to={`/mensajes?jobId=${offer.jobId}`}
+                              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold text-emerald-600 transition-colors hover:bg-emerald-50"
+                            >
+                              <Send className="h-3 w-3" />
+                              Chatear con el cliente
+                            </Link>
+                          )}
                           {offer.status === 'pending' && (
                             <button
                               type="button"

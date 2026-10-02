@@ -746,6 +746,10 @@ const conversations: Conversation[] = [
     id: 'demo-conv-fuga',
     jobId: 'demo-job-fuga',
     participantIds: ['demo-client-carlos', 'demo-worker-juan'],
+    participantsSnapshot: {
+      'demo-client-carlos': { name: 'Carlos Pérez', avatarUrl: null },
+      'demo-worker-juan': { name: 'Juan Martínez', avatarUrl: null },
+    },
     lastMessage: {
       content: 'Puedo pasar mañana por la mañana',
       senderId: 'demo-worker-juan',
@@ -761,6 +765,10 @@ const conversations: Conversation[] = [
     id: 'demo-conv-pintura',
     jobId: 'demo-job-pintura',
     participantIds: ['demo-client-maria', 'demo-worker-juan'],
+    participantsSnapshot: {
+      'demo-client-maria': { name: 'María López', avatarUrl: null },
+      'demo-worker-juan': { name: 'Juan Martínez', avatarUrl: null },
+    },
     lastMessage: {
       content: '¡Excelente trabajo, gracias!',
       senderId: 'demo-client-maria',
@@ -776,6 +784,10 @@ const conversations: Conversation[] = [
     id: 'demo-conv-llanta',
     jobId: 'demo-job-llanta',
     participantIds: ['demo-client-carlos', 'demo-worker-pedro'],
+    participantsSnapshot: {
+      'demo-client-carlos': { name: 'Carlos Pérez', avatarUrl: null },
+      'demo-worker-pedro': { name: 'Pedro Ramírez', avatarUrl: null },
+    },
     lastMessage: {
       content: 'Buenas, tengo la llanta y las herramientas',
       senderId: 'demo-worker-pedro',

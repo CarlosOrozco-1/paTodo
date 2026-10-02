@@ -19,6 +19,7 @@ import { db } from '../firebase/init';
 import { jobFromDoc, readJob, requireUid } from '../firebase/fs';
 import { encodeGeohash } from '../firebase/geohash';
 import { apiPost } from '../firebase/rest';
+import { ensureApiWarm } from '../apiWarmup';
 
 const pageLimit = 20;
 
@@ -210,6 +211,10 @@ export const realJobs = {
   },
 
   async complete(id: string): Promise<Job> {
+    // Esta ruta es transaccional y además dispara notificación y FCM, así que
+    // con el contenedor de Render recién arrancado se acerca al timeout. Se
+    // espera a que termine de despertar antes de gastar el presupuesto.
+    await ensureApiWarm();
     const response = await apiPost<unknown>('/completeJob', { jobId: id });
     const backend = (Array.isArray(response) ? response[0] : response) as Record<string, unknown>;
     if (!backend || typeof backend.id !== 'string') {

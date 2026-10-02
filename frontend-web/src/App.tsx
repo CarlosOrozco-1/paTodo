@@ -1,5 +1,6 @@
 import { createBrowserRouter, createHashRouter, RouterProvider } from 'react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { warmUpApi } from '@/api/apiWarmup';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ProtectedRoute } from '@/components/protected/ProtectedRoute';
@@ -9,8 +10,10 @@ import { DemoBanner } from '@/components/demo/DemoBanner';
 import { SplashScreen } from '@/components/SplashScreen';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
+import { CompleteGoogleProfile } from '@/pages/auth/CompleteGoogleProfile';
 import { LandingPage } from '@/pages/public/LandingPage';
 import { NotFound } from '@/pages/public/NotFound';
+import { PublicProfile } from '@/pages/public/PublicProfile';
 import { ClientDashboard } from '@/pages/client/ClientDashboard';
 import { MyJobs } from '@/pages/client/MyJobs';
 import { CreateJob } from '@/pages/client/CreateJob';
@@ -57,6 +60,14 @@ const router = import.meta.env.VITE_HASH_ROUTER === 'true'
             ),
           },
         ],
+      },
+      {
+        // Alta con Google: la sesión de Firebase ya existe pero el documento se
+        // crea al confirmar el formulario. Va FUERA de PublicRoute a propósito:
+        // ese guard expulsa a quien está autenticado, y aquí el usuario lo está.
+        // El propio componente se encarga de validar que haya sesión y borrador.
+        path: '/completar-perfil',
+        element: <CompleteGoogleProfile />,
       },
       {
         path: '/',
@@ -112,6 +123,15 @@ const router = import.meta.env.VITE_HASH_ROUTER === 'true'
         ),
       },
       {
+        path: '/',
+        element: (
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        ),
+        children: [{ path: 'perfil/:id', element: <PublicProfile /> }],
+      },
+      {
         path: '*',
         element: <NotFound />,
       },
@@ -142,6 +162,12 @@ const router = import.meta.env.VITE_HASH_ROUTER === 'true'
         ),
       },
     ],
+  },
+  {
+    // Ver la nota de la ruta equivalente en el router de hash más arriba:
+    // fuera de PublicRoute porque el usuario ya está autenticado.
+    path: '/completar-perfil',
+    element: <CompleteGoogleProfile />,
   },
   {
     path: '/',
@@ -197,6 +223,15 @@ const router = import.meta.env.VITE_HASH_ROUTER === 'true'
     ),
   },
   {
+    path: '/',
+    element: (
+      <ProtectedRoute>
+        <DashboardLayout />
+      </ProtectedRoute>
+    ),
+    children: [{ path: 'perfil/:id', element: <PublicProfile /> }],
+  },
+  {
     path: '*',
     element: <NotFound />,
   },
@@ -204,6 +239,14 @@ const router = import.meta.env.VITE_HASH_ROUTER === 'true'
 
 export function App() {
   const [showSplash, setShowSplash] = useState(true);
+
+  // Render se apaga tras ~15 min sin tráfico y el siguiente request paga un
+  // arranque en frío. Como el resto de la app habla con Firestore por SDK,
+  // este ping es la única llamada temprana que garantiza que el backend esté
+  // despierto antes de que el usuario intente completar o aceptar un trabajo.
+  useEffect(() => {
+    warmUpApi();
+  }, []);
 
   return (
     <>

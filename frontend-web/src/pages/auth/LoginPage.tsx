@@ -8,6 +8,8 @@ import { getErrorMessage } from '@/api/axiosClient';
 import { isDemoMode } from '@/api/demo';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { homeRouteFor } from '@/utils/roles';
+import type { UserRole } from '@/types/user.types';
 
 const DEMO_USERS = [
   {
@@ -55,11 +57,7 @@ export function LoginPage() {
     const target =
       from !== '/' && from !== '/login' && from !== '/registro'
         ? from
-        : role === 'worker'
-          ? '/profesional'
-          : role === 'admin'
-            ? '/admin'
-            : '/cliente';
+        : homeRouteFor(role as UserRole);
     navigate(target, { replace: true });
   };
 
@@ -99,10 +97,18 @@ export function LoginPage() {
         toast('error', 'No se recibieron las credenciales de Google');
         return;
       }
-      await loginWithGoogle(credentialResponse.credential);
+      const result = await loginWithGoogle(credentialResponse.credential);
+
+      // Cuenta nueva: el documento se crea al confirmar el formulario, porque
+      // Google no entrega teléfono y /createUser lo exige.
+      if (result.needsProfile) {
+        sessionStorage.setItem('paTodo_google_draft', JSON.stringify(result.draft));
+        navigate('/completar-perfil', { replace: true });
+        return;
+      }
+
       toast('success', 'Sesión iniciada con Google');
-      const { user } = useAuthStore.getState();
-      if (user) redirectUser(user.role);
+      redirectUser(result.user.role);
     } catch (error) {
       toast('error', getErrorMessage(error));
     }

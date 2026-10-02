@@ -25,10 +25,16 @@ export interface LastMessage {
   createdAt: string;
 }
 
+export interface ParticipantSnapshot {
+  name: string;
+  avatarUrl: string | null;
+}
+
 export interface Conversation {
   id: ObjectId;
   jobId?: ObjectId;
   participantIds: ObjectId[];
+  participantsSnapshot: Record<string, ParticipantSnapshot>;
   lastMessage?: LastMessage;
   unreadCount: Record<string, number>;
   isActive: boolean;
