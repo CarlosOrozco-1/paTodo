@@ -1,281 +1,255 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import type { LineString } from 'geojson';
-import {
-  ArrowUp,
-  Compass,
-  CornerUpLeft,
-  CornerUpRight,
-  Navigation,
-  Volume2,
-  VolumeX,
-} from 'lucide-react';
+import { Navigation, Volume2, VolumeX, AlertCircle } from 'lucide-react';
+import { cn } from '@/utils/cn';
 import type { JobTrackingPosition } from '@/api/firebase/jobTracking';
-import 'mapbox-gl/dist/mapbox-gl.css';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
-interface NavigatorDestination {
-  latitude: number;
-  longitude: number;
-  label: string;
-}
+export type NavigatorDestination = {
+  latitude?: number;
+  longitude?: number;
+  addressText?: string;
+  label?: string;
+};
 
-interface InternalNavigatorProps {
-  destination: NavigatorDestination;
-  onPositionUpdate: (position: JobTrackingPosition) => void;
+type InternalNavigatorProps = {
+  destination?: NavigatorDestination;
+  onPositionUpdate?: (position: JobTrackingPosition) => void;
   className?: string;
-}
-
-interface DirectionsStep {
-  distance: number;
-  maneuver: { instruction: string; modifier?: string };
-}
-
-interface DirectionsRoute {
-  distance: number;
-  duration: number;
-  geometry: LineString;
-  legs?: Array<{ steps?: DirectionsStep[] }>;
-}
-
-interface DirectionsResponse {
-  routes?: DirectionsRoute[];
-}
-
-interface UpcomingStep {
-  instruction: string;
-  distance: number;
-  modifier?: string;
-}
+};
 
 export function InternalNavigator({
   destination,
   onPositionUpdate,
-  className = 'h-96 w-full',
+  className,
 }: InternalNavigatorProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const workerMarker = useRef<mapboxgl.Marker | null>(null);
-  const destinationMarker = useRef<mapboxgl.Marker | null>(null);
-  const onPositionUpdateRef = useRef(onPositionUpdate);
-  const voiceEnabledRef = useRef(true);
-  const lastSpokenInstruction = useRef('');
-  const [currentStep, setCurrentStep] = useState('Esperando ubicación GPS…');
-  const [distanceRemaining, setDistanceRemaining] = useState('--');
-  const [durationRemaining, setDurationRemaining] = useState('--');
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [upcomingSteps, setUpcomingSteps] = useState<UpcomingStep[]>([]);
-  const mapUnavailable = !mapboxgl.accessToken;
+  const markerRef = useRef<mapboxgl.Marker | null>(null);
+  const destinationMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
-  useEffect(() => {
-    onPositionUpdateRef.current = onPositionUpdate;
-  }, [onPositionUpdate]);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [currentInstruction, setCurrentInstruction] = useState('Calculando ruta GPS en vivo...');
+  const [distanceText, setDistanceText] = useState('--');
+  const [durationText, setDurationText] = useState('--');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const lastSpokenInstruction = useRef<string>('');
+  const voiceEnabledRef = useRef(voiceEnabled);
+  const lastUserCoords = useRef<[number, number] | null>(null);
+  const hasArrived = useRef<boolean>(false);
 
   useEffect(() => {
     voiceEnabledRef.current = voiceEnabled;
   }, [voiceEnabled]);
 
+  const speak = (text: string) => {
+    if (!voiceEnabledRef.current || !('speechSynthesis' in window)) return;
+    // Si la instrucción es idéntica, no se repite en bucle (evita spam si estás detenido)
+    if (lastSpokenInstruction.current === text) return;
+    lastSpokenInstruction.current = text;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'es-ES';
+    window.speechSynthesis.speak(utterance);
+  };
+
   useEffect(() => {
     if (!mapContainer.current || !mapboxgl.accessToken) return;
 
     let mounted = true;
-    let watchId: number | undefined;
-    let firstFit = true;
-    let lastDirectionsRequest = 0;
-    let directionsRequestId = 0;
+    let watchId: number | null = null;
 
     const currentMap = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [destination.longitude, destination.latitude],
-      zoom: 14,
+      style: 'mapbox://styles/mapbox/navigation-day-v1',
+      center: [-90.5069, 14.6349],
+      zoom: 15,
+      pitch: 45,
     });
     map.current = currentMap;
 
-    const destinationElement = document.createElement('div');
-    destinationElement.className =
-      'flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-amber-500 text-xs font-bold text-white shadow-lg';
-    destinationElement.textContent = 'B';
-    const popupContent = document.createElement('span');
-    popupContent.textContent = destination.label;
-    destinationMarker.current = new mapboxgl.Marker(destinationElement)
-      .setLngLat([destination.longitude, destination.latitude])
-      .setPopup(new mapboxgl.Popup().setDOMContent(popupContent))
-      .addTo(currentMap);
-
-    const addRoute = (geometry: LineString) => {
-      if (!mounted || currentMap !== map.current) return;
-      const data = { type: 'Feature' as const, properties: {}, geometry };
-      if (currentMap.getSource('route')) {
-        (currentMap.getSource('route') as mapboxgl.GeoJSONSource).setData(data);
-      } else {
-        currentMap.addSource('route', { type: 'geojson', data });
-        currentMap.addLayer({
-          id: 'route',
-          type: 'line',
-          source: 'route',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-color': '#059669', 'line-width': 6, 'line-opacity': 0.9 },
-        });
-      }
-    };
-
-    const updatePosition = async (position: GeolocationPosition) => {
-      if (!mounted || currentMap !== map.current) return;
-      const { latitude, longitude, accuracy, heading, speed } = position.coords;
-      onPositionUpdateRef.current({
-        latitude,
-        longitude,
-        accuracyMeters: Number.isFinite(accuracy) ? accuracy : undefined,
-        headingDegrees: heading === null ? undefined : heading,
-        speedMetersPerSecond: speed === null ? undefined : speed,
-      });
-
-      if (!workerMarker.current) {
-        const markerElement = document.createElement('div');
-        markerElement.className =
-          'flex h-10 w-10 items-center justify-center rounded-full border-3 border-white bg-emerald-600 text-sm font-bold text-white shadow-xl';
-        markerElement.textContent = 'T';
-        workerMarker.current = new mapboxgl.Marker(markerElement)
-          .setLngLat([longitude, latitude])
-          .addTo(currentMap);
-      } else {
-        workerMarker.current.setLngLat([longitude, latitude]);
-      }
-
-      if (firstFit) {
-        const bounds = new mapboxgl.LngLatBounds();
-        bounds.extend([longitude, latitude]);
-        bounds.extend([destination.longitude, destination.latitude]);
-        currentMap.fitBounds(bounds, { padding: 72, maxZoom: 15, duration: 700 });
-        firstFit = false;
-      }
-
-      const now = Date.now();
-      if (now - lastDirectionsRequest < 12000) return;
-      lastDirectionsRequest = now;
-      const requestId = ++directionsRequestId;
-
-      try {
-        const response = await fetch(
-          `https://api.mapbox.com/directions/v5/mapbox/driving/${longitude},${latitude};${destination.longitude},${destination.latitude}?geometries=geojson&steps=true&language=es&access_token=${mapboxgl.accessToken}`,
-        );
-        if (!response.ok) throw new Error('Directions request failed');
-        const result = (await response.json()) as DirectionsResponse;
-        const route = result.routes?.[0];
-        if (!route || !mounted || requestId !== directionsRequestId) return;
-
-        setDistanceRemaining(`${(route.distance / 1000).toFixed(1)} km`);
-        setDurationRemaining(`${Math.round(route.duration / 60)} min`);
-        const steps = route.legs?.[0]?.steps ?? [];
-        const nextStep = steps[0];
-        if (nextStep) {
-          const metres = Math.round(nextStep.distance);
-          const instruction = nextStep.maneuver.instruction;
-          const text = metres > 10 ? `En ${metres} m: ${instruction}` : instruction;
-          setCurrentStep(text);
-          if (
-            voiceEnabledRef.current &&
-            'speechSynthesis' in window &&
-            text !== lastSpokenInstruction.current
-          ) {
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'es-ES';
-            window.speechSynthesis.speak(utterance);
-            lastSpokenInstruction.current = text;
-          }
-          setUpcomingSteps(
-            steps.slice(1, 4).map((step) => ({
-              instruction: step.maneuver.instruction,
-              distance: Math.round(step.distance),
-              modifier: step.maneuver.modifier,
-            })),
+    const resolveDestCoords = async (dest?: NavigatorDestination): Promise<[number, number] | null> => {
+      if (dest?.addressText && dest.addressText.trim().length > 0) {
+        try {
+          const query = encodeURIComponent(`${dest.addressText}, Guatemala`);
+          const res = await fetch(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${mapboxgl.accessToken}&country=gt&limit=1`
           );
+          const data = await res.json();
+          if (data.features && data.features.length > 0) {
+            return data.features[0].center as [number, number];
+          }
+        } catch {
+          // Fallback
         }
+      }
 
-        if (currentMap.isStyleLoaded()) addRoute(route.geometry);
-        else currentMap.once('load', () => addRoute(route.geometry));
-      } catch {
-        if (mounted && requestId === directionsRequestId) {
-          setCurrentStep('No se pudo actualizar la ruta. Sigue hacia el destino.');
+      if (dest?.longitude !== undefined && dest?.latitude !== undefined && dest.longitude !== 0 && dest.latitude !== 0) {
+        return [dest.longitude, dest.latitude];
+      }
+
+      return [-90.5069, 14.6349];
+    };
+
+    const fetchRoute = async (userCoords: [number, number], destCoords: [number, number]) => {
+      if (!map.current || !mounted) return;
+      try {
+        const res = await fetch(
+          `https://api.mapbox.com/directions/v5/mapbox/driving/${userCoords[0]},${userCoords[1]};${destCoords[0]},${destCoords[1]}?steps=true&geometries=geojson&language=es&access_token=${mapboxgl.accessToken}`
+        );
+        const data = await res.json();
+        if (data.routes && data.routes.length > 0) {
+          const route = data.routes[0];
+          const distanceMeters = route.distance;
+          
+          setDistanceText((distanceMeters / 1000).toFixed(1) + ' km');
+          setDurationText(Math.ceil(route.duration / 60) + ' min');
+
+          // Comportamiento Waze al llegar (< 30 metros del destino)
+          if (distanceMeters < 30) {
+            if (!hasArrived.current) {
+              hasArrived.current = true;
+              const arrivalMsg = 'Has llegado a tu destino.';
+              setCurrentInstruction(arrivalMsg);
+              speak(arrivalMsg);
+            }
+            return;
+          } else {
+            hasArrived.current = false;
+          }
+
+          if (route.legs?.[0]?.steps?.[0]) {
+            const instruction = route.legs[0].steps[0].maneuver.instruction;
+            setCurrentInstruction(instruction);
+            speak(instruction); // Habla de forma progresiva según cambie la instrucción de Mapbox
+          }
+
+          if (map.current.getSource('route-nav')) {
+            (map.current.getSource('route-nav') as mapboxgl.GeoJSONSource).setData({
+              type: 'Feature',
+              properties: {},
+              geometry: route.geometry,
+            });
+          } else {
+            map.current.addSource('route-nav', {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                properties: {},
+                geometry: route.geometry,
+              },
+            });
+            map.current.addLayer({
+              id: 'route-nav-layer',
+              type: 'line',
+              source: 'route-nav',
+              layout: { 'line-join': 'round', 'line-cap': 'round' },
+              paint: { 'line-color': '#059669', 'line-width': 6, 'line-opacity': 0.85 },
+            });
+          }
         }
+      } catch {
+        // Red silenciosa
       }
     };
 
-    if ('geolocation' in navigator) {
-      watchId = navigator.geolocation.watchPosition(
-        (position) => void updatePosition(position),
-        () => setCurrentStep('Permite el acceso a la ubicación para iniciar la navegación.'),
-        { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 },
-      );
-    }
+    const initNavigator = async () => {
+      const destCoords = await resolveDestCoords(destination);
+      if (!mounted || !destCoords) return;
+
+      if (!destinationMarkerRef.current) {
+        const destEl = document.createElement('div');
+        destEl.className = 'w-8 h-8 bg-amber-500 border-2 border-white rounded-full shadow-lg flex items-center justify-center text-white font-bold text-xs';
+        destEl.innerText = 'B';
+        destinationMarkerRef.current = new mapboxgl.Marker(destEl).setLngLat(destCoords).addTo(currentMap);
+      } else {
+        destinationMarkerRef.current.setLngLat(destCoords);
+      }
+
+      if (navigator.geolocation) {
+        watchId = navigator.geolocation.watchPosition(
+          async (position) => {
+            if (!mounted || !map.current) return;
+            setErrorMsg(null);
+            const { latitude, longitude, heading } = position.coords;
+            onPositionUpdate?.({ latitude, longitude });
+
+            const userCoords: [number, number] = [longitude, latitude];
+            lastUserCoords.current = userCoords;
+
+            if (!markerRef.current) {
+              const el = document.createElement('div');
+              el.className = 'w-11 h-11 bg-emerald-600 rounded-full border-4 border-white shadow-2xl flex items-center justify-center text-white transition-transform duration-300';
+              el.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>';
+              markerRef.current = new mapboxgl.Marker(el).setLngLat(userCoords).addTo(currentMap);
+            } else {
+              markerRef.current.setLngLat(userCoords);
+              if (heading !== null && !isNaN(heading)) {
+                const el = markerRef.current.getElement();
+                el.style.transform = `rotate(${heading}deg)`;
+              }
+            }
+
+            currentMap.easeTo({ center: userCoords, duration: 1000, pitch: 50 });
+            await fetchRoute(userCoords, destCoords);
+          },
+          (err) => {
+            setErrorMsg('Buscando señal GPS...');
+            console.warn(err);
+          },
+          { enableHighAccuracy: false, maximumAge: 30000, timeout: 20000 }
+        );
+      }
+    };
+
+    initNavigator();
 
     return () => {
       mounted = false;
-      if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       currentMap.remove();
-      map.current = null;
-      workerMarker.current = null;
-      destinationMarker.current = null;
+      markerRef.current = null;
+      destinationMarkerRef.current = null;
     };
-  }, [destination.latitude, destination.longitude, destination.label]);
-
-  if (mapUnavailable) {
-    return <div className={`flex items-center justify-center bg-gray-100 text-sm text-gray-600 ${className}`}>No se pudo cargar el mapa.</div>;
-  }
+  }, [destination?.addressText, destination?.latitude, destination?.longitude]);
 
   return (
-    <div className={`relative flex flex-col overflow-hidden rounded-xl border border-gray-200 ${className}`}>
-      <div className="absolute inset-x-3 top-3 z-10 flex items-center gap-3 rounded-xl border border-gray-700/60 bg-gray-950/95 p-3 text-white shadow-xl">
-        <div className="shrink-0 rounded-lg bg-emerald-600 p-2">
-          <Navigation className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-emerald-300">
-              <Compass className="h-3 w-3" /> GPS en vivo
-            </span>
-            <button
-              type="button"
-              aria-label={voiceEnabled ? 'Silenciar instrucciones' : 'Activar instrucciones'}
-              onClick={() => setVoiceEnabled((enabled) => !enabled)}
-              className="rounded p-1 text-gray-300 hover:text-white"
-            >
-              {voiceEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-            </button>
+    <div className={cn('relative overflow-hidden rounded-2xl border border-emerald-200 shadow-md bg-white', className)}>
+      <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between rounded-xl bg-gray-900/90 backdrop-blur-md px-4 py-2.5 text-white shadow-lg">
+        <div className="flex items-center gap-3 min-w-0">
+          <Navigation className="h-5 w-5 text-emerald-400 shrink-0 animate-pulse" />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold truncate text-emerald-300">{currentInstruction}</p>
+            <p className="text-[10px] text-gray-300 truncate">Destino: {destination?.label || destination?.addressText || 'Ubicación'}</p>
           </div>
-          <p className="mt-1 truncate text-sm font-semibold">{currentStep}</p>
         </div>
-        <div className="shrink-0 border-l border-gray-700 pl-3 text-right">
-          <p className="text-sm font-bold text-emerald-300">{distanceRemaining}</p>
-          <p className="text-[10px] text-gray-300">{durationRemaining}</p>
+        <div className="flex items-center gap-3 shrink-0 pl-2">
+          <div className="text-right">
+            <span className="text-xs font-bold text-emerald-400">{distanceText}</span>
+            <span className="block text-[10px] text-gray-300">{durationText}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setVoiceEnabled(!voiceEnabled)}
+            className="rounded-lg bg-white/10 p-1.5 hover:bg-white/20 transition-colors"
+            title={voiceEnabled ? 'Desactivar voz' : 'Activar voz'}
+          >
+            {voiceEnabled ? <Volume2 className="h-4 w-4 text-emerald-400" /> : <VolumeX className="h-4 w-4 text-gray-400" />}
+          </button>
         </div>
       </div>
 
-      {upcomingSteps.length > 0 && (
-        <div className="absolute inset-x-3 bottom-3 z-10 rounded-xl border border-gray-700/60 bg-gray-950/90 px-3 py-2 text-white shadow-lg">
-          <p className="text-[10px] font-bold uppercase text-gray-400">Siguientes giros</p>
-          {upcomingSteps.slice(0, 2).map((step, index) => (
-            <div key={`${step.instruction}-${index}`} className="flex items-center justify-between gap-2 border-t border-gray-800 py-1.5 text-xs">
-              <span className="flex min-w-0 items-center gap-2 truncate">
-                {step.modifier?.includes('left') ? (
-                  <CornerUpLeft className="h-4 w-4 shrink-0 text-amber-300" />
-                ) : step.modifier?.includes('right') ? (
-                  <CornerUpRight className="h-4 w-4 shrink-0 text-amber-300" />
-                ) : (
-                  <ArrowUp className="h-4 w-4 shrink-0 text-emerald-300" />
-                )}
-                <span className="truncate">{step.instruction}</span>
-              </span>
-              <span className="shrink-0 text-gray-300">{step.distance} m</span>
-            </div>
-          ))}
+      {errorMsg && (
+        <div className="absolute bottom-3 left-3 right-3 z-10 flex items-center gap-2 rounded-lg bg-amber-500/90 p-2 text-xs text-white">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{errorMsg}</span>
         </div>
       )}
-      <div ref={mapContainer} className="h-full w-full" />
+
+      <div ref={mapContainer} className="h-full w-full min-h-[320px]" />
     </div>
   );
 }

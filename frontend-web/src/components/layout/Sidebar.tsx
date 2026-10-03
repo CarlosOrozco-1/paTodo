@@ -32,7 +32,7 @@ const workerNav: NavItem[] = [
   { to: '/profesional', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/profesional/trabajos-disponibles', icon: ClipboardList, label: 'Trabajos Disponibles' },
   { to: '/profesional/mis-ofertas', icon: Hand, label: 'Mis Ofertas', badgeTypes: ['offer'] },
-  { to: '/profesional/trabajos-activos', icon: CheckCircle, label: 'Trabajos Activos', badgeTypes: ['job_status'] },
+  { to: '/profesional/trabajos-activos', icon: CheckCircle, label: 'Mi Actividad', badgeTypes: ['job_status'] },
 ];
 
 const adminNav: NavItem[] = [

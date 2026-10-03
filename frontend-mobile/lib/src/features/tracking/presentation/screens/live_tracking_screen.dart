@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -16,6 +17,8 @@ import '../../../services/data/firebase_service.dart';
 enum _MapStyle { normal, satellite, traffic }
 
 enum _Vehicle { car, motorcycle }
+
+enum _OfferTimeUnit { hours, minutes }
 
 class LiveTrackingScreen extends StatefulWidget {
   final String jobId;
@@ -35,8 +38,11 @@ class LiveTrackingScreen extends StatefulWidget {
   State<LiveTrackingScreen> createState() => _LiveTrackingScreenState();
 }
 
-class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
+class _LiveTrackingScreenState extends State<LiveTrackingScreen>
+    with SingleTickerProviderStateMixin {
   final _api = ApiClient.create();
+  final _mapController = MapController();
+  late final AnimationController _replayController;
   bool _loading = true;
   bool _showLayers = false;
   String? _error;
@@ -49,8 +55,13 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   _Vehicle _vehicle = _Vehicle.car;
   bool _isPreviewOffer = false;
   bool _isWorkerDriver = false;
+  bool _hasAcceptedJob = false;
+  bool _isCompletedJob = false;
+  bool _canReplayRoute = false;
+  Map<String, dynamic>? _savedRoute;
   String? _driverId;
   LatLng? _jobLocation;
+  String? _jobDirections;
   bool _isClient = false;
   double? _arrivalDistanceMeters;
   String? _arrivalCode;
@@ -76,7 +87,22 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   @override
   void initState() {
     super.initState();
+    _replayController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 12),
+    )..addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadRoute();
+  }
+
+  Future<void> _warmRouteService() async {
+    try {
+      await _api.dio.get('/');
+    } catch (error) {
+      // DEV: Warm-up best-effort; the route request reports any real failure.
+      debugPrint('DEV: Route service warm-up skipped: $error');
+    }
   }
 
   Future<void> _loadRoute() async {
@@ -85,12 +111,25 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       _error = null;
     });
     try {
+      final locationTimer = Stopwatch()..start();
       final isPreviewOffer = await _refreshAssignedWorkerLocation();
-      final response = await _api.dio.post(
-        '/computeRoute',
-        data: {'jobId': widget.jobId},
+      debugPrint(
+        'DEV: Route location preparation took ${locationTimer.elapsedMilliseconds} ms.',
       );
-      final data = Map<String, dynamic>.from(response.data as Map);
+      final Map<String, dynamic> data;
+      if (_isCompletedJob && _savedRoute != null) {
+        data = _savedRoute!;
+      } else {
+        final routeTimer = Stopwatch()..start();
+        final response = await _api.dio.post(
+          '/computeRoute',
+          data: {'jobId': widget.jobId},
+        );
+        debugPrint(
+          'DEV: Route service request took ${routeTimer.elapsedMilliseconds} ms.',
+        );
+        data = Map<String, dynamic>.from(response.data as Map);
+      }
       final geometry = Map<String, dynamic>.from(data['geometry'] as Map);
       final coordinates = geometry['coordinates'] as List? ?? [];
       final route = coordinates.map(_toLatLng).whereType<LatLng>().toList();
@@ -103,17 +142,31 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         _durationSeconds = (data['duration'] as num?)?.round();
         _distanceMeters = (data['distance'] as num?)?.round();
         _isPreviewOffer = isPreviewOffer;
+        _canReplayRoute = _isCompletedJob && _savedRoute != null;
         _arrivalDistanceMeters =
             _jobLocation == null ? null : _distanceToJob(route.first);
         _loading = false;
       });
-      _startDriverListener();
-      _maybeLoadArrivalCode();
+      if (!_isCompletedJob) {
+        _startDriverListener();
+        _maybeLoadArrivalCode();
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || route.length < 2) return;
+        _mapController.fitCamera(
+          CameraFit.bounds(
+            bounds: LatLngBounds.fromPoints(route),
+            padding: const EdgeInsets.fromLTRB(48, 110, 48, 340),
+          ),
+        );
+      });
       if (isPreviewOffer) {
         _loadOwnOfferStatus();
         _startOwnOfferListener();
       }
-      if (_isWorkerDriver && !isPreviewOffer) _startLiveLocationSharing();
+      if (_isWorkerDriver && !isPreviewOffer && !_isCompletedJob) {
+        _startLiveLocationSharing();
+      }
     } on DioException catch (error) {
       debugPrint(
         'TRACKING_ROUTE_ERROR: ${error.response?.data ?? error.message}',
@@ -130,39 +183,68 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     if (user == null) return false;
 
     try {
+      final snapshots = await Future.wait<Object>([
+        FirebaseFirestore.instance
+            .collection('jobs')
+            .doc(widget.jobId)
+            .get(),
+        user.getIdTokenResult(),
+      ]);
       final jobSnapshot =
-          await FirebaseFirestore.instance
-              .collection('jobs')
-              .doc(widget.jobId)
-              .get();
+          snapshots[0] as DocumentSnapshot<Map<String, dynamic>>;
+      final tokenResult = snapshots[1] as IdTokenResult;
       final job = jobSnapshot.data();
       if (job == null) return false;
 
       final workerId = job['workerId'] as String?;
       final location = Map<String, dynamic>.from(job['location'] as Map? ?? {});
+      final routeData = job['route'];
+      final savedRoute =
+          routeData is Map ? Map<String, dynamic>.from(routeData) : null;
+      final vehicleUsed = job['vehicleUsed']?.toString();
       final jobPoint = location['geopoint'];
-      final claims = (await user.getIdTokenResult()).claims ?? {};
+      final directions = _extractDirections(location);
+      final claims = tokenResult.claims ?? {};
       final isAssignedWorker = workerId == user.uid;
       final isWorkerPreview =
           (workerId == null || workerId.isEmpty) &&
           job['status'] == 'pending' &&
           (claims['role'] == 'worker' || claims['role'] == 'both');
       final driverId = isWorkerPreview ? user.uid : workerId;
-      if (driverId != null) await _loadVehicleForDriver(driverId);
+      if (driverId != null) unawaited(_loadVehicleForDriver(driverId));
       if (mounted) {
         setState(() {
           _driverId = driverId;
           _isWorkerDriver = isAssignedWorker || isWorkerPreview;
           _isClient = job['clientId'] == user.uid;
+          _hasAcceptedJob = job['status'] == 'accepted';
+          _isCompletedJob = job['status'] == 'completed';
+          _savedRoute = savedRoute;
+          if (_isCompletedJob && vehicleUsed != null) {
+            _vehicle =
+                vehicleUsed == 'motorcycle'
+                    ? _Vehicle.motorcycle
+                    : _Vehicle.car;
+          }
+          _jobDirections = directions;
           if (jobPoint is GeoPoint) {
             _jobLocation = LatLng(jobPoint.latitude, jobPoint.longitude);
           }
         });
-        if (_isClient && _isAtJob && _arrivalCode == null) {
+        if (!_isCompletedJob && _isClient && _isAtJob && _arrivalCode == null) {
           _loadArrivalCode();
         }
       }
-      if (!isAssignedWorker && !isWorkerPreview) return false;
+      final hasAssignedWorker = workerId != null && workerId.isNotEmpty;
+      if (!_isCompletedJob &&
+          (isAssignedWorker ||
+              isWorkerPreview ||
+              (_isClient && hasAssignedWorker))) {
+        unawaited(_warmRouteService());
+      }
+      if (_isCompletedJob || (!isAssignedWorker && !isWorkerPreview)) {
+        return false;
+      }
 
       if (!await Geolocator.isLocationServiceEnabled()) return isWorkerPreview;
       var permission = await Geolocator.checkPermission();
@@ -174,12 +256,24 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         return isWorkerPreview;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
+      final lastKnownPosition = await Geolocator.getLastKnownPosition();
+      final lastKnownAge =
+          lastKnownPosition == null
+              ? null
+              : DateTime.now().difference(lastKnownPosition.timestamp);
+      final position =
+          lastKnownPosition != null &&
+                  lastKnownAge != null &&
+                  !lastKnownAge.isNegative &&
+                  lastKnownAge <= const Duration(seconds: 30) &&
+                  lastKnownPosition.accuracy <= 100
+              ? lastKnownPosition
+              : await Geolocator.getCurrentPosition(
+                locationSettings: const LocationSettings(
+                  accuracy: LocationAccuracy.medium,
+                  timeLimit: Duration(seconds: 10),
+                ),
+              );
       await FirebaseFirestore.instance.collection('users').doc(user.uid).update(
         {
           'location': {
@@ -335,10 +429,47 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     );
   }
 
+  String? _extractDirections(Map<String, dynamic> location) {
+    final storedDirections = location['directions']?.toString().trim();
+    if (storedDirections != null && storedDirections.isNotEmpty) {
+      return storedDirections;
+    }
+    final address = location['address']?.toString() ?? '';
+    const marker = 'Indicaciones:';
+    final markerIndex = address.lastIndexOf(marker);
+    if (markerIndex < 0) return null;
+    final directions = address.substring(markerIndex + marker.length).trim();
+    return directions.isEmpty ? null : directions;
+  }
+
   bool get _isAtJob => (_arrivalDistanceMeters ?? double.infinity) <= 20;
 
+  LatLng? get _replayPosition {
+    if (!_canReplayRoute || _route.isEmpty) return null;
+    final progress = _replayController.value;
+    final segment = (progress * (_route.length - 1)).floor();
+    if (segment >= _route.length - 1) return _route.last;
+    final start = _route[segment];
+    final end = _route[segment + 1];
+    final segmentProgress = progress * (_route.length - 1) - segment;
+    return LatLng(
+      start.latitude + (end.latitude - start.latitude) * segmentProgress,
+      start.longitude + (end.longitude - start.longitude) * segmentProgress,
+    );
+  }
+
+  void _toggleRouteReplay() {
+    if (!_canReplayRoute) return;
+    if (_replayController.isAnimating) {
+      _replayController.stop();
+      return;
+    }
+    if (_replayController.value >= 1) _replayController.value = 0;
+    _replayController.forward();
+  }
+
   void _maybeLoadArrivalCode() {
-    if (_isClient && _isAtJob && _arrivalCode == null) {
+    if (!_isCompletedJob && _isClient && _isAtJob && _arrivalCode == null) {
       _loadArrivalCode();
     }
   }
@@ -395,10 +526,86 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         );
   }
 
-  void _closeAfterArrival(BuildContext dialogContext) {
-    Navigator.of(dialogContext).pop();
+  void _showTripCompletedDialog(BuildContext codeDialogContext) {
+    Navigator.of(codeDialogContext).pop();
+    _locationSubscription?.cancel();
+    _driverSubscription?.cancel();
+    if (mounted) setState(() => _isCompletedJob = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) Navigator.of(context).pop();
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (dialogContext) => Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 30, 24, 22),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 76,
+                      height: 76,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE7F7E9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.route_rounded,
+                        color: AppTheme.primaryGreen,
+                        size: 38,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      '¡Trayecto finalizado!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'El servicio quedó marcado como realizado. Podrás consultar los mensajes anteriores, pero el chat ya no permitirá enviar nuevos.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppTheme.textLight,
+                        height: 1.45,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: FilledButton(
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop();
+                          Navigator.of(context).pop();
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppTheme.primaryGreen,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          'Entendido',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+      );
     });
   }
 
@@ -427,7 +634,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       context: context,
       builder:
           (dialogContext) => AlertDialog(
-            title: const Text('Confirmar llegada'),
+            title: const Text('Finalizar servicio'),
             content: TextField(
               controller: controller,
               keyboardType: TextInputType.number,
@@ -452,8 +659,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                         'code': controller.text.trim(),
                       },
                     );
-                    if (!mounted) return;
-                    _closeAfterArrival(dialogContext);
+                    if (!mounted || !dialogContext.mounted) return;
+                    _showTripCompletedDialog(dialogContext);
                   } on DioException catch (error) {
                     if (error.response?.statusCode == 404 &&
                         controller.text.trim() == _fallbackArrivalCode &&
@@ -463,8 +670,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                           '/completeJob',
                           data: {'jobId': widget.jobId},
                         );
-                        if (!mounted) return;
-                        _closeAfterArrival(dialogContext);
+                        if (!mounted || !dialogContext.mounted) return;
+                        _showTripCompletedDialog(dialogContext);
                         return;
                       } on DioException {
                         // Muestra el mismo mensaje de error inferior.
@@ -475,12 +682,13 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                             ? (error.response?.data['error']?.toString() ??
                                 'No pudimos verificar el código.')
                             : 'No pudimos verificar el código.';
+                    if (!dialogContext.mounted) return;
                     ScaffoldMessenger.of(
                       dialogContext,
                     ).showSnackBar(SnackBar(content: Text(message)));
                   }
                 },
-                child: const Text('Finalizar'),
+                child: const Text('Confirmar y finalizar'),
               ),
             ],
           ),
@@ -555,6 +763,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     _locationSubscription?.cancel();
     _driverSubscription?.cancel();
     _ownOfferSubscription?.cancel();
+    _replayController.dispose();
     super.dispose();
   }
 
@@ -564,9 +773,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
       backgroundColor: const Color(0xFFF4F7F5),
       body:
           _loading
-              ? const Center(
-                child: CircularProgressIndicator(color: AppTheme.primaryGreen),
-              )
+              ? _RouteLoading(destination: widget.otherUserName)
               : _error != null
               ? _RouteError(message: _error!, onRetry: _loadRoute)
               : _buildMap(),
@@ -577,7 +784,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
     return Stack(
       children: [
         FlutterMap(
-          options: MapOptions(initialCenter: _route.first, initialZoom: 13),
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: _route[_route.length ~/ 2],
+            initialZoom: 11,
+          ),
           children: [
             TileLayer(
               urlTemplate: _tileUrl,
@@ -642,7 +853,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                           ),
                         ),
                         Text(
-                          'Ruta hacia ${widget.otherUserName}',
+                          _isCompletedJob
+                              ? 'Servicio completado'
+                              : 'Ruta hacia ${widget.otherUserName}',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.textLight,
@@ -668,7 +881,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   }
 
   List<Marker> get _markers => [
-    if (_origin != null)
+    if (!_isCompletedJob && _origin != null)
       Marker(
         point: _origin!,
         width: 54,
@@ -678,7 +891,21 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
               _vehicle == _Vehicle.motorcycle
                   ? Icons.two_wheeler_rounded
                   : Icons.directions_car_rounded,
-          color: Color(0xFF2563EB),
+          color: const Color(0xFF2563EB),
+          animateIcon: true,
+        ),
+      ),
+    if (_isCompletedJob && _replayPosition != null)
+      Marker(
+        point: _replayPosition!,
+        width: 58,
+        height: 58,
+        child: _MapMarker(
+          icon:
+              _vehicle == _Vehicle.motorcycle
+                  ? Icons.two_wheeler_rounded
+                  : Icons.directions_car_rounded,
+          color: AppTheme.primaryGreen,
         ),
       ),
     if (_destination != null)
@@ -766,7 +993,18 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
   void _showOfferSheet() {
     final priceController = TextEditingController();
     final timeController = TextEditingController();
+    var timeUnit = _OfferTimeUnit.minutes;
     var sending = false;
+
+    String formattedEstimatedTime() {
+      final amount = int.tryParse(timeController.text.trim());
+      if (amount == null || amount < 1) return '';
+      final unit = switch (timeUnit) {
+        _OfferTimeUnit.hours => amount == 1 ? 'hora' : 'horas',
+        _OfferTimeUnit.minutes => amount == 1 ? 'minuto' : 'minutos',
+      };
+      return '$amount $unit';
+    }
 
     showModalBottomSheet<void>(
       context: context,
@@ -787,10 +1025,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                         top: Radius.circular(28),
                       ),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                         Center(
                           child: Container(
                             width: 42,
@@ -802,12 +1041,36 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        const Text(
-                          'Enviar solicitud de trabajo',
-                          style: TextStyle(
-                            fontSize: 21,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Enviar solicitud de trabajo',
+                                style: TextStyle(
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Material(
+                              color: const Color(0xFFFFEBEE),
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                tooltip: 'Cerrar',
+                                onPressed: () => Navigator.pop(sheetContext),
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  color: Color(0xFFD32F2F),
+                                ),
+                                constraints: const BoxConstraints.tightFor(
+                                  width: 42,
+                                  height: 42,
+                                ),
+                                padding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 5),
                         Text(
@@ -826,17 +1089,128 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                             border: OutlineInputBorder(),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: timeController,
-                          textInputAction: TextInputAction.done,
-                          decoration: const InputDecoration(
-                            labelText: 'Tiempo estimado',
-                            hintText: 'Ej. 30 minutos',
-                            prefixIcon: Icon(Icons.schedule_outlined),
-                            border: OutlineInputBorder(),
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAF8EB),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.schedule_rounded,
+                                color: AppTheme.primaryGreen,
+                                size: 19,
+                              ),
+                              const SizedBox(width: 9),
+                              Expanded(
+                                child: Text(
+                                  'Tiempo estimado para llegar a ${widget.otherUserName}',
+                                  style: const TextStyle(
+                                    color: AppTheme.textDark,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 112,
+                              child: TextField(
+                                controller: timeController,
+                                keyboardType: TextInputType.number,
+                                textInputAction: TextInputAction.done,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                textAlign: TextAlign.center,
+                                onChanged: (_) => setSheetState(() {}),
+                                decoration: InputDecoration(
+                                  labelText: 'Cantidad',
+                                  hintText: '1',
+                                  filled: true,
+                                  fillColor: const Color(0xFFF8FAF8),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFFD9E5DA),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: SegmentedButton<_OfferTimeUnit>(
+                                showSelectedIcon: false,
+                                segments: const [
+                                  ButtonSegment(
+                                    value: _OfferTimeUnit.hours,
+                                    label: Text('Hora'),
+                                  ),
+                                  ButtonSegment(
+                                    value: _OfferTimeUnit.minutes,
+                                    label: Text('Minuto'),
+                                  ),
+                                ],
+                                selected: {timeUnit},
+                                onSelectionChanged: (selection) {
+                                  setSheetState(
+                                    () => timeUnit = selection.first,
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (formattedEstimatedTime().isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F8F3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFE1EEE2),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  color: AppTheme.primaryGreen,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Llegarás en ${formattedEstimatedTime()}',
+                                  style: const TextStyle(
+                                    color: AppTheme.textDark,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 18),
                         SizedBox(
                           width: double.infinity,
@@ -851,7 +1225,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                           '.',
                                         ),
                                       );
-                                      final time = timeController.text.trim();
+                                      final time = formattedEstimatedTime();
                                       if (price == null ||
                                           price <= 0 ||
                                           time.isEmpty) {
@@ -874,11 +1248,15 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                           time,
                                           null,
                                         );
-                                        if (!mounted) return;
+                                        if (!mounted || !context.mounted) {
+                                          return;
+                                        }
                                         setState(
                                           () => _offerStatus = 'pending',
                                         );
-                                        Navigator.pop(sheetContext);
+                                        if (sheetContext.mounted) {
+                                          Navigator.pop(sheetContext);
+                                        }
                                         ScaffoldMessenger.of(
                                           context,
                                         ).showSnackBar(
@@ -889,16 +1267,18 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                           ),
                                         );
                                       } catch (error) {
-                                        setSheetState(() => sending = false);
-                                        ScaffoldMessenger.of(
-                                          sheetContext,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'No pudimos enviar la solicitud. Intenta de nuevo.',
+                                        if (sheetContext.mounted) {
+                                          setSheetState(() => sending = false);
+                                          ScaffoldMessenger.of(
+                                            sheetContext,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'No pudimos enviar la solicitud. Intenta de nuevo.',
+                                              ),
                                             ),
-                                          ),
-                                        );
+                                          );
+                                        }
                                         debugPrint(
                                           'OFFER_FROM_ROUTE_ERROR: $error',
                                         );
@@ -924,15 +1304,108 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                             ),
                           ),
                         ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
           ),
     ).whenComplete(() {
-      priceController.dispose();
-      timeController.dispose();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        priceController.dispose();
+        timeController.dispose();
+      });
     });
+  }
+
+  void _showDirections() {
+    final directions = _jobDirections;
+    if (directions == null || directions.isEmpty) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder:
+          (sheetContext) => SafeArea(
+            top: false,
+            child: Container(
+              margin: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(22, 12, 22, 26),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.all(Radius.circular(28)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEAF8EB),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.door_front_door_outlined,
+                          color: AppTheme.primaryGreen,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Indicaciones del cliente',
+                          style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF6FAF6),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      directions,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.45,
+                        color: AppTheme.textDark,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('Entendido'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
   }
 
   Widget _buildBottomPanel() {
@@ -955,10 +1428,10 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                 children: [
                   const Icon(Icons.route_rounded, color: AppTheme.primaryGreen),
                   const SizedBox(width: 9),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Tu ruta',
-                      style: TextStyle(
+                      _isCompletedJob ? 'Trayecto realizado' : 'Tu ruta',
+                      style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
                       ),
@@ -973,7 +1446,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                   ),
                 ],
               ),
-              if (_isAtJob) ...[
+              if (_isAtJob && !_isCompletedJob) ...[
                 const SizedBox(height: 14),
                 Container(
                   width: double.infinity,
@@ -1025,6 +1498,24 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                           ),
                 ),
               ],
+              if (!_isCompletedJob &&
+                  _hasAcceptedJob &&
+                  !_isClient &&
+                  _jobDirections != null) ...[
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _showDirections,
+                    icon: const Icon(Icons.door_front_door_outlined),
+                    label: const Text('Indicaciones del cliente'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.primaryGreen,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 15),
               Row(
                 children: [
@@ -1045,8 +1536,13 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                 ],
               ),
               const SizedBox(height: 15),
-              _vehicleSelector(),
-              const SizedBox(height: 15),
+              if (_isCompletedJob) ...[
+                _buildCompletedTripInfo(),
+                const SizedBox(height: 15),
+              ] else ...[
+                _vehicleSelector(),
+                const SizedBox(height: 15),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -1068,7 +1564,9 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                             : _offerStatus == 'rejected'
                             ? 'Solicitud rechazada'
                             : 'Enviar solicitud de trabajo')
-                        : 'Chatear con el cliente',
+                        : (_isCompletedJob
+                            ? 'Ver conversación'
+                            : 'Chatear con el cliente'),
                   ),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppTheme.primaryGreen,
@@ -1080,6 +1578,82 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCompletedTripInfo() {
+    final vehicleName =
+        _vehicle == _Vehicle.motorcycle ? 'Motocicleta' : 'Carro';
+    final vehicleIcon =
+        _vehicle == _Vehicle.motorcycle
+            ? Icons.two_wheeler_rounded
+            : Icons.directions_car_rounded;
+    final isPlaying = _replayController.isAnimating;
+    final hasPlayed = _replayController.value >= 1;
+    final hasProgress = _replayController.value > 0 && !hasPlayed;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF4F8F4),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: const Color(0xFFE4ECE5)),
+          ),
+          child: Row(
+            children: [
+              Icon(vehicleIcon, color: AppTheme.primaryGreen),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Vehículo utilizado',
+                  style: TextStyle(fontSize: 13, color: AppTheme.textLight),
+                ),
+              ),
+              Text(
+                vehicleName,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 11),
+        if (_canReplayRoute)
+          FilledButton.icon(
+            onPressed: _toggleRouteReplay,
+            icon: Icon(
+              isPlaying
+                  ? Icons.pause_rounded
+                  : hasPlayed
+                  ? Icons.replay_rounded
+                  : Icons.play_arrow_rounded,
+            ),
+            label: Text(
+              isPlaying
+                  ? 'Pausar recorrido'
+                  : hasPlayed
+                  ? 'Reproducir de nuevo'
+                  : hasProgress
+                  ? 'Continuar trayecto'
+                  : 'Reproducir trayecto',
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFE6F5E8),
+              foregroundColor: AppTheme.primaryGreen,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+          )
+        else
+          const Text(
+            'No hay un trayecto guardado para reproducir.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppTheme.textLight, fontSize: 12),
+          ),
+      ],
     );
   }
 
@@ -1143,16 +1717,49 @@ class _RoundMapButton extends StatelessWidget {
 class _MapMarker extends StatelessWidget {
   final IconData icon;
   final Color color;
-  const _MapMarker({required this.icon, required this.color});
+  final bool animateIcon;
+
+  const _MapMarker({
+    required this.icon,
+    required this.color,
+    this.animateIcon = false,
+  });
+
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
-      color: color,
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [color, Color.lerp(color, Colors.black, 0.16)!],
+      ),
       shape: BoxShape.circle,
       border: Border.all(color: Colors.white, width: 3),
-      boxShadow: const [_mapShadow],
+      boxShadow: [
+        _mapShadow,
+        BoxShadow(
+          color: color.withValues(alpha: animateIcon ? 0.30 : 0.16),
+          blurRadius: animateIcon ? 18 : 10,
+          spreadRadius: animateIcon ? 1 : 0,
+          offset: const Offset(0, 4),
+        ),
+      ],
     ),
-    child: Icon(icon, color: Colors.white, size: 25),
+    child: Center(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 280),
+        transitionBuilder: (child, animation) => ScaleTransition(
+          scale: animation,
+          child: FadeTransition(opacity: animation, child: child),
+        ),
+        child: Icon(
+          icon,
+          key: ValueKey(icon),
+          color: Colors.white,
+          size: 27,
+        ),
+      ),
+    ),
   );
 }
 
@@ -1198,17 +1805,60 @@ class _VehicleButton extends StatelessWidget {
     required this.onTap,
   });
   @override
-  Widget build(BuildContext context) => OutlinedButton.icon(
-    onPressed: onTap,
-    icon: Icon(icon, size: 19),
-    label: Text(label),
-    style: OutlinedButton.styleFrom(
-      foregroundColor: selected ? Colors.white : AppTheme.textDark,
-      backgroundColor: selected ? AppTheme.primaryGreen : Colors.white,
-      side: BorderSide(
+  Widget build(BuildContext context) => AnimatedContainer(
+    duration: const Duration(milliseconds: 220),
+    decoration: BoxDecoration(
+      color: selected ? AppTheme.primaryGreen : Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(
         color: selected ? AppTheme.primaryGreen : const Color(0xFFE2E8F0),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      boxShadow: selected
+          ? [
+              BoxShadow(
+                color: AppTheme.primaryGreen.withValues(alpha: 0.22),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ]
+          : null,
+    ),
+    child: Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 240),
+                transitionBuilder: (child, animation) => ScaleTransition(
+                  scale: animation,
+                  child: FadeTransition(opacity: animation, child: child),
+                ),
+                child: Icon(
+                  icon,
+                  key: ValueKey(icon),
+                  size: 19,
+                  color: selected ? Colors.white : AppTheme.textDark,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : AppTheme.textDark,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     ),
   );
 }
@@ -1241,6 +1891,69 @@ class _RouteFact extends StatelessWidget {
         ],
       ),
     ],
+  );
+}
+
+class _RouteLoading extends StatelessWidget {
+  final String destination;
+
+  const _RouteLoading({required this.destination});
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 82,
+            height: 82,
+            decoration: const BoxDecoration(
+              color: Color(0xFFEAF8EB),
+              shape: BoxShape.circle,
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const SizedBox(
+                  width: 66,
+                  height: 66,
+                  child: CircularProgressIndicator(
+                    color: AppTheme.primaryGreen,
+                    strokeWidth: 3,
+                  ),
+                ),
+                const Icon(
+                  Icons.route_rounded,
+                  color: AppTheme.primaryGreen,
+                  size: 28,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+          const Text(
+            'Trazando ruta…',
+            style: TextStyle(
+              color: AppTheme.textDark,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Estamos preparando el camino hasta $destination.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.textLight,
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    ),
   );
 }
 

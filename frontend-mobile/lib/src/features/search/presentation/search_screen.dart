@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/category_theme.dart';
+import '../../../core/utils/category_utils.dart';
 import '../../home/presentation/home_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -9,10 +11,11 @@ class SearchScreen extends StatefulWidget {
   @override
   State<SearchScreen> createState() => _SearchScreenState();
 }
-
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String? _selectedCategoryId;
+  String? _selectedCategoryName;
 
   @override
   void initState() {
@@ -122,18 +125,30 @@ class _SearchScreenState extends State<SearchScreen> {
 
                   final docs = snapshot.data?.docs ?? [];
 
-                  // Filtrar únicamente por coincidencia en el título del trabajo
+                  // Solo se muestran trabajos disponibles que coincidan con el
+                  // texto buscado y, cuando aplica, con la categoría elegida.
                   final filteredDocs = docs.where((doc) {
-                    if (_searchQuery.isEmpty) return true;
                     final data = doc.data() as Map<String, dynamic>;
                     final details = data['details'] as Map<String, dynamic>? ?? {};
                     final title = (details['title'] as String? ?? '').toLowerCase();
+                    final description =
+                        (details['description'] as String? ?? '').toLowerCase();
+                    final categoryId = jobCategoryId(data);
+                    final status = (data['status'] ?? 'pending').toString();
+                    final matchesCategory =
+                        _selectedCategoryId == null ||
+                        categoryId == _selectedCategoryId;
+                    final matchesQuery =
+                        _searchQuery.isEmpty ||
+                        title.contains(_searchQuery) ||
+                        description.contains(_searchQuery) ||
+                        categoryId.contains(_searchQuery);
 
-                    return title.contains(_searchQuery);
+                    return status == 'pending' && matchesCategory && matchesQuery;
                   }).toList();
 
-                  // Si la búsqueda está vacía, mostrar únicamente categorías estáticas
-                  if (_searchQuery.isEmpty) {
+                  // Sin texto ni categoría seleccionada se muestra el catálogo.
+                  if (_searchQuery.isEmpty && _selectedCategoryId == null) {
                     return SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -176,7 +191,9 @@ class _SearchScreenState extends State<SearchScreen> {
                             ),
                             const SizedBox(height: 20),
                             Text(
-                              'Sin resultados para "$_searchQuery"',
+                              _selectedCategoryName == null
+                                  ? 'Sin resultados para "$_searchQuery"'
+                                  : 'Sin trabajos de $_selectedCategoryName',
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 fontSize: 18,
@@ -185,11 +202,18 @@ class _SearchScreenState extends State<SearchScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            const Text(
-                              'Intenta buscar con otras palabras clave como "llanta", "plomería", "mecánica" o "limpieza".',
+                            Text(
+                              _selectedCategoryName == null
+                                  ? 'Intenta buscar con otras palabras clave como "llanta", "plomería", "mecánica" o "limpieza".'
+                                  : 'Prueba otra categoría o vuelve más tarde.',
                               textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 14, color: AppTheme.textLight, height: 1.4),
                             ),
+                            if (_selectedCategoryId != null)
+                              TextButton(
+                                onPressed: _clearCategory,
+                                child: const Text('Ver categorías'),
+                              ),
                             const SizedBox(height: 100),
                           ],
                         ),
@@ -206,13 +230,26 @@ class _SearchScreenState extends State<SearchScreen> {
                           if (index == 0) {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 14),
-                              child: Text(
-                                'Resultados encontrados (${filteredDocs.length})',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.textDark,
-                                ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _selectedCategoryName == null
+                                          ? 'Resultados encontrados (${filteredDocs.length})'
+                                          : '${_selectedCategoryName} (${filteredDocs.length})',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.textDark,
+                                      ),
+                                    ),
+                                  ),
+                                  if (_selectedCategoryId != null)
+                                    TextButton(
+                                      onPressed: _clearCategory,
+                                      child: const Text('Ver categorías'),
+                                    ),
+                                ],
                               ),
                             );
                           }
@@ -233,57 +270,142 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildCategoriesGrid() {
-    final categories = [
-      {'name': 'Hogar', 'icon': Icons.home_rounded, 'color': const Color(0xFFE3F2FD)},
-      {'name': 'Técnico', 'icon': Icons.build_rounded, 'color': const Color(0xFFFFECB3)},
-      {'name': 'Mensajería', 'icon': Icons.local_shipping_rounded, 'color': const Color(0xFFC8E6C9)},
-      {'name': 'Limpieza', 'icon': Icons.cleaning_services_rounded, 'color': const Color(0xFFF3E5F5)},
-      {'name': 'Clases', 'icon': Icons.school_rounded, 'color': const Color(0xFFFFCDD2)},
-      {'name': 'Mascotas', 'icon': Icons.pets_rounded, 'color': const Color(0xDDEFEBE9)},
-    ];
+  void _clearCategory() {
+    setState(() {
+      _selectedCategoryId = null;
+      _selectedCategoryName = null;
+    });
+  }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
-        childAspectRatio: 1.55,
-      ),
-      itemCount: categories.length,
-      itemBuilder: (context, index) {
-        final cat = categories[index];
-        return Container(
-          decoration: BoxDecoration(
-            color: cat['color'] as Color,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: (cat['color'] as Color).withOpacity(0.4),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
+  void _selectCategory(_SearchCategory category) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _selectedCategoryId = category.id;
+      _selectedCategoryName = category.name;
+    });
+  }
+
+  Widget _buildCategoriesGrid() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('categories').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(28),
+              child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+            ),
+          );
+        }
+
+        final categories = List<_SearchCategory>.from(
+          snapshot.hasError || !snapshot.hasData
+              ? _fallbackSearchCategories
+              : snapshot.data!.docs
+                  .where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return data['isActive'] != false;
+                  })
+                  .map((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final name = (data['name'] ?? '').toString().trim();
+                    return _SearchCategory(
+                      id: normalizeCategoryId(doc.id),
+                      name: name.isEmpty ? _categoryLabel(doc.id) : name,
+                      sortOrder: (data['sortOrder'] as num?)?.toInt() ?? 999,
+                    );
+                  })
+                  .toList(),
+        );
+        categories.sort((a, b) {
+          final byOrder = a.sortOrder.compareTo(b.sortOrder);
+          return byOrder != 0 ? byOrder : a.name.compareTo(b.name);
+        });
+        final visibleCategories =
+            categories.isEmpty ? _fallbackSearchCategories : categories;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            childAspectRatio: 1.55,
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(cat['icon'] as IconData, size: 28, color: AppTheme.textDark),
-              const SizedBox(height: 6),
-              Text(
-                cat['name'] as String,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: AppTheme.textDark,
+          itemCount: visibleCategories.length,
+          itemBuilder: (context, index) {
+            final category = visibleCategories[index];
+            final backgroundColor = jobCategoryBackgroundColor(category.id);
+            final foregroundColor = jobCategoryColor(category.id);
+            return Material(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => _selectCategory(category),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: foregroundColor.withValues(alpha: .12),
+                        blurRadius: 12,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        jobCategoryIcon(category.id),
+                        size: 28,
+                        color: foregroundColor,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        category.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: foregroundColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 }
+
+class _SearchCategory {
+  final String id;
+  final String name;
+  final int sortOrder;
+
+  const _SearchCategory({
+    required this.id,
+    required this.name,
+    this.sortOrder = 999,
+  });
+}
+
+const _fallbackSearchCategories = <_SearchCategory>[
+  _SearchCategory(id: 'general', name: 'General'),
+  _SearchCategory(id: 'abogado', name: 'Abogado'),
+  _SearchCategory(id: 'carpinteria', name: 'Carpintería'),
+  _SearchCategory(id: 'electricidad', name: 'Electricidad'),
+  _SearchCategory(id: 'jardineria', name: 'Jardinería'),
+  _SearchCategory(id: 'limpieza', name: 'Limpieza'),
+  _SearchCategory(id: 'mecanica', name: 'Mecánica'),
+  _SearchCategory(id: 'pintura', name: 'Pintura'),
+  _SearchCategory(id: 'plomeria', name: 'Plomería'),
+];
+
+String _categoryLabel(String id) => categoryDisplayName(id);

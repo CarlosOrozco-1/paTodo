@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -25,6 +27,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final _repository = ChatRepository();
   final _textController = TextEditingController();
   String? _conversationId;
+  String? _conversationStatus;
+  StreamSubscription<String?>? _conversationStatusSubscription;
   bool _loading = true;
   bool _sending = false;
 
@@ -42,7 +46,24 @@ class _ChatScreenState extends State<ChatScreen> {
         jobId: widget.jobId,
         userId: _userId,
       );
-      if (mounted) setState(() => _conversationId = conversationId);
+      if (!mounted) return;
+      await _conversationStatusSubscription?.cancel();
+      setState(() {
+        _conversationId = conversationId;
+        _conversationStatus = null;
+      });
+      if (conversationId != null) {
+        _conversationStatusSubscription = _repository
+            .conversationStatus(conversationId)
+            .listen(
+              (status) {
+                if (mounted) setState(() => _conversationStatus = status);
+              },
+              onError: (Object error) {
+                debugPrint('CHAT_STATUS_LISTEN_ERROR: $error');
+              },
+            );
+      }
     } catch (error) {
       debugPrint('CHAT_CONVERSATION_ERROR: $error');
     } finally {
@@ -53,6 +74,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _send() async {
     final conversationId = _conversationId;
     if (conversationId == null ||
+        _conversationStatus != 'active' ||
         _sending ||
         _textController.text.trim().isEmpty) {
       return;
@@ -82,6 +104,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    unawaited(_conversationStatusSubscription?.cancel());
     _textController.dispose();
     super.dispose();
   }
@@ -106,8 +129,33 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          if (_conversationStatus == 'closed') _buildClosedBanner(),
           Expanded(child: _buildMessages()),
-          if (_conversationId != null) _buildComposer(),
+          if (_conversationStatus == 'active') _buildComposer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClosedBanner() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF7EC),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.lock_outline_rounded, color: AppTheme.primaryGreen),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Servicio finalizado. Puedes consultar los mensajes anteriores; el chat está cerrado.',
+              style: TextStyle(fontSize: 13, height: 1.3),
+            ),
+          ),
         ],
       ),
     );
@@ -160,9 +208,11 @@ class _ChatScreenState extends State<ChatScreen> {
         }
         final messages = snapshot.data ?? [];
         if (messages.isEmpty) {
-          return const Center(
+          return Center(
             child: Text(
-              'Escribe el primer mensaje para coordinar el servicio.',
+              _conversationStatus == 'closed'
+                  ? 'No hay mensajes anteriores en esta conversación.'
+                  : 'Escribe el primer mensaje para coordinar el servicio.',
             ),
           );
         }

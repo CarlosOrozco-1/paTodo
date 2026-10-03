@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/utils/geohash_util.dart';
 import '../domain/service_model.dart';
@@ -159,6 +160,12 @@ class FirebaseService {
     return null;
   }
 
+  /// Cancela un trabajo publicado por su cliente. La API cierra las ofertas y
+  /// conversaciones relacionadas de manera transaccional.
+  Future<void> cancelJob(String jobId) async {
+    await _api.dio.post('/cancelJob', data: {'jobId': jobId});
+  }
+
   /// Jobs pendientes en tiempo real (vista trabajador).
   Stream<List<ServiceJob>> getPendingJobs() {
     return _firestore
@@ -175,16 +182,33 @@ class FirebaseService {
 
   /// Jobs pendientes una sola vez (para el mapa).
   Future<List<ServiceJob>> fetchPendingJobs() async {
-    final snapshot =
-        await _firestore
-            .collection('jobs')
-            .where('status', isEqualTo: 'pending')
-            .limit(100)
-            .get();
-    final jobs =
-        snapshot.docs
-            .map((doc) => ServiceJob.fromMap(doc.data(), doc.id))
-            .toList();
+    late final QuerySnapshot<Map<String, dynamic>> snapshot;
+    try {
+      snapshot =
+          await _firestore
+              .collection('jobs')
+              .where('status', isEqualTo: 'pending')
+              .limit(100)
+              .get();
+    } on FirebaseException catch (error, stackTrace) {
+      // DEV: respaldo para instalaciones con una consulta pendiente de indice.
+      // Las reglas autorizan la lectura autenticada de jobs; el filtro se aplica
+      // tambien abajo para no mostrar trabajos que ya no estan pendientes.
+      debugPrint('PENDING_JOBS_QUERY_ERROR (${error.code}): ${error.message}');
+      debugPrintStack(stackTrace: stackTrace);
+      snapshot = await _firestore.collection('jobs').limit(100).get();
+    }
+    final jobs = <ServiceJob>[];
+    for (final doc in snapshot.docs) {
+      try {
+        final job = ServiceJob.fromMap(doc.data(), doc.id);
+        if (job.status == 'pending') jobs.add(job);
+      } catch (error, stackTrace) {
+        // DEV: un trabajo legado o incompleto no debe ocultar los demas.
+        debugPrint('PENDING_JOB_PARSE_ERROR (${doc.id}): $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
     jobs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return jobs;
   }

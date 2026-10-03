@@ -5,11 +5,10 @@ import {
   MapPin, 
   Clock, 
   Calendar, 
-  Briefcase, 
-  Sparkles,
   MessageSquare,
   Star,
   Navigation,
+  RotateCcw,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { offersService } from '@/api/offers.service';
@@ -34,7 +33,7 @@ import { cn } from '@/utils/cn';
 import { Modal } from '@/components/ui/Modal';
 import { ReviewForm } from '@/components/reviews/ReviewForm';
 import { reviewsService } from '@/api/reviews.service';
-import { InternalNavigator } from '@/components/ui/InternalNavigator';
+import { InternalNavigator, type NavigatorDestination } from '@/components/ui/InternalNavigator';
 import { JobLocationMap } from '@/components/ui/JobLocationMap';
 import {
   publishJobTrackingPosition,
@@ -67,11 +66,13 @@ export function ActiveJobs() {
   const [loading, setLoading] = useState(true);
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [reviewJob, setReviewJob] = useState<Job | null>(null);
-  // Ids de los trabajos que este profesional ya reseñó. El backend rechaza con
-  // 409 una segunda reseña del mismo trabajo, así que el botón no debe
-  // ofrecerse cuando ya existe: salía siempre y el error llegaba al guardar.
   const [reviewedJobIds, setReviewedJobIds] = useState<Set<string>>(new Set());
   const [navigatingJobId, setNavigatingJobId] = useState<string | null>(null);
+  
+  // Estados para destinos personalizados y buscador temporal
+  const [customDestinations, setCustomDestinations] = useState<Record<string, NavigatorDestination>>({});
+  const [destinationInputs, setDestinationInputs] = useState<Record<string, string>>({});
+
   const lastPublishedPositions = useRef(new Map<string, PublishedPosition>());
 
   const handlePositionUpdate = useCallback(async (jobId: string, position: JobTrackingPosition) => {
@@ -89,8 +90,7 @@ export function ActiveJobs() {
     try {
       await publishJobTrackingPosition(jobId, position);
     } catch (error) {
-      console.warn('No se pudo compartir la ubicación del trabajo:', error);
-      toast('error', 'No pudimos compartir tu ubicación. Revisa tu conexión.');
+      console.warn('Rastreo en la nube no disponible:', error);
     }
   }, []);
 
@@ -99,8 +99,6 @@ export function ActiveJobs() {
     let cancelled = false;
     const load = async () => {
       try {
-        // Se consulta el historial de reseñas del propio profesional: una sola
-        // lectura en vez de una por trabajo.
         const mine = await reviewsService.getAllByUser(user.id);
         if (cancelled) return;
         setReviewedJobIds(new Set(mine.map((review) => review.jobId)));
@@ -171,17 +169,10 @@ export function ActiveJobs() {
 
   if (loading) return <Spinner label="Cargando tus trabajos activos..." />;
 
-  // Métricas rápidas calculadas
   const inProgressJobs = jobs.filter((j) => j.status === 'in_progress');
-  const completedJobsCount = jobs.filter((j) => j.status === 'completed').length;
-  const totalActiveValue = jobs.reduce((sum, job) => {
-    const offer = offers.find((o) => o.jobId === job.id && o.status === 'accepted');
-    return sum + (offer?.price ?? job.pricing.proposedPrice);
-  }, 0);
 
   return (
     <div className="space-y-6">
-      {/* Cabecera */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Trabajos Activos</h1>
@@ -199,45 +190,6 @@ export function ActiveJobs() {
         </span>
       </div>
 
-      {/* Tarjetas de Resumen Superior */}
-      {jobs.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="rounded-2xl border border-teal-100 bg-teal-50/40 p-4 shadow-xs flex items-center gap-3.5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100 text-teal-700">
-              <Briefcase className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-teal-800">Total Proyectos</p>
-              <p className="text-xl font-bold text-teal-900">{jobs.length}</p>
-            </div>
-          </div>
-
-          {/* Tarjeta de Ganancias  */}
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 shadow-xs flex items-center gap-3.5">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 shadow-inner border border-emerald-100">
-              <span className="text-lg font-black">Q</span>
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Ganancias</p>
-              <p className="text-xl font-bold text-emerald-900">
-                {formatCurrency(totalActiveValue, 'GTQ')}
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4 shadow-xs flex items-center gap-3.5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-amber-800">Completados</p>
-              <p className="text-xl font-bold text-amber-900">{completedJobsCount}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Lista de Trabajos */}
       {jobs.length === 0 ? (
         <WorkflowEmptyState
           icon={<CheckCircle2 className="h-9 w-9 text-brand-700" />}
@@ -269,6 +221,17 @@ export function ActiveJobs() {
             const workerCoordinates =
               user?.location?.coordinates ??
               user?.availability.serviceArea.center?.coordinates;
+
+            // Destino original del trabajo
+            const originalDestination = {
+              longitude: job.location.coordinates?.[0],
+              latitude: job.location.coordinates?.[1],
+              addressText: job.location.address,
+              label: job.location.address || 'Destino del trabajo',
+            };
+
+            const activeDestination = customDestinations[job.id] || originalDestination;
+            const hasCustomDest = Boolean(customDestinations[job.id]);
 
             return (
               <Card 
@@ -317,21 +280,20 @@ export function ActiveJobs() {
                   />
 
                   <CardContent className="space-y-4 pt-2">
-                    {/* Descripción */}
                     <p className="text-xs text-gray-600 leading-relaxed bg-gray-50/60 p-3 rounded-2xl border border-gray-100">
                       {job.details.description}
                     </p>
 
+                    {/* Navegador GPS en vivo y buscador de destino personalizado */}
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
                         <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-700">
                           <Navigation className="h-4 w-4 text-emerald-700" />
                           {navigatingJobId === job.id
-                            ? 'Navegación GPS en vivo'
-                            : canNavigate
-                              ? 'Ruta de desplazamiento'
-                              : 'Ubicación del trabajo'}
+                            ? 'Navegación GPS'
+                            : 'Ruta de desplazamiento'}
                         </span>
+
                         {canNavigate && (
                           <Button
                             variant="outline"
@@ -343,13 +305,57 @@ export function ActiveJobs() {
                           </Button>
                         )}
                       </div>
+
+                      {/* Input de Buscador de Destino Alternativo con botón para limpiar */}
+                      {navigatingJobId === job.id && (
+                        <div className="flex gap-2 pt-1 items-center">
+                          <input
+                            type="text"
+                            placeholder="Buscar otro destino temporal (ej. Ferretería)..."
+                            value={destinationInputs[job.id] || ''}
+                            onChange={(e) => setDestinationInputs({ ...destinationInputs, [job.id]: e.target.value })}
+                            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-gray-300 focus:outline-none focus:border-brand-600"
+                          />
+                          <Button
+                            size="sm"
+                            className="text-xs bg-gray-900 text-white"
+                            onClick={() => {
+                              const val = destinationInputs[job.id];
+                              if (val) {
+                                setCustomDestinations({
+                                  ...customDestinations,
+                                  [job.id]: { addressText: val, label: val }
+                                });
+                                toast('success', 'Destino temporal actualizado');
+                              }
+                            }}
+                          >
+                            Ir
+                          </Button>
+
+                          {hasCustomDest && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 flex items-center gap-1"
+                              onClick={() => {
+                                const copy = { ...customDestinations };
+                                delete copy[job.id];
+                                setCustomDestinations(copy);
+                                setDestinationInputs({ ...destinationInputs, [job.id]: '' });
+                                toast('success', 'Destino restaurado al domicilio del cliente');
+                              }}
+                              title="Restaurar destino original del cliente"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" /> Restaurar
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                      
                       {navigatingJobId === job.id && canNavigate ? (
                         <InternalNavigator
-                          destination={{
-                            latitude: job.location.coordinates[1],
-                            longitude: job.location.coordinates[0],
-                            label: job.location.address || 'Destino del trabajo',
-                          }}
+                          destination={activeDestination}
                           onPositionUpdate={(position) => {
                             void handlePositionUpdate(job.id, position);
                           }}
@@ -363,22 +369,18 @@ export function ActiveJobs() {
                               : { addressText: user?.contact.address?.city || 'Ciudad de Guatemala' }),
                             label: 'Tu ubicación (Origen)',
                           }}
-                          destination={{
-                            lng: job.location.coordinates[0],
-                            lat: job.location.coordinates[1],
-                            addressText: job.location.address,
-                            label: 'Domicilio del cliente (Destino)',
-                          }}
+                          destination={activeDestination}
                           className="h-44 w-full"
                         />
                       )}
                     </div>
 
-                    {/* Ficha Técnica: Ubicación y Fechas */}
                     <div className="grid gap-2 text-xs text-gray-500">
                       <div className="flex items-center gap-2 text-gray-700 font-medium">
                         <MapPin className="h-4 w-4 text-brand-600 shrink-0" />
-                        <span className="truncate">{job.location.address || 'Dirección no especificada'}</span>
+                        <span className="truncate">
+                          {hasCustomDest ? `Destino temporal: ${activeDestination.addressText}` : (activeDestination.addressText || job.location.address || 'Dirección no especificada')}
+                        </span>
                       </div>
                       
                       <div className="flex flex-wrap items-center gap-4 text-gray-400 text-[11px] pt-1">
@@ -397,7 +399,7 @@ export function ActiveJobs() {
                   </CardContent>
                 </div>
 
-                {/* Pie con Acción de Finalizado */}
+                {/* Acciones de Finalización */}
                 {['accepted', 'assigned', 'in_progress'].includes(job.status) ? (
                   <div className="p-5 pt-0">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3">

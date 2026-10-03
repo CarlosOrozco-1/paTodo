@@ -4,11 +4,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/category_theme.dart';
+import '../../../core/utils/category_utils.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../services/data/firebase_service.dart';
 import '../../tracking/presentation/screens/live_tracking_screen.dart';
@@ -16,7 +20,7 @@ import '../../tracking/presentation/screens/live_tracking_screen.dart';
 /// Pantalla de inicio unificada:
 /// - Lee el rol del Custom Claim (`client`/`worker`/`both`).
 /// - client → sus jobs vía Firestore directo (stream en tiempo real).
-/// - worker/both → GET /jobs/nearby vía API (una carga + pull-to-refresh).
+/// - worker/both → trabajos pendientes por Firestore, filtrados a 15 km.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -24,12 +28,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late final ApiClient _api = ApiClient.create();
+  static const _nearbyRadiusKm = 15.0;
+  final _service = FirebaseService();
   String? _role;
   String? _displayName;
   String? _photoUrl;
   int _bothTab = 0; // 0: Trabajos Cercanos, 1: Mis Trabajos
+
   List<Map<String, dynamic>> _nearby = [];
+  LatLng? _userLocation;
   bool _loading = true;
   String? _error;
 
@@ -96,37 +103,50 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadNearby() async {
     try {
-      final res = await _api.dio.get(
-        '/jobs/nearby',
-        queryParameters: {
-          'lat': 14.6349, // TODO: reemplazar con Geolocator
-          'lng': -90.5069,
-          'radiusKm': 10,
-        },
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
       );
+      final pendingJobs = await _service.fetchPendingJobs();
+      final nearby =
+          pendingJobs
+              .where(
+                (job) =>
+                    Geolocator.distanceBetween(
+                          position.latitude,
+                          position.longitude,
+                          job.location.latitude,
+                          job.location.longitude,
+                        ) /
+                        1000 <=
+                    _nearbyRadiusKm,
+              )
+              .map((job) {
+                final data = Map<String, dynamic>.from(job.toMap());
+                data['id'] = job.id;
+                data['distanceKm'] = (Geolocator.distanceBetween(
+                          position.latitude,
+                          position.longitude,
+                          job.location.latitude,
+                          job.location.longitude,
+                        ) /
+                        1000)
+                    .toStringAsFixed(1);
+                return data;
+              })
+              .toList();
       if (!mounted) return;
       setState(() {
-        _nearby = List<Map<String, dynamic>>.from(res.data['items'] ?? []);
+        _userLocation = LatLng(position.latitude, position.longitude);
+        _nearby = nearby;
         _loading = false;
       });
-    } on DioException catch (e) {
-      if (!mounted) return;
-      if (e.response?.statusCode == 403) {
-        setState(() {
-          _role = 'client';
-          _loading = false;
-        });
-      } else {
-        setState(() {
-          _error =
-              'No pudimos conectar. Revisa tu internet e inténtalo de nuevo.';
-          _loading = false;
-        });
-      }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('HOME_NEARBY_LOAD_ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
       if (mounted)
         setState(() {
-          _error = 'Ocurrió un error inesperado.';
+          _error =
+              'No pudimos cargar los trabajos cercanos. Inténtalo de nuevo.';
           _loading = false;
         });
     }
@@ -154,8 +174,6 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       sectionTitle = 'Trabajos Cercanos';
     }
-
-    final nearbyJobIds = _nearby.map((j) => (j['id'] ?? '').toString()).toSet();
 
     return RefreshIndicator(
       color: AppTheme.primaryGreen,
@@ -378,7 +396,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   else if (showTabs)
                     _bothTab == 0
                         ? _NearbyList(items: _nearby)
-                        : _MoreJobsList(nearbyJobIds: nearbyJobIds)
+                        : _MoreJobsList(userLocation: _userLocation)
                   else
                     _NearbyList(items: _nearby),
                 ],
@@ -840,15 +858,15 @@ class _NearbyList extends StatelessWidget {
   }
 }
 
-// ─────────────────── Lista Más Publicaciones (lejanas / otras zonas) ───────────────────
+// ───────────────────── Lista Todas las Publicaciones ─────────────────────
 
 class _MoreJobsList extends StatelessWidget {
-  final Set<String> nearbyJobIds;
-  const _MoreJobsList({required this.nearbyJobIds});
+  final LatLng? userLocation;
+
+  const _MoreJobsList({required this.userLocation});
 
   @override
   Widget build(BuildContext context) {
-    const userLocation = LatLng(14.6349, -90.5069);
     const distanceCalc = Distance();
 
     return StreamBuilder<QuerySnapshot>(
@@ -858,8 +876,9 @@ class _MoreJobsList extends StatelessWidget {
               .where('status', isEqualTo: 'pending')
               .snapshots(),
       builder: (_, snap) {
-        if (snap.connectionState == ConnectionState.waiting)
+        if (snap.connectionState == ConnectionState.waiting) {
           return const _LoadingShimmer();
+        }
         if (snap.hasError) {
           return const Center(
             child: Text('No se pudieron cargar más publicaciones.'),
@@ -867,60 +886,73 @@ class _MoreJobsList extends StatelessWidget {
         }
 
         final docs = snap.data?.docs ?? [];
-        // Filtrar aquellas publicaciones que NO estén en la lista de cercanas
-        final distantDocs =
-            docs.where((d) => !nearbyJobIds.contains(d.id)).toList();
-
-        if (distantDocs.isEmpty) {
+        if (docs.isEmpty) {
           return const _EmptyState(
             icon: Icons.public_off_outlined,
-            title: 'Sin más publicaciones',
-            subtitle:
-                'Todas las publicaciones activas se encuentran en tu radio cercano o no hay más en otras zonas.',
+            title: 'Sin publicaciones disponibles',
+            subtitle: 'Cuando haya nuevos trabajos, aparecerán aquí.',
           );
+        }
+
+        final jobs =
+            docs.map((doc) {
+              final data = Map<String, dynamic>.from(
+                doc.data() as Map<String, dynamic>,
+              );
+              data['id'] = doc.id;
+
+              final location = data['location'] as Map<String, dynamic>? ?? {};
+              final rawGeo = location['geopoint'];
+              double? latitude;
+              double? longitude;
+              if (rawGeo is GeoPoint) {
+                latitude = rawGeo.latitude;
+                longitude = rawGeo.longitude;
+              } else if (rawGeo is Map) {
+                latitude =
+                    (rawGeo['latitude'] ?? rawGeo['_latitude'])?.toDouble();
+                longitude =
+                    (rawGeo['longitude'] ?? rawGeo['_longitude'])?.toDouble();
+              }
+
+              if (userLocation != null &&
+                  latitude != null &&
+                  longitude != null) {
+                final distanceMeters = distanceCalc.as(
+                  LengthUnit.Meter,
+                  userLocation!,
+                  LatLng(latitude, longitude),
+                );
+                data['distanceKm'] = (distanceMeters / 1000).toStringAsFixed(1);
+              }
+
+              return data;
+            }).toList();
+
+        if (userLocation != null) {
+          jobs.sort((a, b) {
+            final distanceA = double.tryParse(
+              a['distanceKm']?.toString() ?? '',
+            );
+            final distanceB = double.tryParse(
+              b['distanceKm']?.toString() ?? '',
+            );
+            if (distanceA == null) return distanceB == null ? 0 : 1;
+            if (distanceB == null) return -1;
+            return distanceA.compareTo(distanceB);
+          });
         }
 
         return Column(
           children:
-              distantDocs.map((doc) {
-                final data = Map<String, dynamic>.from(
-                  doc.data() as Map<String, dynamic>,
-                );
-                data['id'] = doc.id;
-
-                // Calcular distancia aproximada si no viene en el documento
-                if (data['distanceKm'] == null) {
-                  final loc = data['location'] as Map<String, dynamic>? ?? {};
-                  final rawGeo = loc['geopoint'];
-                  if (rawGeo != null) {
-                    double? lat;
-                    double? lng;
-                    if (rawGeo.runtimeType.toString() == 'GeoPoint') {
-                      lat = (rawGeo as dynamic).latitude as double?;
-                      lng = (rawGeo as dynamic).longitude as double?;
-                    } else if (rawGeo is Map) {
-                      lat =
-                          (rawGeo['latitude'] ?? rawGeo['_latitude'])
-                              ?.toDouble();
-                      lng =
-                          (rawGeo['longitude'] ?? rawGeo['_longitude'])
-                              ?.toDouble();
-                    }
-                    if (lat != null && lng != null) {
-                      final distMeters = distanceCalc.as(
-                        LengthUnit.Meter,
-                        userLocation,
-                        LatLng(lat, lng),
-                      );
-                      data['distanceKm'] = (distMeters / 1000).toStringAsFixed(
-                        1,
-                      );
-                    }
-                  }
-                }
-
-                return ModernJobCard(jobData: data, jobId: doc.id);
-              }).toList(),
+              jobs
+                  .map(
+                    (data) => ModernJobCard(
+                      jobData: data,
+                      jobId: data['id'] as String,
+                    ),
+                  )
+                  .toList(),
         );
       },
     );
@@ -934,36 +966,6 @@ class ModernJobCard extends StatelessWidget {
   final String jobId;
 
   const ModernJobCard({super.key, required this.jobData, required this.jobId});
-
-  static const _categoryIcons = <String, IconData>{
-    'mecanica': Icons.build_rounded,
-    'plomeria': Icons.water_drop_rounded,
-    'electricidad': Icons.bolt_rounded,
-    'jardineria': Icons.yard_rounded,
-    'limpieza': Icons.cleaning_services_rounded,
-    'pintura': Icons.format_paint_rounded,
-    'general': Icons.handyman_rounded,
-  };
-
-  static const _categoryColors = <String, Color>{
-    'mecanica': Color(0xFFD32F2F),
-    'plomeria': Color(0xFF1976D2),
-    'electricidad': Color(0xFFF57C00),
-    'jardineria': Color(0xFF388E3C),
-    'limpieza': Color(0xFF0097A7),
-    'pintura': Color(0xFF7B1FA2),
-    'general': Color(0xFF5D4037),
-  };
-
-  static const _categoryNames = <String, String>{
-    'mecanica': 'Mecánica',
-    'plomeria': 'Plomería',
-    'electricidad': 'Electricidad',
-    'jardineria': 'Jardinería',
-    'limpieza': 'Limpieza',
-    'pintura': 'Pintura',
-    'general': 'General',
-  };
 
   void _openDetail(BuildContext context) {
     Navigator.push(
@@ -984,10 +986,7 @@ class ModernJobCard extends StatelessWidget {
         (details['title'] ?? jobData['title'] ?? 'Sin título').toString();
     final description =
         (details['description'] ?? jobData['description'] ?? '').toString();
-    final categoryId =
-        (details['categoryId'] ?? jobData['categoryId'] ?? 'general')
-            .toString()
-            .toLowerCase();
+    final categoryId = jobCategoryId(jobData);
     final status = (jobData['status'] ?? 'pending').toString();
 
     final priceRaw =
@@ -1019,24 +1018,24 @@ class ModernJobCard extends StatelessWidget {
     }
     final clientName = jobData['clientName']?.toString();
 
-    final catIcon = _categoryIcons[categoryId] ?? Icons.handyman_rounded;
-    final catColor = _categoryColors[categoryId] ?? const Color(0xFF5D4037);
-    final catName = _categoryNames[categoryId] ?? categoryId.toUpperCase();
+    final catIcon = jobCategoryIcon(categoryId);
+    final catColor = jobCategoryColor(categoryId);
+    final catName = categoryDisplayName(categoryId);
 
     final statusColor = switch (status) {
-      'pending' => const Color(0xFFE65100),
+      'pending' => const Color(0xFF1976D2),
       'accepted' => const Color(0xFF1565C0),
       'completed' => const Color(0xFF2E7D32),
       _ => Colors.grey,
     };
     final statusLabel = switch (status) {
-      'pending' => 'Pendiente',
+      'pending' => 'Disponible',
       'accepted' => 'Aceptado',
       'completed' => 'Completado',
       _ => status,
     };
     final statusIcon = switch (status) {
-      'pending' => Icons.schedule_rounded,
+      'pending' => Icons.public_rounded,
       'accepted' => Icons.handshake_rounded,
       'completed' => Icons.check_circle_rounded,
       _ => Icons.info_rounded,
@@ -1075,6 +1074,17 @@ class ModernJobCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  height: 4,
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [catColor.withValues(alpha: 0.45), catColor],
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
                 // ── Fila Superior: Categoría + Estado ──
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1298,6 +1308,8 @@ class ModernJobCard extends StatelessWidget {
 }
 
 // ─────────────────────────── Pantalla de Detalle ───────────────────────────
+
+enum _DetailOfferTimeUnit { hours, minutes }
 
 class JobDetailScreen extends StatefulWidget {
   final Map<String, dynamic> jobData;
@@ -1606,233 +1618,379 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   void _showSendOfferDialog(BuildContext context) {
     final priceCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
+    final timeCtrl = TextEditingController();
+    var timeUnit = _DetailOfferTimeUnit.minutes;
     final currency =
         (widget.jobData['pricing'] as Map<String, dynamic>?)?['currency'] ??
         'Q';
+
+    String formattedEstimatedTime() {
+      final amount = int.tryParse(timeCtrl.text.trim());
+      if (amount == null || amount < 1) return '';
+      final unit = switch (timeUnit) {
+        _DetailOfferTimeUnit.hours => amount == 1 ? 'hora' : 'horas',
+        _DetailOfferTimeUnit.minutes => amount == 1 ? 'minuto' : 'minutos',
+      };
+      return '$amount $unit';
+    }
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder:
-          (_) => Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-              ),
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Handle
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
+          (sheetContext) => StatefulBuilder(
+            builder:
+                (context, setSheetState) => Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
+                  ),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(28),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Enviar oferta',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'El cliente revisará tu propuesta y decidirá si te contrata.',
-                    style: TextStyle(color: AppTheme.textLight, fontSize: 13),
-                  ),
-                  const SizedBox(height: 20),
-                  // Precio propuesto
-                  TextField(
-                    controller: priceCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'Tu precio ($currency)',
-                      prefixIcon: const Icon(
-                        Icons.attach_money,
-                        color: AppTheme.primaryGreen,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(
-                          color: AppTheme.primaryGreen,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  // Nota opcional
-                  TextField(
-                    controller: noteCtrl,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: 'Mensaje al cliente (opcional)',
-                      alignLabelWithHint: true,
-                      prefixIcon: const Padding(
-                        padding: EdgeInsets.only(bottom: 40),
-                        child: Icon(
-                          Icons.chat_bubble_outline,
-                          color: AppTheme.primaryGreen,
-                        ),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(
-                          color: AppTheme.primaryGreen,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: StatefulBuilder(
-                      builder:
-                          (ctx, setSheetState) => FilledButton.icon(
-                            onPressed:
-                                _sendingOffer
-                                    ? null
-                                    : () async {
-                                      final priceText = priceCtrl.text.trim();
-                                      if (priceText.isEmpty) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Ingresa el precio de tu oferta.',
-                                            ),
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                      final offerPrice = double.tryParse(
-                                        priceText,
-                                      );
-                                      if (offerPrice == null ||
-                                          offerPrice <= 0) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Ingresa un precio válido.',
-                                            ),
-                                          ),
-                                        );
-                                        return;
-                                      }
-
-                                      setSheetState(() {});
-                                      setState(() => _sendingOffer = true);
-                                      Navigator.pop(context); // cerrar sheet
-
-                                      try {
-                                        final uid =
-                                            FirebaseAuth
-                                                .instance
-                                                .currentUser
-                                                ?.uid;
-                                        if (uid == null)
-                                          throw Exception('Sin sesión');
-
-                                        // DEV: Escritura directa a Firestore — las offers son creadas por el worker/both.
-                                        await FirebaseService().createOffer(
-                                          widget.jobId,
-                                          offerPrice,
-                                          'Por confirmar',
-                                          noteCtrl.text.trim(),
-                                        );
-
-                                        if (mounted) {
-                                          setState(
-                                            () => _ownOfferStatus = 'pending',
-                                          );
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                '¡Oferta enviada! El cliente la revisará pronto.',
-                                              ),
-                                              backgroundColor:
-                                                  AppTheme.primaryGreen,
-                                            ),
-                                          );
-                                        }
-                                      } catch (_) {
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'No pudimos enviar tu oferta. Inténtalo de nuevo.',
-                                              ),
-                                              backgroundColor: Colors.redAccent,
-                                            ),
-                                          );
-                                        }
-                                      } finally {
-                                        if (mounted)
-                                          setState(() => _sendingOffer = false);
-                                      }
-                                    },
-                            icon:
-                                _sendingOffer
-                                    ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                    : const Icon(Icons.send_rounded),
-                            label: Text(
-                              _sendingOffer ? 'Enviando…' : 'Enviar oferta',
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Handle
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(2),
                             ),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppTheme.primaryGreen,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Enviar solicitud de trabajo',
+                                style: TextStyle(
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.textDark,
+                                ),
                               ),
-                              textStyle: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                            ),
+                            Material(
+                              color: const Color(0xFFFFEBEE),
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                tooltip: 'Cerrar',
+                                onPressed: () => Navigator.pop(sheetContext),
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  color: Color(0xFFD32F2F),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tu propuesta llegará a ${_clientName ?? 'el cliente'}.',
+                          style: const TextStyle(
+                            color: AppTheme.textLight,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        // Precio propuesto
+                        TextField(
+                          controller: priceCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Tu precio ($currency)',
+                            prefixIcon: const Icon(
+                              Icons.attach_money,
+                              color: AppTheme.primaryGreen,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: AppTheme.primaryGreen,
+                                width: 2,
                               ),
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 14),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAF8EB),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.schedule_rounded,
+                                color: AppTheme.primaryGreen,
+                                size: 19,
+                              ),
+                              SizedBox(width: 9),
+                              Expanded(
+                                child: Text(
+                                  'Tiempo estimado para llegar a ${_clientName ?? 'el cliente'}',
+                                  style: const TextStyle(
+                                    color: AppTheme.textDark,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 112,
+                              child: TextField(
+                                controller: timeCtrl,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                textAlign: TextAlign.center,
+                                onChanged: (_) => setSheetState(() {}),
+                                decoration: InputDecoration(
+                                  labelText: 'Cantidad',
+                                  hintText: '1',
+                                  filled: true,
+                                  fillColor: const Color(0xFFF8FAF8),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: SegmentedButton<_DetailOfferTimeUnit>(
+                                showSelectedIcon: false,
+                                segments: const [
+                                  ButtonSegment(
+                                    value: _DetailOfferTimeUnit.hours,
+                                    label: Text('Hora'),
+                                  ),
+                                  ButtonSegment(
+                                    value: _DetailOfferTimeUnit.minutes,
+                                    label: Text('Minuto'),
+                                  ),
+                                ],
+                                selected: {timeUnit},
+                                onSelectionChanged: (selection) {
+                                  setSheetState(
+                                    () => timeUnit = selection.first,
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (formattedEstimatedTime().isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F8F3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFE1EEE2),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  color: AppTheme.primaryGreen,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Llegarás en ${formattedEstimatedTime()}',
+                                  style: const TextStyle(
+                                    color: AppTheme.textDark,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          child: StatefulBuilder(
+                            builder:
+                                (ctx, setSheetState) => FilledButton.icon(
+                                  onPressed:
+                                      _sendingOffer
+                                          ? null
+                                          : () async {
+                                            final priceText =
+                                                priceCtrl.text.trim();
+                                            final time =
+                                                formattedEstimatedTime();
+                                            if (priceText.isEmpty ||
+                                                time.isEmpty) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Ingresa tu precio y el tiempo estimado.',
+                                                  ),
+                                                ),
+                                              );
+                                              return;
+                                            }
+                                            final offerPrice = double.tryParse(
+                                              priceText.replaceAll(',', '.'),
+                                            );
+                                            if (offerPrice == null ||
+                                                offerPrice <= 0) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Ingresa un precio válido.',
+                                                  ),
+                                                ),
+                                              );
+                                              return;
+                                            }
+
+                                            setState(
+                                              () => _sendingOffer = true,
+                                            );
+                                            setSheetState(() {});
+                                            try {
+                                              final uid =
+                                                  FirebaseAuth
+                                                      .instance
+                                                      .currentUser
+                                                      ?.uid;
+                                              if (uid == null)
+                                                throw Exception('Sin sesión');
+
+                                              // DEV: Escritura directa a Firestore — las offers son creadas por el worker/both.
+                                              await FirebaseService()
+                                                  .createOffer(
+                                                    widget.jobId,
+                                                    offerPrice,
+                                                    time,
+                                                    null,
+                                                  );
+
+                                              if (mounted) {
+                                                setState(
+                                                  () =>
+                                                      _ownOfferStatus =
+                                                          'pending',
+                                                );
+                                                if (sheetContext.mounted) {
+                                                  Navigator.pop(sheetContext);
+                                                }
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      '¡Oferta enviada! El cliente la revisará pronto.',
+                                                    ),
+                                                    backgroundColor:
+                                                        AppTheme.primaryGreen,
+                                                  ),
+                                                );
+                                              }
+                                            } catch (_) {
+                                              if (mounted) {
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'No pudimos enviar tu oferta. Inténtalo de nuevo.',
+                                                    ),
+                                                    backgroundColor:
+                                                        Colors.redAccent,
+                                                  ),
+                                                );
+                                              }
+                                            } finally {
+                                              if (mounted) {
+                                                setState(
+                                                  () => _sendingOffer = false,
+                                                );
+                                              }
+                                              if (sheetContext.mounted) {
+                                                setSheetState(() {});
+                                              }
+                                            }
+                                          },
+                                  icon:
+                                      _sendingOffer
+                                          ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                          : const Icon(Icons.send_rounded),
+                                  label: Text(
+                                    _sendingOffer
+                                        ? 'Enviando…'
+                                        : 'Enviar solicitud',
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: AppTheme.primaryGreen,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
           ),
     );
   }
@@ -1846,8 +2004,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
     final title = details['title'] as String? ?? 'Sin título';
     final desc = details['description'] as String? ?? 'Sin descripción';
-    final categoryId =
-        (details['categoryId'] as String? ?? 'general').toLowerCase();
+    final categoryId = normalizeCategoryId(details['categoryId'] ?? 'general');
     final price = (pricing['proposedPrice'] ?? 0.0) as num;
     final currency = pricing['currency'] as String? ?? 'Q';
     final status = jobData['status'] as String? ?? 'pending';
@@ -1907,9 +2064,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final IconData statusIcon;
     switch (status) {
       case 'pending':
-        statusColor = const Color(0xFFE65100);
-        statusLabel = 'Pendiente';
-        statusIcon = Icons.schedule_rounded;
+        statusColor = const Color(0xFF1976D2);
+        statusLabel = 'Disponible';
+        statusIcon = Icons.public_rounded;
         break;
       case 'accepted':
         final unavailable = !isOwner && currentUid != workerId;
@@ -1930,27 +2087,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         statusIcon = Icons.info_outline;
     }
 
-    // Icono y color de categoría
-    const categoryIcons = <String, IconData>{
-      'mecanica': Icons.build_rounded,
-      'plomeria': Icons.water_drop_rounded,
-      'electricidad': Icons.bolt_rounded,
-      'jardineria': Icons.yard_rounded,
-      'limpieza': Icons.cleaning_services_rounded,
-      'pintura': Icons.format_paint_rounded,
-      'general': Icons.handyman_rounded,
-    };
-    const categoryColors = <String, Color>{
-      'mecanica': Color(0xFFB71C1C),
-      'plomeria': Color(0xFF0D47A1),
-      'electricidad': Color(0xFFF57F17),
-      'jardineria': Color(0xFF1B5E20),
-      'limpieza': Color(0xFF006064),
-      'pintura': Color(0xFF4A148C),
-      'general': Color(0xFF3E2723),
-    };
-    final catIcon = categoryIcons[categoryId] ?? Icons.handyman_rounded;
-    final catColor = categoryColors[categoryId] ?? const Color(0xFF3E2723);
+    final catIcon = jobCategoryIcon(categoryId);
+    final catColor = jobCategoryColor(categoryId);
+    final heroDarkColor = Color.lerp(catColor, Colors.black, 0.24)!;
+    final heroLightColor = Color.lerp(catColor, Colors.white, 0.12)!;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
@@ -2017,7 +2157,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             expandedHeight: 200,
             pinned: true,
             stretch: true,
-            backgroundColor: const Color(0xFF1B5E20),
+            backgroundColor: heroDarkColor,
             iconTheme: const IconThemeData(color: Colors.white),
             flexibleSpace: FlexibleSpaceBar(
               stretchModes: const [
@@ -2042,13 +2182,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 children: [
                   // Gradiente base
                   Container(
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [
-                          Color(0xFF1B5E20),
-                          Color(0xFF2E7D32),
-                          Color(0xFF43A047),
-                        ],
+                        colors: [heroDarkColor, catColor, heroLightColor],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -2130,24 +2266,30 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: catColor.withValues(alpha: 0.10),
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: catColor.withOpacity(0.12),
-                          blurRadius: 20,
-                          offset: const Offset(0, 6),
+                          color: catColor.withValues(alpha: 0.10),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
                     child: Column(
                       children: [
-                        // Barra de color de categoría en la parte superior
                         Container(
-                          height: 5,
+                          height: 4,
+                          margin: const EdgeInsets.fromLTRB(18, 14, 18, 0),
                           decoration: BoxDecoration(
-                            color: catColor,
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(24),
+                            gradient: LinearGradient(
+                              colors: [
+                                catColor.withValues(alpha: 0.45),
+                                catColor,
+                              ],
                             ),
+                            borderRadius: BorderRadius.circular(4),
                           ),
                         ),
                         Padding(
@@ -2200,7 +2342,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                           ),
                                           const SizedBox(width: 5),
                                           Text(
-                                            categoryId,
+                                            categoryDisplayName(categoryId),
                                             style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w700,

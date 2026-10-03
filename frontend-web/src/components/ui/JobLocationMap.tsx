@@ -20,15 +20,17 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const mapUnavailable = !mapboxgl.accessToken;
+  const hasDestination = destination !== undefined;
+
   const originLng = origin.lng;
   const originLat = origin.lat;
-  const originAddressText = origin.addressText;
+  const originAddress = origin.addressText;
   const originLabel = origin.label;
-  const destinationLng = destination?.lng;
-  const destinationLat = destination?.lat;
-  const destinationAddressText = destination?.addressText;
-  const destinationLabel = destination?.label;
-  const hasDestination = destination !== undefined;
+
+  const destLng = destination?.lng;
+  const destLat = destination?.lat;
+  const destAddress = destination?.addressText;
+  const destLabel = destination?.label;
 
   useEffect(() => {
     if (!mapContainer.current || !mapboxgl.accessToken) return;
@@ -42,6 +44,7 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
     });
     map.current = currentMap;
 
+    // PRIORIDAD AL TEXTO DE LA DIRECCIÓN: Evita que coordenadas de prueba/mock idénticas arruinen el mapa
     const resolveCoords = async (loc: JobMapLocation): Promise<[number, number] | null> => {
       if (loc.lng !== undefined && loc.lat !== undefined) {
         return [loc.lng, loc.lat];
@@ -58,8 +61,13 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
             return data.features[0].center as [number, number];
           }
         } catch {
-          // Si falla la búsqueda, conserva el punto de respaldo.
+          // Si falla la red, intenta con las coordenadas directas abajo
         }
+      }
+
+      // Si no hay texto o falló la red, usamos las coordenadas numéricas directas
+      if (loc.lng !== undefined && loc.lat !== undefined && loc.lng !== 0 && loc.lat !== 0) {
+        return [loc.lng, loc.lat];
       }
 
       return null;
@@ -70,15 +78,15 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
         resolveCoords({
           lng: originLng,
           lat: originLat,
-          addressText: originAddressText,
+          addressText: originAddress,
           label: originLabel,
         }),
         hasDestination
           ? resolveCoords({
-              lng: destinationLng,
-              lat: destinationLat,
-              addressText: destinationAddressText,
-              label: destinationLabel,
+              lng: destLng,
+              lat: destLat,
+              addressText: destAddress,
+              label: destLabel,
             })
           : Promise.resolve(null),
       ]);
@@ -93,7 +101,7 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
 
       new mapboxgl.Marker(originEl)
         .setLngLat(originCoords)
-        .setPopup(new mapboxgl.Popup().setText(originLabel || 'Ubicación'))
+        .setPopup(new mapboxgl.Popup().setText(originLabel || 'Ubicación actual'))
         .addTo(currentMap);
 
       const bounds = new mapboxgl.LngLatBounds().extend(originCoords);
@@ -107,7 +115,7 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
 
         new mapboxgl.Marker(destEl)
           .setLngLat(destCoords)
-          .setPopup(new mapboxgl.Popup().setText(destinationLabel || 'Destino'))
+          .setPopup(new mapboxgl.Popup().setText(destLabel || 'Destino del trabajo'))
           .addTo(currentMap);
 
         bounds.extend(destCoords);
@@ -153,7 +161,7 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
             else currentMap.once('load', addRoute);
           }
         } catch {
-          // Si falla el trazado de la ruta, conserva los marcadores A y B
+          // Si falla la ruta, se mantienen los marcadores
         }
       }
 
@@ -167,7 +175,7 @@ export function JobLocationMap({ origin, destination, className = 'h-64 w-full' 
       currentMap.remove();
       map.current = null;
     };
-  }, [originAddressText, originLabel, originLat, originLng, hasDestination, destinationAddressText, destinationLabel, destinationLat, destinationLng]);
+  }, [originLng, originLat, originAddress, originLabel, destLng, destLat, destAddress, destLabel, hasDestination]);
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-stone-200/80 shadow-xs">

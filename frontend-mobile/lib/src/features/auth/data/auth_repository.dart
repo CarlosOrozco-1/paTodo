@@ -108,9 +108,13 @@ class AuthRepository {
     final googleUser = await GoogleSignIn.instance.authenticate();
     debugPrint('GTRACE_STEP2_ACCOUNT_OK: ${googleUser.email}');
     final googleAuth = googleUser.authentication;
-    final hasIdToken = googleAuth.idToken != null && googleAuth.idToken!.isNotEmpty;
+    final idToken = googleAuth.idToken;
+    final hasIdToken = idToken != null && idToken.isNotEmpty;
     debugPrint('GTRACE_STEP3_IDTOKEN: present=$hasIdToken');
-    final credential = GoogleAuthProvider.credential(idToken: googleAuth.idToken);
+    if (!hasIdToken) {
+      throw StateError('google-id-token-missing');
+    }
+    final credential = GoogleAuthProvider.credential(idToken: idToken);
     debugPrint('GTRACE_STEP4_FIREBASE_SIGNIN_BEGIN');
     final cred = await _auth.signInWithCredential(credential);
     debugPrint('GTRACE_STEP5_FIREBASE_OK: ${cred.user!.uid}');
