@@ -6,8 +6,9 @@ function readRemoteMode(): ApiMode {
   const raw = import.meta.env.VITE_API_MODE as string | undefined;
   if (raw === 'real' || raw === 'auto') return raw;
   if (raw === 'demo') return 'demo';
-  // Por defecto: demo (comportamiento previo) salvo que se configure algo más.
-  return 'demo';
+  // Por defecto: real (la app espera Firebase/API). El modo `demo` debe
+  // indicarse explícitamente con VITE_API_MODE=demo.
+  return 'real';
 }
 
 let cachedBackendAvailable: boolean | null = localStorage.getItem(FALLBACK_KEY)
