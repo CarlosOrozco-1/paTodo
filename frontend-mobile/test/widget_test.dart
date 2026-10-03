@@ -8,8 +8,8 @@ void main() {
   testWidgets('Sin sesión muestra el login', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
     expect(find.text('PaTodo'), findsOneWidget);
-    expect(find.text('Entrar'), findsOneWidget);
-    expect(find.text('Entrar con Google'), findsOneWidget);
+    expect(find.text('Entrar a mi cuenta'), findsOneWidget);
+    expect(find.text('Continuar con Google'), findsOneWidget);
   });
 
   testWidgets('Sin perfil muestra completar perfil', (tester) async {

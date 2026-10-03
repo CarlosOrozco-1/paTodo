@@ -11,7 +11,7 @@ import '../../services/domain/service_model.dart';
 
 enum _MapLayer { normal, satellite, roads }
 
-/// Mapa para trabajadores: muestra trabajos pendientes dentro de 20 km.
+/// Mapa para trabajadores: muestra trabajos pendientes dentro de 15 km.
 class NearbyMapScreen extends StatefulWidget {
   const NearbyMapScreen({super.key});
 
@@ -20,7 +20,7 @@ class NearbyMapScreen extends StatefulWidget {
 }
 
 class _NearbyMapScreenState extends State<NearbyMapScreen> {
-  static const _radiusKm = 20.0;
+  static const _radiusKm = 15.0;
   final _service = FirebaseService();
   final _mapController = MapController();
   LatLng? _current;
@@ -68,8 +68,9 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
         _jobs = nearby;
         _loading = false;
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
       debugPrint('NEARBY_MAP_LOAD_ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
       setState(() {
         if (_current != null) {
@@ -128,6 +129,12 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
       ) /
       1000;
 
+  void _zoomBy(double amount) {
+    final camera = _mapController.camera;
+    final zoom = (camera.zoom + amount).clamp(3.0, 19.0).toDouble();
+    _mapController.move(camera.center, zoom);
+  }
+
   String get _tileUrl {
     switch (_layer) {
       case _MapLayer.satellite:
@@ -145,13 +152,6 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
       backgroundColor: const Color(0xFFF6F8F7),
       appBar: AppBar(
         title: const Text('Trabajos cerca de ti'),
-        actions: [
-          IconButton(
-            tooltip: 'Capas del mapa',
-            icon: const Icon(Icons.layers_outlined),
-            onPressed: () => setState(() => _showLayers = !_showLayers),
-          ),
-        ],
       ),
       body:
           _loading
@@ -168,15 +168,6 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                         : null,
               )
               : _buildMap(),
-      floatingActionButton:
-          _current == null
-              ? null
-              : FloatingActionButton(
-                backgroundColor: AppTheme.primaryGreen,
-                foregroundColor: Colors.white,
-                onPressed: () => _mapController.move(_current!, 14),
-                child: const Icon(Icons.my_location_rounded),
-              ),
     );
   }
 
@@ -186,9 +177,15 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
       children: [
         FlutterMap(
           mapController: _mapController,
-          options: MapOptions(initialCenter: center, initialZoom: 12.5),
+          options: MapOptions(
+            initialCenter: center,
+            initialZoom: 12.5,
+            minZoom: 3,
+            maxZoom: 19,
+          ),
           children: [
             TileLayer(
+              key: ValueKey(_layer),
               urlTemplate: _tileUrl,
               userAgentPackageName: 'com.patodo.app',
             ),
@@ -223,6 +220,7 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
           ),
         ),
         if (_showLayers) _buildLayerPicker(),
+        Positioned(right: 16, bottom: 22, child: _buildMapControls()),
       ],
     );
   }
@@ -302,6 +300,84 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMapControls() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _MapActionButton(
+          tooltip: _showLayers ? 'Cerrar capas' : 'Capas del mapa',
+          icon: Icons.layers_rounded,
+          isActive: _showLayers,
+          onPressed: () => setState(() => _showLayers = !_showLayers),
+        ),
+        const SizedBox(height: 12),
+        Material(
+          color: Colors.white,
+          elevation: 8,
+          borderRadius: BorderRadius.circular(17),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'Acercar',
+                onPressed: () => _zoomBy(1),
+                icon: const Icon(Icons.add_rounded),
+                color: AppTheme.textDark,
+              ),
+              Container(
+                width: 26,
+                height: 1,
+                color: const Color(0xFFE8EDE9),
+              ),
+              IconButton(
+                tooltip: 'Alejar',
+                onPressed: () => _zoomBy(-1),
+                icon: const Icon(Icons.remove_rounded),
+                color: AppTheme.textDark,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _MapActionButton(
+          tooltip: 'Ir a mi ubicacion',
+          icon: Icons.my_location_rounded,
+          onPressed:
+              _current == null ? null : () => _mapController.move(_current!, 14),
+        ),
+      ],
+    );
+  }
+}
+
+class _MapActionButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool isActive;
+
+  const _MapActionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.isActive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isActive ? AppTheme.primaryGreen : Colors.white,
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        icon: Icon(icon),
+        color: isActive ? Colors.white : AppTheme.primaryGreen,
       ),
     );
   }
@@ -417,7 +493,7 @@ class _MapStatus extends StatelessWidget {
           Expanded(
             child: Text(
               error ??
-                  '$count trabajo${count == 1 ? '' : 's'} disponibles en un radio de 20 km',
+                  '$count trabajo${count == 1 ? '' : 's'} disponibles en un radio de 15 km',
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
             ),
           ),

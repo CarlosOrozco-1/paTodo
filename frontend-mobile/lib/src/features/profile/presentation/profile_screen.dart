@@ -33,6 +33,7 @@ class ProfileScreen extends StatelessWidget {
 
     if (confirm != true) return;
 
+    final navigator = Navigator.of(context);
     try {
       // DEV: Cerrar sesión en GoogleSignIn para liberar cuenta en cache si aplica
       try {
@@ -42,10 +43,8 @@ class ProfileScreen extends StatelessWidget {
       // Cerrar sesión en Firebase Auth
       await FirebaseAuth.instance.signOut();
 
-      if (context.mounted) {
-        // Redirige al login limpiando el stack de rutas
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-      }
+      // /home puede estar encima de la raíz que escucha authStateChanges.
+      navigator.popUntil((route) => route.isFirst);
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

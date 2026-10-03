@@ -18,13 +18,22 @@ class ChatRepository {
             .where('participants', arrayContains: userId)
             .get();
 
+    String? closedConversationId;
     for (final conversation in conversations.docs) {
       final data = conversation.data();
-      if (data['jobId'] == jobId && data['status'] == 'active') {
-        return conversation.id;
-      }
+      if (data['jobId'] != jobId) continue;
+      if (data['status'] == 'active') return conversation.id;
+      if (data['status'] == 'closed') closedConversationId = conversation.id;
     }
-    return null;
+    return closedConversationId;
+  }
+
+  Stream<String?> conversationStatus(String conversationId) {
+    return _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .snapshots()
+        .map((snapshot) => snapshot.data()?['status'] as String?);
   }
 
   Stream<List<ChatMessage>> messages(String conversationId) {
