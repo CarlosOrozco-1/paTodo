@@ -17,8 +17,10 @@ La app queda en `http://localhost:5173`.
 
 Modos de operación (`VITE_API_MODE`):
 
-- `real` → Firebase + API REST (`https://patodo.onrender.com`). Modo por defecto.
+- `real` → Firebase + API REST (`https://patodo.onrender.com`). **Modo por defecto**
+  si `VITE_API_MODE` no está definido.
 - `demo` → datos simulados en `localStorage` (sin backend; incluye el panel admin).
+  Debe indicarse explícitamente.
 - `auto` → prueba el health check de la API al arrancar y cae a `demo` si no responde.
 
 Otros build:

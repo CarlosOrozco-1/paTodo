@@ -1,6 +1,9 @@
 node_modules/
 dist/
 .env
+# Archivo de entorno sin punto (p. ej. `api/env`): puede contener el service
+# account. No debe versionarse nunca.
+/env
 src/**/*.js
 src/**/*.js.map
 src/**/*.d.ts

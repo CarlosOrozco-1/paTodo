@@ -149,7 +149,7 @@ Los equipos web y móvil tienen **sus propios repositorios**. En el monorepo:
 - `frontend-web/` conserva la **app web completa** (React + Vite + TypeScript +
   Tailwind, con Capacitor empaquetado como último paso); se integró desde el
   repo de los compañeros y usa modo `demo`/`real`/`auto` (`.env`, por defecto
-  demo). Los frontends (web y móvil) comparten Firebase y la API REST.
+  `real`; `demo` es explícito). Los frontends (web y móvil) comparten Firebase y la API REST.
 - `frontend-mobile/` conserva la **app móvil Flutter**.
 
 Antes de tocar esas carpetas o de integrar algo, leer:
