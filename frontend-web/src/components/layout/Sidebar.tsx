@@ -32,7 +32,7 @@ const workerNav: NavItem[] = [
   { to: '/profesional', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/profesional/trabajos-disponibles', icon: ClipboardList, label: 'Trabajos Disponibles' },
   { to: '/profesional/mis-ofertas', icon: Hand, label: 'Mis Ofertas', badgeTypes: ['offer'] },
-  { to: '/profesional/trabajos-activos', icon: CheckCircle, label: 'Trabajos Activos', badgeTypes: ['job_status'] },
+  { to: '/profesional/trabajos-activos', icon: CheckCircle, label: 'Mi Actividad', badgeTypes: ['job_status'] },
 ];
 
 const adminNav: NavItem[] = [
@@ -42,9 +42,25 @@ const adminNav: NavItem[] = [
   { to: '/admin/trabajos', icon: ClipboardList, label: 'Todos los Trabajos' },
 ];
 
+/**
+ * Un usuario `both` ve los dos paneles, separados y rotulados. Se renombran
+ * los "Dashboard" porque en un menú unificado dos entradas con la misma
+ * etiqueta serían ambiguas.
+ */
+const bothNav: NavItem[] = [
+  { to: '/cliente', icon: LayoutDashboard, label: 'Como cliente' },
+  { to: '/cliente/mis-trabajos', icon: Briefcase, label: 'Mis Trabajos', badgeTypes: ['job_status'] },
+  { to: '/cliente/crear-trabajo', icon: PlusCircle, label: 'Publicar Trabajo' },
+  { to: '/profesional', icon: Hand, label: 'Como profesional' },
+  { to: '/profesional/trabajos-disponibles', icon: ClipboardList, label: 'Trabajos Disponibles' },
+  { to: '/profesional/mis-ofertas', icon: Hand, label: 'Mis Ofertas', badgeTypes: ['offer'] },
+  { to: '/profesional/trabajos-activos', icon: CheckCircle, label: 'Trabajos Activos' },
+];
+
 const navMap: Record<string, NavItem[]> = {
   client: clientNav,
   worker: workerNav,
+  both: bothNav,
   admin: adminNav,
 };
 
@@ -55,7 +71,7 @@ export function Sidebar() {
   const location = useLocation();
   const notifications = useNotificationStore((s) => s.notifications);
 
-  const nav = navMap[user?.role || 'client'] || clientNav;
+  const nav = (user && navMap[user.role]) || clientNav;
 
   const badgeCount = (item: NavItem) => {
     if (!item.badgeTypes?.length) return 0;

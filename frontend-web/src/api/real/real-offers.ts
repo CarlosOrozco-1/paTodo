@@ -17,6 +17,7 @@ import { NotSupportedError } from '.';
 import { db } from '../firebase/init';
 import { offerFromDoc, requireUid } from '../firebase/fs';
 import { apiPost } from '../firebase/rest';
+import { ensureApiWarm } from '../apiWarmup';
 
 export const realOffers = {
   async getAllByJob(jobId: string): Promise<Offer[]> {
@@ -80,6 +81,9 @@ export const realOffers = {
     const current = await getDoc(offerRef);
     if (!current.exists()) throw new Error('Oferta no encontrada');
     const offer = offerFromDoc(current)!;
+    // Misma razón que `completeJob`: transacción + notificación tras arranque
+    // en frío de Render.
+    await ensureApiWarm();
     await apiPost('/acceptOffer', { jobId: offer.jobId, offerId: id });
     const updated = await getDoc(offerRef);
     return mapOffer(offerFromDoc(updated)!);

@@ -83,6 +83,73 @@ service cloud.firestore {
                     && notSuspended()
                     && resource.data.clientId == request.auth.uid
                     && resource.data.status == 'pending';
+
+      // Modelo: jobs/{jobId}/tracking/current contiene solo la ultima posicion
+      // (latitude/longitude), UID del trabajador y timestamp. No es historial.
+      match /tracking/{trackingId} {
+        function parentJobPath() {
+          return /databases/$(database)/documents/jobs/$(jobId);
+        }
+
+        function parentJobIsActive() {
+          return exists(parentJobPath())
+                 && get(parentJobPath()).data.status in ['accepted', 'assigned', 'in_progress'];
+        }
+
+        function isJobParticipant() {
+          return signedIn()
+                 && parentJobIsActive()
+                 && (request.auth.uid == get(parentJobPath()).data.clientId
+                     || request.auth.uid == get(parentJobPath()).data.workerId);
+        }
+
+        function isAssignedWorker() {
+          return signedIn()
+                 && hasRole(['worker', 'both'])
+                 && parentJobIsActive()
+                 && request.auth.uid == get(parentJobPath()).data.workerId;
+        }
+
+        function isValidTrackingLocation() {
+          let data = request.resource.data;
+          return smallEnough()
+                 && data.keys().hasAll(['workerId', 'latitude', 'longitude', 'updatedAt'])
+                 && data.keys().hasOnly(['workerId', 'latitude', 'longitude', 'accuracyMeters',
+                                         'headingDegrees', 'speedMetersPerSecond', 'updatedAt'])
+                 && data.workerId is string
+                 && data.workerId == request.auth.uid
+                 && data.latitude is number
+                 && data.latitude >= -90
+                 && data.latitude <= 90
+                 && data.longitude is number
+                 && data.longitude >= -180
+                 && data.longitude <= 180
+                 && data.updatedAt is timestamp
+                 && data.updatedAt == request.time
+                 && (!('accuracyMeters' in data)
+                     || (data.accuracyMeters is number
+                         && data.accuracyMeters >= 0
+                         && data.accuracyMeters <= 10000))
+                 && (!('headingDegrees' in data)
+                     || (data.headingDegrees is number
+                         && data.headingDegrees >= 0
+                         && data.headingDegrees <= 360))
+                 && (!('speedMetersPerSecond' in data)
+                     || (data.speedMetersPerSecond is number
+                         && data.speedMetersPerSecond >= 0
+                         && data.speedMetersPerSecond <= 100));
+        }
+
+        allow read: if trackingId == 'current' && isJobParticipant();
+        allow create: if trackingId == 'current'
+                      && isAssignedWorker()
+                      && isValidTrackingLocation();
+        allow update: if trackingId == 'current'
+                      && isAssignedWorker()
+                      && isValidTrackingLocation()
+                      && request.resource.data.workerId == resource.data.workerId;
+        allow delete: if false;
+      }
     }
 
     // ===================== offers =====================

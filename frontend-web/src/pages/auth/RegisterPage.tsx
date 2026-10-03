@@ -21,8 +21,9 @@ import { getErrorMessage } from '@/api/axiosClient';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/utils/cn';
+import { homeRouteFor } from '@/utils/roles';
 
-type Role = 'client' | 'worker';
+type Role = 'client' | 'worker' | 'both';
 
 interface FormState {
   firstName: string;
@@ -124,7 +125,7 @@ export function RegisterPage() {
         role,
       });
       toast('success', '¡Cuenta creada correctamente!');
-      navigate(role === 'worker' ? '/profesional' : '/cliente', { replace: true });
+      navigate(homeRouteFor(role), { replace: true });
     } catch (error) {
       toast('error', getErrorMessage(error));
     }
@@ -136,9 +137,16 @@ export function RegisterPage() {
         toast('error', 'No se recibieron las credenciales de Google');
         return;
       }
-      await loginWithGoogle(credentialResponse.credential, role);
-      toast('success', '¡Cuenta creada con Google!');
-      navigate(role === 'worker' ? '/profesional' : '/cliente', { replace: true });
+      const result = await loginWithGoogle(credentialResponse.credential);
+      if (result.needsProfile) {
+        // La cuenta es nueva: se guarda lo que trae Google y se pide confirmar
+        // el resto. El rol se elige ahí, no antes de saber qué hará el usuario.
+        sessionStorage.setItem('paTodo_google_draft', JSON.stringify(result.draft));
+        navigate('/completar-perfil', { replace: true });
+        return;
+      }
+      toast('success', '¡Sesión iniciada con Google!');
+      navigate(homeRouteFor(result.user.role), { replace: true });
     } catch (error) {
       toast('error', getErrorMessage(error));
     }
@@ -175,34 +183,52 @@ export function RegisterPage() {
               <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2">
                 ¿Cómo deseas registrarte?
               </label>
-              <div className="grid grid-cols-2 gap-2 p-1.5 bg-gray-50 rounded-2xl border border-gray-200">
+              <div className="grid grid-cols-3 gap-2 p-1.5 bg-gray-50 rounded-2xl border border-gray-200">
                 <button
                   type="button"
                   onClick={() => setRole('client')}
                   className={cn(
-                    'flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer',
+                    'flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer',
                     role === 'client'
                       ? 'bg-white text-brand-700 shadow-sm border border-gray-100'
                       : 'text-gray-500 hover:text-gray-900'
                   )}
                 >
-                  <UserRound className="h-4 w-4" />
+                  <UserRound className="h-4 w-4 shrink-0" />
                   Cliente
                 </button>
                 <button
                   type="button"
                   onClick={() => setRole('worker')}
                   className={cn(
-                    'flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer',
+                    'flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer',
                     role === 'worker'
                       ? 'bg-white text-brand-700 shadow-sm border border-gray-100'
                       : 'text-gray-500 hover:text-gray-900'
                   )}
                 >
-                  <Wrench className="h-4 w-4" />
+                  <Wrench className="h-4 w-4 shrink-0" />
                   Profesional
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setRole('both')}
+                  className={cn(
+                    'flex items-center justify-center gap-2 py-2.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer',
+                    role === 'both'
+                      ? 'bg-white text-brand-700 shadow-sm border border-gray-100'
+                      : 'text-gray-500 hover:text-gray-900'
+                  )}
+                >
+                  <Sparkles className="h-4 w-4 shrink-0" />
+                  Ambos
+                </button>
               </div>
+              {role === 'both' && (
+                <p className="mt-2 text-[11px] text-gray-500 leading-relaxed">
+                  Podrás publicar trabajos y hacer ofertas. Cambia de panel cuando quieras desde el menú lateral.
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -314,10 +340,10 @@ export function RegisterPage() {
             </div>
 
             <p className="text-center text-[11px] text-gray-400 pt-1">
-              {role === 'worker' ? (
+              {role === 'worker' || role === 'both' ? (
                 <span className="inline-flex items-center gap-1.5 text-brand-700 bg-brand-50 px-2.5 py-1 rounded-lg">
                   <Briefcase className="h-3.5 w-3.5 shrink-0" />
-                  Tu perfil será revisado por el equipo de PaTodo
+                  Tu perfil de profesional será revisado por el equipo de PaTodo
                 </span>
               ) : (
                 'Al registrarte aceptas los términos y condiciones de PaTodo'

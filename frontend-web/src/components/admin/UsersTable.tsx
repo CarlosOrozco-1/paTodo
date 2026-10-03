@@ -14,6 +14,7 @@ import { StarRating } from '@/components/ui/StarRating';
 import { formatDate } from '@/utils/formatters';
 import { cn } from '@/utils/cn';
 import { toast } from '@/stores/uiStore';
+import { isWorker } from '@/utils/roles';
 
 interface UsersTableProps {
   users: UserAdminView[];
@@ -25,12 +26,14 @@ interface UsersTableProps {
 const roleLabels: Record<string, string> = {
   client: 'Cliente',
   worker: 'Profesional',
+  both: 'Cliente y Profesional',
   admin: 'Admin',
 };
 
 const roleStyles: Record<string, string> = {
   client: 'bg-blue-100 text-blue-800',
   worker: 'bg-purple-100 text-purple-800',
+  both: 'bg-brand-100 text-brand-800',
   admin: 'bg-gray-800 text-white',
 };
 
@@ -107,7 +110,7 @@ export function UsersTable({ users, onSuspend, onActivate, onView }: UsersTableP
 
                 {/* Calificación */}
                 <td className="px-5 py-3">
-                  {user.role === 'worker' ? (
+                  {isWorker(user.role) ? (
                     <StarRating rating={user.stats?.rating ?? 0} count={user.stats?.ratingCount ?? 0} size="sm" />
                   ) : (
                     <span className="text-gray-300">—</span>

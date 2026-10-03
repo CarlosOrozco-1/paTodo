@@ -18,6 +18,13 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { fullName, timeAgo } from '@/utils/formatters';
+import {
+  dashboardRouteFor,
+  isAdmin,
+  isBoth,
+  profileRouteFor,
+  ROLE_LABELS,
+} from '@/utils/roles';
 
 export function Navbar() {
   const { user, logout } = useAuthStore();
@@ -36,12 +43,7 @@ export function Navbar() {
       useNotificationStore.getState().reset();
       return;
     }
-
-    void useNotificationStore.getState().load();
-    const refreshTimer = window.setInterval(() => {
-      void useNotificationStore.getState().load();
-    }, 10000);
-    return () => window.clearInterval(refreshTimer);
+    return useNotificationStore.getState().subscribe();
   }, [user]);
 
   const unreadNotifications = notifications.filter((notification) => !notification.read);
@@ -62,8 +64,8 @@ export function Navbar() {
     navigate('/login');
   };
 
-  const profileRoute = user?.role === 'worker' ? '/profesional/perfil' : user?.role === 'admin' ? '/admin' : '/cliente/perfil';
-  const dashboardRoute = user?.role === 'worker' ? '/profesional' : user?.role === 'admin' ? '/admin' : '/cliente';
+  const profileRoute = profileRouteFor(user?.role);
+  const dashboardRoute = dashboardRouteFor(user?.role);
 
   return (
     <nav className="sticky top-0 z-40 border-b border-brand-100/60 bg-white/90 backdrop-blur-md shadow-2xs">
@@ -193,9 +195,14 @@ export function Navbar() {
                         <p className="text-xs font-bold text-gray-900 truncate">
                           {fullName(user.profile)}
                         </p>
-                        {user.role === 'admin' && (
+                        {isAdmin(user.role) && (
                           <Badge className="bg-amber-50 text-amber-700 border border-amber-200/60 text-[9px] font-extrabold">
                             ADMIN
+                          </Badge>
+                        )}
+                        {isBoth(user.role) && (
+                          <Badge className="bg-brand-50 text-brand-700 border border-brand-200/60 text-[9px] font-extrabold">
+                            {ROLE_LABELS.both.toUpperCase()}
                           </Badge>
                         )}
                       </div>
@@ -209,8 +216,19 @@ export function Navbar() {
                         className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-brand-50/50 hover:text-brand-700 transition-colors"
                       >
                         <LayoutDashboard className="h-4 w-4 text-brand-600" />
-                        Mi Dashboard
+                        {isBoth(user.role) ? 'Panel de cliente' : 'Mi Dashboard'}
                       </Link>
+
+                      {isBoth(user.role) && (
+                        <Link
+                          to="/profesional"
+                          onClick={() => setMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-brand-50/50 hover:text-brand-700 transition-colors"
+                        >
+                          <LayoutDashboard className="h-4 w-4 text-brand-600" />
+                          Panel de profesional
+                        </Link>
+                      )}
 
                       {user.role === 'admin' && (
                         <Link

@@ -11,8 +11,8 @@ interface ConversationListProps {
   conversations: Conversation[];
   activeConversationId?: string | null;
   userId: string;
-  userNames: Record<string, string>;
-  userAvatars: Record<string, string>;
+  resolveName: (conversation: Conversation, otherId: string) => string;
+  resolveAvatar: (conversation: Conversation, otherId: string) => string;
   onSelect: (conversation: Conversation) => void;
 }
 
@@ -20,15 +20,15 @@ export function ConversationList({
   conversations,
   activeConversationId,
   userId,
-  userNames,
-  userAvatars,
+  resolveName,
+  resolveAvatar,
   onSelect,
 }: ConversationListProps) {
   const [search, setSearch] = useState('');
   const filtered = conversations.filter((conv) => {
     const otherId = conv.participantIds.find((id) => id !== userId);
     if (!otherId) return true;
-    const name = userNames[otherId] || 'Usuario';
+    const name = resolveName(conv, otherId);
     return name.toLowerCase().includes(search.toLowerCase());
   });
 
@@ -49,7 +49,7 @@ export function ConversationList({
         ) : (
           filtered.map((conv) => {
             const otherId = conv.participantIds.find((id) => id !== userId) || '';
-            const name = userNames[otherId] || 'Usuario';
+            const name = resolveName(conv, otherId);
             const unread = conv.unreadCount?.[userId] || 0;
             return (
               <button
@@ -61,7 +61,7 @@ export function ConversationList({
                   activeConversationId === conv.id && 'bg-brand-50',
                 )}
               >
-                <Avatar name={name} src={userAvatars[otherId]} size="md" />
+                <Avatar name={name} src={resolveAvatar(conv, otherId)} size="md" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between">
                     <p className="truncate text-sm font-semibold text-gray-900">
