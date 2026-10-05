@@ -20,6 +20,41 @@
 - Estar autenticado en Firebase CLI (`npx --yes firebase-tools@latest login`).
   La sesión se persiste en el equipo.
 
+## Validación automática del build (obligatoria)
+
+Vite **incrusta el `.env` dentro del bundle al compilar**. Si una máquina no lo
+tiene, la app arranca en modo `demo` y se publica en `pa-todo.web.app` sirviendo
+datos simulados de `localStorage` en lugar de los reales de Firebase. Es un
+fallo silencioso: el build termina " bien" y el deploy también.
+
+Por eso `npm run build` incluye dos validaciones automáticas:
+
+| Momento | Script | Qué hace |
+|---|---|---|
+| Antes de compilar | `scripts/check-web-env.mjs` | Falla con `exit 1` si falta el `.env`, si `VITE_API_MODE` no es `real`, o si alguna variable obligatoria está vacía o es un valor de ejemplo. |
+| Después de compilar | `scripts/verify-web-bundle.mjs` | Lee `dist/assets/*.js` y confirma que el proyecto de Firebase, el dominio de auth y la URL de la API **están dentro del bundle**. |
+
+Salida esperada de un build correcto:
+
+```
+[build] OK · modo=real · firebase=pa-todo · api=https://patodo.onrender.com
+✓ built in ...
+[verify] OK · 1 archivo(s) JS (3060 KB) · config de .env incrustada
+```
+
+**No hay que verificar el `.env` a mano**: si algo falta, el build se cancela solo
+con un mensaje que dice qué variable falta y cómo resolverlo. Ese es el punto:
+la regla no depende de que alguien la lea.
+
+- `VITE_API_MODE=auto` **no** se acepta para producción: si la API no responde
+  (Render en plan gratuito tarda 20-50 s en despertar) la app cae a datos
+  simulados.
+- Para compilar un demo a propósito (no publicar en Hosting):
+  `ALLOW_DEMO_BUILD=1 npm run build`. El build pasa, pero queda sin verificar.
+- `npm run build:portable` (APK/Capacitor) **no** pasa por estas validaciones:
+  usa su propio `.env.portable` y su modo `portable`.
+- Para revalidar un bundle ya compilado sin recompilar: `npm run verify:bundle`.
+
 ## Procedimiento de actualización (producción)
 
 Todo se corre desde la **raíz del monorepo**:
@@ -66,8 +101,13 @@ Si una versión publicada sale mal:
 - **Este documento es el único criterio** para publicar la web: no inventar
   pasos adicionales (no subir `dist/` a git, no deployar `api/`, no tocar
   `firestore.rules` en este flujo).
-- Si el `.env` de `frontend-web/` no está en modo `real`, detenerse y pedir
-  confirmación antes de buildear (un `.env` en modo `demo` publicaría la web
-  sin datos reales).
+- Si el `.env` de `frontend-web/` no está en modo `real`, el build **se cancela
+  solo** (`check-web-env.mjs`). No hace falta comprobarlo antes: si el build
+  terminó y mostró `[build] OK` + `[verify] OK`, se puede publicar. Si falló,
+  pasar el mensaje exacto al usuario y **no** usar `ALLOW_DEMO_BUILD` salvo que
+  lo pida explícitamente.
+- Ante la duda de si el bundle lleva datos reales, `npm run verify:bundle` lo
+  comprueba sin recompilar. No inspeccionar el `.env` a mano como paso
+  obligatorio: la validación es del build, no del agente.
 - Si un paso falla, avisar con el mensaje de error exacto y NO continuar al
   siguiente.

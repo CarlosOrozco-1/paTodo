@@ -67,6 +67,18 @@ patodo/
   el procedimiento exacto está en `docs/web-actualizacion.md`. Cuando el equipo
   pida "actualiza la web", seguir ese documento (build local + deploy hostelado;
   probar primero con un canal de vista previa si se requiere).
+- **Guardián del build web** (obligatorio, no opcional): `npm run build` en
+  `frontend-web/` valida solo el `.env` y cancela con `exit 1` si falta, si
+  `VITE_API_MODE` no es `real` o si una variable obligatoria quedó vacía o con
+  valor de ejemplo; después comprueba que la config quedó incrustada en
+  `dist/assets/`. Esto existe porque Vite incrusta el `.env` al compilar: sin él
+  la app cae en modo `demo` y se publica en producción con datos simulados de
+  `localStorage` en lugar de los de Firebase, sin ningún error visible. Por eso
+  **no hay que comprobar el `.env` a mano**: si el build imprime
+  `[build] OK` y `[verify] OK`, se publica; si falla, se reporta el mensaje tal
+  cual. No usar `ALLOW_DEMO_BUILD` salvo petición explícita del usuario, y nunca
+  publicar en Hosting un bundle así. `npm run build:portable` (APK) no pasa por
+  estas validaciones.
 - Un error de la app móvil no implica necesariamente un deploy desactualizado:
   verificar en orden → (1) índice Firestore, (2) reglas Firestore, (3) `api/`
   en Render, (4) estatus del request (cold start de Render en plan gratuito).
