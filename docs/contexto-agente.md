@@ -60,6 +60,12 @@ Flujo core (happy path):
   `docs/auth-google.md` (origin/client_id `377828600122-…`, CORS en Render,
   400 en `/createUser`), y pendientes para el equipo web (modal "Completa tu
   perfil" con teléfono + rol `both`).
+- **Llamadas de voz (evaluado, NO implementado):** análisis técnico en
+  `docs/llamadas-voz.md`. Requiere un servidor porque el Access Token del SDK de
+  voz solo puede firmarse en backend (el secreto nunca puede ir en el cliente);
+  por eso iría en `api/` (Render) y no en Cloud Functions, que además exigen el
+  plan Blaze. Falta la decisión de negocio app↔app vs. app→teléfono y el costo de
+  Twilio.
 
 ## 4. Endpoints de la API REST
 
