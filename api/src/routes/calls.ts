@@ -76,6 +76,28 @@ const CALLER_ONLY = new Set<string>(["canceled", "missed"]);
 /** Estados que puede registrar únicamente quien recibe. */
 const CALLEE_ONLY = new Set<string>(["declined"]);
 
+/**
+ * Documento de exclusion mutua por trabajo: `callLocks/{jobId}` guarda el
+ * `callId` de la llamada viva de ese trabajo.
+ *
+ * Existe por un motivo concreto: dos peticiones simultaneas de
+ * /createVoiceSession (doble tap en "Llamar", dos pestanas, un reintento del
+ * cliente) pueden pasar a la vez la comprobacion "no hay llamada activa" y
+ * crear DOS llamadas. El receptor veria dos pantallas de llamada entrante y no
+ * sabria cual contestar.
+ *
+ * La transaccion de Firestore serializa las escrituras sobre el mismo
+ * documento, asi que la segunda peticion ve el bloqueo de la primera y responde
+ * 409. No hace falta ningun tipo de lock en memoria: con varias instancias de
+ * la API en Render funciona igual.
+ *
+ * No es un documento de negocio: no se lista ni se exporta, y las reglas lo
+ * niegan entero a los clientes.
+ */
+function lockRefFor(jobId: string): FirebaseFirestore.DocumentReference {
+  return db.collection("callLocks").doc(jobId);
+}
+
 interface CreateVoiceSessionBody {
   jobId: string;
 }
@@ -191,64 +213,93 @@ callsRouter.post("/createVoiceSession", async (request, response) => {
       );
     }
 
-    // Barrido de llamadas abandonadas antes de comprobar si hay una activa.
-    // Usa el indice calls: jobId + createdAt.
-    const recentCalls = await db
-      .collection("calls")
-      .where("jobId", "==", body.jobId)
-      .orderBy("createdAt", "desc")
-      .limit(10)
-      .get();
+// Todo lo que decide si la llamada puede empezar ocurre DENTRO de una
+    // transaccion sobre callLocks/{jobId}. Las lecturas van antes que las
+    // escrituras, como exige Firestore.
+    const lockRef = lockRefFor(body.jobId);
+    const callRef = db.collection("calls").doc();
+    let abandonedCallId = "";
 
-    const now = Date.now();
-    let activeCall: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+    await db.runTransaction(async (transaction) => {
+      // ============ LECTURAS ============
+      const lockDoc = await transaction.get(lockRef);
 
-    for (const callDoc of recentCalls.docs) {
-      const data = callDoc.data();
-      if (!ACTIVE_STATUSES.includes(data.status as CallStatus)) continue;
+      if (lockDoc.exists) {
+        const lockedCallId = lockDoc.data()?.callId;
+        const stale = typeof lockedCallId !== "string" || lockedCallId === "";
 
-      if (data.status === "ringing") {
-        const updatedAt = data.updatedAt;
-        const age =
-          updatedAt instanceof Timestamp ? now - updatedAt.toMillis() : Number.MAX_SAFE_INTEGER;
+        let blockedCallId = "";
 
-        if (age > RINGING_TIMEOUT_MS) {
-          // Llamada abandonada: se cierra para no dejar bloqueada la relación.
-          await callDoc.ref.update({
-            status: "missed",
-            endedAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-          await deleteSignals(callDoc.id);
-          continue;
+        if (!stale) {
+          const lockedCallDoc = await transaction.get(
+            db.collection("calls").doc(lockedCallId)
+          );
+
+          if (!lockedCallDoc.exists) {
+            // El bloqueo apunta a una llamada que ya no existe: se puede reutilizar.
+          } else {
+            const lockedData = lockedCallDoc.data() ?? {};
+
+            if (!ACTIVE_STATUSES.includes(lockedData.status as CallStatus)) {
+              // La llamada ya termino y el cierre todavia no libero el bloqueo.
+            } else {
+              const updatedAt = lockedData.updatedAt;
+              const age =
+                updatedAt instanceof Timestamp
+                  ? Date.now() - updatedAt.toMillis()
+                  : Number.MAX_SAFE_INTEGER;
+
+              if (lockedData.status === "ringing" && age > RINGING_TIMEOUT_MS) {
+                // Llamada abandonada: sin tono de ring en el v1 el `ringing` no
+                // expira solo, y sin cerrarla la relacion quedaria bloqueada
+                // para siempre. Se cierra y se sigue con la nueva.
+                abandonedCallId = lockedCallId;
+                transaction.update(lockedCallDoc.ref, {
+                  status: "missed",
+                  endedAt: FieldValue.serverTimestamp(),
+                  updatedAt: FieldValue.serverTimestamp(),
+                });
+              } else {
+                blockedCallId = lockedCallId;
+              }
+            }
+          }
+        }
+
+        if (blockedCallId !== "") {
+          throw httpError(
+            409,
+            "already-exists",
+            "Ya hay una llamada activa entre las dos partes de este trabajo."
+          );
         }
       }
 
-      activeCall = callDoc;
-      break;
-    }
+      // ============ ESCRITURAS ============
+      transaction.set(callRef, {
+        jobId: body.jobId,
+        callerId: uid,
+        calleeId,
+        direction: "outgoing",
+        status: "ringing",
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
 
-    if (activeCall) {
-      throw httpError(
-        409,
-        "already-exists",
-        "Ya hay una llamada activa entre las dos partes de este trabajo."
-      );
+      transaction.set(lockRef, {
+        jobId: body.jobId,
+        callId: callRef.id,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+
+    // La senalizacion de la llamada abandonada se borra fuera de la transaccion:
+    // son mensajes sueltos y meterlos aqui alargaria el bloqueo sin aportar nada.
+    if (abandonedCallId !== "") {
+      await deleteSignals(abandonedCallId);
     }
 
     const callerName = await displayNameOf(uid);
-    const callRef = db.collection("calls").doc();
-
-    await callRef.set({
-      jobId: body.jobId,
-      callerId: uid,
-      calleeId,
-      direction: "outgoing",
-      status: "ringing",
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-
     const callSnapshot = await callRef.get();
     const callData = callSnapshot.data() ?? {};
 
@@ -422,6 +473,21 @@ callsRouter.post("/endVoiceCall", async (request, response) => {
 
     await callRef.update(update);
     await deleteSignals(callRef.id);
+
+    // Libera el bloqueo de exclusion mutua de este trabajo. Sin esto, el
+    // siguiente createVoiceSession veria el bloqueo apuntando a una llamada ya
+    // cerrada y tendria que limpiarlo, en vez de empezar limpio.
+    const jobId = callData.jobId;
+    if (typeof jobId === "string" && jobId !== "") {
+      const lockRef = lockRefFor(jobId);
+      const lockDoc = await lockRef.get();
+
+      // Solo se borra si sigue apuntando a ESTA llamada: si otra llamada ya
+      // tomo el bloqueo en paralelo, no hay que pisarla.
+      if (lockDoc.exists && lockDoc.data()?.callId === callRef.id) {
+        await lockRef.delete();
+      }
+    }
 
     const updated = await callRef.get();
     const updatedData = updated.data() ?? {};

@@ -233,3 +233,23 @@ test('la senalizacion exige timestamp del servidor', async () => {
 test('rechazar limpio cuando la llamada no existe, sin error de evaluacion', async () => {
   await assertFails(setDoc(signalDoc(asClient(), 'call-inexistente'), validSignal()));
 });
+
+// ---------- callLocks: documento interno de la API ----------
+
+// El bloqueo de exclusion mutua es un detalle de la API. Si un cliente pudiera
+// tocarlo, podria desbloquearse a si mismo y saltarse el 409 que evita el doble
+// tap, o bloquear a otro usuario para siempre.
+test('ningun cliente puede leer ni escribir el bloqueo de un trabajo', async () => {
+  const clientDb = asClient();
+  const strangerDb = asStranger();
+  const lock = (db) => doc(db, 'callLocks', 'job-1');
+
+  await assertFails(getDoc(lock(clientDb)));
+  await assertFails(getDoc(lock(strangerDb)));
+  await assertFails(getDoc(lock(asAnon())));
+
+  await assertFails(setDoc(lock(clientDb), { jobId: 'job-1', callId: 'call-1' }));
+  await assertFails(setDoc(lock(strangerDb), { jobId: 'job-1', callId: 'call-1' }));
+  await assertFails(deleteDoc(lock(clientDb)));
+  await assertFails(deleteDoc(lock(strangerDb)));
+});

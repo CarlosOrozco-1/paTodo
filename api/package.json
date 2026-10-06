@@ -12,7 +12,8 @@
     "seed:demo-flow": "npm run build && node dist/seeder/seedDemoFlow.js",
     "sync-claims": "npm run build && node dist/scripts/syncClaims.js",
     "create-admin": "npm run build && node dist/scripts/createAdmin.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:voice": "npm run build && firebase emulators:exec --config ../firebase.test.json --only firestore,auth --project demo-pa-todo \"node test/calls.e2e.js\""
   },
   "keywords": [],
   "author": "",

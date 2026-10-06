@@ -82,8 +82,13 @@ Por eso la señalización va en **Firestore**, no en RTDB:
 > autorizan a leer `calls/{callId}` documento por documento, pero no una consulta
 > a la colección (en un query `callId` no está ligado, así que la regla no puede
 > saber si quien pregunta es participante). El historial de llamadas de un trabajo
-> lo devuelve **la API** con el Admin SDK, que sí ignora las reglas; por eso existe
-> el índice `calls: jobId + createdAt`. El cliente nunca lista llamadas por su cuenta.
+> lo devuelve **la API** con el Admin SDK, que sí ignora las reglas. El cliente
+> nunca lista llamadas por su cuenta.
+
+> El índice `calls: jobId + createdAt` que se había creado en la fase II se
+> eliminó: servía para el barrido de llamadas abandonadas, que ahora hace la
+> transacción del cerrojo leyendo un solo documento. `calls` no necesita ningún
+> índice compuesto.
 
 > Acción pendiente: corregir `AGENTS.md`, que hoy describe una base de datos que no
 > existe en el proyecto. **Hecho** en este cambio, junto con
@@ -128,6 +133,7 @@ Dos piezas, con autores distintos:
 |---|---|---|---|
 | `calls/{callId}` | **solo la API** | Registro de la llamada: participantes, estado, duración. | Permanente (historial) |
 | `calls/{callId}/signals/{signalId}` | los clientes | Señalización efímera (SDP / ICE). | La API la borra en `endVoiceCall` |
+| `callLocks/{jobId}` | **solo la API** | Cerrojo transaccional: qué llamada ocupa el trabajo. | La API la borra en `endVoiceCall` |
 
 `calls/{callId}` — contrato en `spec/schemas/calls.json`:
 
@@ -145,6 +151,30 @@ Dos piezas, con autores distintos:
 **El cliente nunca escribe `calls/{callId}` directamente** (igual que `activity`): las
 reglas lo prohíben y la API valida que la transición de estado sea legal. Así nadie
 fabrica historial de llamadas falso.
+
+### El cerrojo que impide el doble toque
+
+Un `GET` previo a `POST /createVoiceSession` **no** evita la carrera: dos pestañas,
+dos dispositivos o un reintento pueden pasar a la vez el chequeo y crear dos
+llamadas. La exclusión la garantiza la API con `callLocks/{jobId}`, que se toma
+dentro de una **transacción** de Firestore:
+
+- Lectura y escritura del cerrojo y creación de la llamada ocurren en la misma
+  transacción. Firestore serializa las transacciones que tocan el mismo documento,
+  así que aunque las dos peticiones lleguen juntas, solo una gana.
+- La otra recibe `409 already-exists`. **Nunca** hay dos llamadas activas del
+  mismo trabajo.
+- Si la llamada que tiene el cerrojo lleva más de `RINGING_TIMEOUT_MS` en
+  `ringing` (la app se cerró, se quedó sin red o el proceso móvil fue terminado),
+  la transacción la cierra como `missed`, borra su señalización huérfana y
+  reutiliza el cerrojo para la nueva. Una llamada ya `in_progress` nunca se barre,
+  por muy vieja que sea.
+- Las reglas niegan cualquier acceso de cliente a `callLocks`: es estado interno.
+- No requiere índice compuesto; los bloqueos son de un solo documento.
+
+Deshabilitar el botón mientras corre la petición alivia el caso de un solo
+dispositivo, pero no las dos pestañas ni el Render en frío (20–50 s). Por eso el
+cerrojo es la garantía real y el botón solo una ayuda visual.
 
 ## 6. Endpoints
 
@@ -169,10 +199,30 @@ Errores: `400` falta `jobId` · `403` no es parte del trabajo · `404` trabajo i
 | # | Fase | Entregable | Depende de | Estado |
 |---|---|---|---|---|
 | I | **Contrato (SDD)** | `spec/schemas/calls.json`, `spec/schemas/call-signal.json`, endpoints en `spec/openapi.yaml` | — | **Hecha** (sin desplegar) |
-| II | **Reglas** | `calls` + `signals` en `firestore.rules`, tests en `tests/rules/calls.test.mjs` (15 casos), índice de `calls` en `firestore.indexes.json` | I | **Hecha** (sin desplegar) |
+| II | **Reglas** | `calls` + `signals` + `callLocks` en `firestore.rules`, tests en `tests/rules/calls.test.mjs` (16 casos) | I | **Hecha** (sin desplegar) |
 | III | **API** | `api/src/routes/calls.ts`, tipo de notificación, credenciales TURN efímeras, vars de entorno en Render | I, II | **Hecha** (sin desplegar) |
 | IV | **TURN** | `coturn` en VM *always free*, credenciales, runbook de operación y rotación | — (paralelo) | Pendiente |
-| V | **Prueba E2E** | Script que abre una sesión, verifica credenciales y transiciones, y limpia | III, IV | Pendiente |
+| V | **Prueba E2E** | `api/test/calls.e2e.js`: abre sesiones simultáneas y verifica transiciones | III, IV | **Parcial** (sin TURN real) |
+
+### Cómo probar la voz
+
+```bash
+cd api
+npm run typecheck     # compila sin emitir
+npm run test:voice    # build + emuladores Firestore/Auth + API real
+```
+
+`npm run test:voice` levanta los emuladores, arranca la API compilada y dispara
+**dos `POST /createVoiceSession` al mismo tiempo** contra el mismo trabajo. Exige
+exactamente un `201`, un `409`, un solo documento en `calls` y un solo
+`callLocks/{jobId}`. Además cubre el barrido de llamadas abandonadas, el cierre y
+la autorización de terceros. Sale con código ≠ 0 si algo falla, así que sirve
+como puerta antes de desplegar. Requiere el CLI de Firebase en el PATH (el mismo
+que usa `firebase deploy`).
+
+> Cuando haya TURN real, la fase V se completa con una llamada entre dos
+> navegadores o entre la app y un navegador, midiendo además si el TURN hizo
+> falta (`mediaRelay: "turn"`).
 
 > Las fases I, II y III están escritas y probadas (typecheck y build de la API en
 > verde, firma TURN verificada contra el esquema de coturn), pero **no están

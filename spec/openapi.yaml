@@ -631,7 +631,10 @@ paths:
                   direction:
                     type: string
                     enum: [outgoing]
-                    description: Siempre outgoing: este endpoint lo ejecuta quien marca.
+                    description: >-
+                      Siempre `outgoing`. Este endpoint lo ejecuta quien marca;
+                      quien recibe la llamada deduce que es entrante por ser el
+                      `calleeId`.
                   signalingPath:
                     type: string
                     description: Ruta en Firestore donde se escribe la señalización, `calls/{callId}/signals`.
@@ -654,7 +657,12 @@ paths:
                   expiresAt:
                     type: string
                     format: date-time
-                    description: Momento en que expiran las credenciales TURN. Opcional y **ausente** cuando el servidor responde solo con STUN (aún no hay TURN configurado): en ese caso la llamada funciona solo mientras haya ruta directa. Si el TURN está configurado, el cliente debe pedir una sesión nueva cuando expire.
+                    description: >-
+                      Momento en que expiran las credenciales TURN. Opcional y **ausente**
+                      cuando el servidor responde solo con STUN (aún no hay TURN
+                      configurado); en ese caso la llamada funciona solo mientras haya
+                      ruta directa. Si el TURN está configurado, el cliente debe pedir
+                      una sesión nueva cuando expire.
                   call:
                     $ref: './schemas/calls.json'
                 required: [callId, jobId, calleeId, direction, signalingPath, iceServers, call]
@@ -667,7 +675,14 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Ya hay una llamada activa entre las dos partes de ese trabajo.
+          description: >-
+            Ya hay una llamada activa entre las dos partes de ese trabajo. La API
+            lo garantiza con un cerrojo transaccional (`callLocks/{jobId}`), así
+            que dos peticiones simultáneas sobre el mismo trabajo producen
+            exactamente un `201` y un `409`, aunque lleguen desde dos pestañas, dos
+            dispositivos o por reintento. Si la llamada anterior lleva más de
+            `RINGING_TIMEOUT_MS` en `ringing`, se cierra como `missed` y la
+            llamada nueva tiene éxito.
           content:
             application/json:
               schema:

@@ -138,7 +138,11 @@ Los roles se asignan mediante **Custom Claims** en Firebase Auth (claim `role`) 
 - `users`, `vehicles`, `skills`, `categories`, `jobs`, `offers`, `reviews`, `notifications`, `conversations` (con subcolección `messages`), `activity` (log de acciones administrativas; escritura solo la API, lectura solo admin).
 - El historial de ubicaciones y la señalización de llamadas se manejan en **Firestore**
   (`jobs/{jobId}/tracking/current` y `calls/{callId}/signals`), no en Realtime
-  Database: RTDB no está configurado en este proyecto. Ver `docs/llamadas-voz.md`.
+  Database: RTDB no está configurada en este proyecto. Ver `docs/llamadas-voz.md`.
+- `calls` (registro de llamadas de voz) y `callLocks` (cerrojo transaccional por
+  trabajo, escrito y borrado solo por la API) los administra únicamente la API;
+  los clientes solo agregan mensajes a `calls/{callId}/signals`. El cerrojo evita
+  el doble toque; se prueba con `npm run test:voice` en `api/`.
 
 ## Estado actual del proyecto
 

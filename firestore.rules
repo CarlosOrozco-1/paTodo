@@ -253,6 +253,24 @@ service cloud.firestore {
       }
     }
 
+    // ===================== callLocks =====================
+    // Exclusion mutua por trabajo, para que dos peticiones simultaneas de
+    // /createVoiceSession no creen dos llamadas (doble tap en "Llamar").
+    //
+    // Aqui hay un documento por trabajo cuyo unico campo es el callId de la
+    // llamada viva. La API lo toma dentro de una transaccion: por eso dos
+    // peticiones a la vez se serializan en vez de colarse.
+    //
+    // NO es un documento de negocio: no se lista, no se exporta y no aparece en
+    // el historial. Los clientes no lo necesitan en absoluto.
+    //
+    // Nota sobre la seguridad: Firestore ya deniega por defecto todo lo que no
+    // esta en un `match`, asi que esta regla es explicita por legibilidad del
+    // ruleset, no necesaria. Si se borra, los clientes siguen sin poder tocarla.
+    match /callLocks/{jobId} {
+      allow read, write: if false;
+    }
+
     // ===================== offers =====================
     match /offers/{offerId} {
       // El trabajador que creó la oferta puede leerla.
