@@ -170,14 +170,17 @@ Errores: `400` falta `jobId` · `403` no es parte del trabajo · `404` trabajo i
 |---|---|---|---|---|
 | I | **Contrato (SDD)** | `spec/schemas/calls.json`, `spec/schemas/call-signal.json`, endpoints en `spec/openapi.yaml` | — | **Hecha** (sin desplegar) |
 | II | **Reglas** | `calls` + `signals` en `firestore.rules`, tests en `tests/rules/calls.test.mjs` (15 casos), índice de `calls` en `firestore.indexes.json` | I | **Hecha** (sin desplegar) |
-| III | **API** | `api/src/routes/calls.ts`, tipo de notificación, credenciales TURN efímeras, vars de entorno en Render | I, II | Pendiente |
+| III | **API** | `api/src/routes/calls.ts`, tipo de notificación, credenciales TURN efímeras, vars de entorno en Render | I, II | **Hecha** (sin desplegar) |
 | IV | **TURN** | `coturn` en VM *always free*, credenciales, runbook de operación y rotación | — (paralelo) | Pendiente |
 | V | **Prueba E2E** | Script que abre una sesión, verifica credenciales y transiciones, y limpia | III, IV | Pendiente |
 
-> Las fases I y II están escritas y probadas contra el emulador, pero **no están
-> desplegadas**: `firebase deploy --only firestore:rules,indexes` desde la raíz.
-> Hasta ese deploy, ningún cliente puede usar las llamadas y los tests de rules
-> de producción seguirían contando 45 casos, no 60.
+> Las fases I, II y III están escritas y probadas (typecheck y build de la API en
+> verde, firma TURN verificada contra el esquema de coturn), pero **no están
+> desplegadas**. La API necesita en Render: `STUN_URLS`, `TURN_URLS`,
+> `TURN_SECRET`, `TURN_TTL_SECONDS` y `RINGING_TIMEOUT_MS`
+> (documentados en `api/.env.example`). Sin TURN la API arranca igual, en modo
+> solo STUN. Hasta que se ejecute `firebase deploy --only firestore:rules,indexes`
+> ningún cliente puede usar las llamadas.
 
 ### Su parte — equipo de desarrollo app
 

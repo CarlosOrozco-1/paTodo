@@ -582,7 +582,17 @@ paths:
           expiración, contraseña = HMAC del secreto). El secreto TURN nunca
           sale del servidor: si no está configurado, la respuesta solo incluye
           STUN y la llamada funciona igual mientras haya ruta directa.
-        - Crea una notificación `voice_call_incoming` para el receptor.
+        - Crea **una sola** notificación `voice_call_incoming` para el receptor
+          y envía el push con `android.priority: high`, porque una llamada
+          entrante solo sirve si el teléfono despierta al instante. El `data`
+          lleva `type`, `jobId`, `callId` y `direction: incoming`.
+
+          Del lado del dispositivo (fase D del equipo de desarrollo app, no de la
+          API): en Android hay que declarar el permiso
+          `USE_FULL_SCREEN_INTENT` y crear el canal de notificación con
+          `IMPORTANCE_HIGH`. La API no puede abrir la pantalla; solo entrega los
+          datos. Sin esa configuración el push llega pero no abre la llamada, y
+          la app no tiene forma de enterarse de que la API ya lo envió.
 
         **La señalización no pasa por la API.** El cliente escribe la oferta,
         la respuesta y los candidatos ICE directamente en la subcolección

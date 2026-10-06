@@ -10,7 +10,8 @@ export type NotificationType =
   | "job_completed"
   | "job_cancelled"
   | "new_review"
-  | "payment_received";
+  | "payment_received"
+  | "voice_call_incoming";
 
 export interface NotificationPayload {
   userId: string;
@@ -25,41 +26,27 @@ export interface NotificationPayload {
 }
 
 /**
- * Crea una notificación en Firestore y envía el push por FCM.
- * Retorna el ID del documento de notificación creado.
+ * Envía un push a los tokens FCM de un usuario y limpia los tokens inválidos.
+ * Devuelve false si el usuario no existe o no tiene tokens.
  */
-export async function createAndSendNotification(
-  payload: NotificationPayload
-): Promise<string> {
-  const notificationRef = db.collection("notifications").doc();
+async function pushToUser(
+  userId: string,
+  message: {
+    notification: { title: string; body: string };
+    data: Record<string, string>;
+    android?: { priority: "high" | "normal"; ttl?: number };
+  }
+): Promise<boolean> {
+  const userDoc = await db.collection("users").doc(userId).get();
 
-  await notificationRef.set({
-    userId: payload.userId,
-    type: payload.type,
-    title: payload.title,
-    body: payload.body,
-    data: payload.data ?? {},
-    isRead: false,
-    readAt: null,
-    createdAt: FieldValue.serverTimestamp(),
-  });
-
-  const userDoc = await db.collection("users").doc(payload.userId).get();
-
-  if (!userDoc.exists) return notificationRef.id;
+  if (!userDoc.exists) return false;
 
   const fcmTokens: string[] = userDoc.data()?.fcmTokens ?? [];
-  if (fcmTokens.length === 0) return notificationRef.id;
+  if (fcmTokens.length === 0) return false;
 
   const pushResponse = await messaging.sendEachForMulticast({
     tokens: fcmTokens,
-    notification: { title: payload.title, body: payload.body },
-    data: {
-      type: payload.type,
-      jobId: payload.data?.jobId ?? "",
-      offerId: payload.data?.offerId ?? "",
-      conversationId: payload.data?.conversationId ?? "",
-    },
+    ...message,
   });
 
   const invalidTokens: string[] = [];
@@ -82,7 +69,89 @@ export async function createAndSendNotification(
     });
   }
 
+  return true;
+}
+
+/**
+ * Crea una notificación en Firestore y envía el push por FCM.
+ * Retorna el ID del documento de notificación creado.
+ */
+export async function createAndSendNotification(
+  payload: NotificationPayload
+): Promise<string> {
+  const notificationRef = db.collection("notifications").doc();
+
+  await notificationRef.set({
+    userId: payload.userId,
+    type: payload.type,
+    title: payload.title,
+    body: payload.body,
+    data: payload.data ?? {},
+    isRead: false,
+    readAt: null,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  await pushToUser(payload.userId, {
+    notification: { title: payload.title, body: payload.body },
+    data: {
+      type: payload.type,
+      jobId: payload.data?.jobId ?? "",
+      offerId: payload.data?.offerId ?? "",
+      conversationId: payload.data?.conversationId ?? "",
+    },
+  });
+
   return notificationRef.id;
+}
+
+/**
+ * Push de llamada de voz entrante.
+ *
+ * Diferencias frente a una notificación normal, y son obligatorias:
+ *
+ * - `priority: high` / `ttl`: una llamada entrante solo sirve si el teléfono
+ *   despierto al instante. Con prioridad normal Android la aplaza y el usuario
+ *   ve la llamada demasiado tarde (o nunca, si la app está en background).
+ * - El `data` lleva `callId` y `direction: incoming`. Sin el `callId` el
+ *   receptor no sabe qué llamada abrir.
+ *
+ * Lo que NO puede hacer la API es abrir la pantalla: eso lo decide el
+ * dispositivo. El equipo de desarrollo app debe declarar en AndroidManifest el
+ * permiso USE_FULL_SCREEN_INTENT y crear el canal de notificación con
+ * IMPORTANCE_HIGH (fase D en docs/llamadas-voz.md).
+ */
+export async function sendIncomingCallPush(input: {
+  userId: string;
+  callId: string;
+  jobId: string;
+  callerName: string;
+}): Promise<void> {
+  const title = "Llamada entrante";
+  const body = `${input.callerName} te está llamando.`;
+
+  const notificationRef = db.collection("notifications").doc();
+  await notificationRef.set({
+    userId: input.userId,
+    type: "voice_call_incoming",
+    title,
+    body,
+    data: { jobId: input.jobId, callId: input.callId },
+    isRead: false,
+    readAt: null,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  await pushToUser(input.userId, {
+    notification: { title, body },
+    data: {
+      type: "voice_call_incoming",
+      jobId: input.jobId,
+      callId: input.callId,
+      direction: "incoming",
+    },
+    android: { priority: "high", ttl: 60_000 },
+  });
 }
 
 /**

@@ -8,6 +8,7 @@ import { jobsRouter } from "./routes/jobs";
 import { reviewsRouter } from "./routes/reviews";
 import { routesRouter } from "./routes/routes";
 import { paymentsRouter } from "./routes/payments";
+import { callsRouter } from "./routes/calls";
 import userRouter from "./routes/user";
 import adminRouter from "./routes/admin";
 import { handleError } from "./shared/errors";
@@ -100,6 +101,7 @@ app.use(jobsRouter);
 app.use(reviewsRouter);
 app.use(routesRouter);
 app.use(paymentsRouter);
+app.use(callsRouter);
 app.use(userRouter);
 app.use(adminRouter);
 
