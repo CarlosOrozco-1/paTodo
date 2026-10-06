@@ -1,11 +1,12 @@
 # Llamadas de voz entre cliente y trabajador — decisión técnica
 
-> **Estado: fases I y II listas y probadas; API (III) pendiente.**
+> **Estado: fases I, II y III listas, probadas y desplegadas (sin TURN).**
 > Contrato: `spec/schemas/calls.json`, `spec/schemas/call-signal.json` y
-> `spec/openapi.yaml`. Reglas + tests + índice en `firestore.rules`,
-> `tests/rules/calls.test.mjs` y `firestore.indexes.json`.
+> `spec/openapi.yaml`. Reglas + tests en `firestore.rules` y
+> `tests/rules/calls.test.mjs`; `calls` no necesita índice compuesto.
+> Prueba real de la carrera: `npm run test:voice` en `api/`.
 > Reparto: infraestructura (este equipo) y app (equipo de desarrollo app).
-> Nada desplegado todavía en Firebase.
+> Infraestructura lista y en producción; falta que la app tenga el botón.
 
 ## 1. Objetivo y alcance
 
@@ -198,9 +199,9 @@ Errores: `400` falta `jobId` · `403` no es parte del trabajo · `404` trabajo i
 
 | # | Fase | Entregable | Depende de | Estado |
 |---|---|---|---|---|
-| I | **Contrato (SDD)** | `spec/schemas/calls.json`, `spec/schemas/call-signal.json`, endpoints en `spec/openapi.yaml` | — | **Hecha** (sin desplegar) |
-| II | **Reglas** | `calls` + `signals` + `callLocks` en `firestore.rules`, tests en `tests/rules/calls.test.mjs` (16 casos) | I | **Hecha** (sin desplegar) |
-| III | **API** | `api/src/routes/calls.ts`, tipo de notificación, credenciales TURN efímeras, vars de entorno en Render | I, II | **Hecha** (sin desplegar) |
+| I | **Contrato (SDD)** | `spec/schemas/calls.json`, `spec/schemas/call-signal.json`, endpoints en `spec/openapi.yaml` | — | **Hecha y desplegada** |
+| II | **Reglas** | `calls` + `signals` + `callLocks` en `firestore.rules`, tests en `tests/rules/calls.test.mjs` (16 casos) | I | **Hecha y desplegada** |
+| III | **API** | `api/src/routes/calls.ts`, tipo de notificación, credenciales TURN efímeras, vars de entorno en Render | I, II | **Hecha y desplegada** |
 | IV | **TURN** | `coturn` en VM *always free*, credenciales, runbook de operación y rotación | — (paralelo) | Pendiente |
 | V | **Prueba E2E** | `api/test/calls.e2e.js`: abre sesiones simultáneas y verifica transiciones | III, IV | **Parcial** (sin TURN real) |
 
@@ -224,13 +225,18 @@ que usa `firebase deploy`).
 > navegadores o entre la app y un navegador, midiendo además si el TURN hizo
 > falta (`mediaRelay: "turn"`).
 
-> Las fases I, II y III están escritas y probadas (typecheck y build de la API en
-> verde, firma TURN verificada contra el esquema de coturn), pero **no están
-> desplegadas**. La API necesita en Render: `STUN_URLS`, `TURN_URLS`,
-> `TURN_SECRET`, `TURN_TTL_SECONDS` y `RINGING_TIMEOUT_MS`
-> (documentados en `api/.env.example`). Sin TURN la API arranca igual, en modo
-> solo STUN. Hasta que se ejecute `firebase deploy --only firestore:rules,indexes`
-> ningún cliente puede usar las llamadas.
+> Las fases I, II y III están **desplegadas**: reglas e índices publicados con
+> `firebase deploy --only firestore:rules,indexes` y la API en Render actualizada
+> al hacer push de `desa` (los dos endpoints responden ya en producción).
+>
+> La API arranca en **solo STUN**, porque `TURN_URLS` y `TURN_SECRET` todavía no
+> están definidos en Render. Con eso las llamadas ya funcionan en la mayoría de
+> las redes, pero en redes que bloquean la conexión directa (datos móviles de
+> algunos operadores, WiFi corporativo) la llamada no se establece. Ese límite se
+> cierra en la fase IV.
+>
+> Variables disponibles (todas opcionales, `api/.env.example`): `STUN_URLS`,
+> `TURN_URLS`, `TURN_SECRET`, `TURN_TTL_SECONDS` y `RINGING_TIMEOUT_MS`.
 
 ### Su parte — equipo de desarrollo app
 
