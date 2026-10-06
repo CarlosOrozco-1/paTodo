@@ -13,7 +13,8 @@
     "sync-claims": "npm run build && node dist/scripts/syncClaims.js",
     "create-admin": "npm run build && node dist/scripts/createAdmin.js",
     "typecheck": "tsc --noEmit",
-    "test:voice": "npm run build && firebase emulators:exec --config ../firebase.test.json --only firestore,auth --project demo-pa-todo \"node test/calls.e2e.js\""
+    "test:voice": "npm run build && firebase emulators:exec --config ../firebase.test.json --only firestore,auth --project demo-pa-todo \"node test/calls.e2e.js\"",
+    "verify:turn": "node scripts/verifyTurn.js"
   },
   "keywords": [],
   "author": "",
