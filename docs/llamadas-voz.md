@@ -133,7 +133,8 @@ Dos piezas, con autores distintos:
 
 - `jobId` — trabajo que une a los dos (siempre presente).
 - `callerId` / `calleeId` — los dos `uid`.
-- `direction` — `outgoing` | `incoming`.
+- `direction` — siempre `outgoing`; quien recibe deduce que es entrante por ser
+  el `calleeId` de esa llamada.
 - `status` — `ringing` → `in_progress` → `completed`, o `declined` | `canceled` |
   `missed` | `failed`.
 - `startedAt` / `endedAt` / `durationSeconds`.

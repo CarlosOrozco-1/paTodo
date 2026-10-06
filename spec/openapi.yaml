@@ -644,12 +644,10 @@ paths:
                   expiresAt:
                     type: string
                     format: date-time
-                    description: Momento en que expiran las credenciales. El cliente debe pedir una sesión nueva si expiraron.
+                    description: Momento en que expiran las credenciales TURN. Opcional y **ausente** cuando el servidor responde solo con STUN (aún no hay TURN configurado): en ese caso la llamada funciona solo mientras haya ruta directa. Si el TURN está configurado, el cliente debe pedir una sesión nueva cuando expire.
                   call:
                     $ref: './schemas/calls.json'
-                  signaling:
-                    $ref: './schemas/call-signal.json'
-                required: [callId, jobId, calleeId, direction, signalingPath, iceServers, expiresAt, call]
+                required: [callId, jobId, calleeId, direction, signalingPath, iceServers, call]
         '400':
           $ref: '#/components/responses/InvalidArgument'
         '401':
@@ -684,9 +682,40 @@ paths:
         - `in_progress` → `completed` | `failed`
 
         El cliente **no** escribe en `calls` directamente: las reglas de
-        Firestore lo prohíben y esta API es la única que valida la transición,
-        de modo que nadie puede inventarse historial de llamadas ni marcar como
-        `completed` una llamada que nunca se conectó.
+        Firestore lo prohíben y esta API es la única que valida la transición.
+
+        Qué garantiza esta API y qué no, con claridad: la API **sí** comprueba
+        que quien llama sea una de las dos partes del trabajo, que la transición
+        sea válida desde el estado actual y que `durationSeconds` sea plausible.
+        **No** puede comprobar que la llamada ocurriera de verdad: no ve el audio
+        (nunca pasa por el servidor) y la duración y el `mediaRelay` los reporta
+        el cliente. Por eso este registro sirve para trazabilidad y métricas, no
+        como prueba ni como fuente de facturación.
+
+        ## Quién puede registrar cada desenlace
+
+        - **Quien marca** (`callerId`): `missed` (no contestó a tiempo),
+          `canceled` (colgó mientras sonaba) y `completed`.
+        - **Quien recibe** (`calleeId`): `declined` (rechazó) y `completed`.
+        - **Cualquiera de los dos**: `in_progress` (la llamada se conectó) y
+          `failed` (fallo técnico).
+        - El estado final se escribe **una sola vez**: después de `completed`,
+          `declined`, `canceled`, `missed` o `failed` la llamada es inmutable y
+          las siguientes llamadas devuelven `409`.
+
+        ## Llamadas que nadie atiende
+
+        Una llamada abandonada en `ringing` bloquearía nuevas llamadas entre las
+        mismas dos personas, porque `createVoiceSession` rechaza con `409` si
+        queda una activa. Para que eso no ocurra:
+
+        - Quien marca debe cerrar su propia llamada como `missed` al vencer el
+          tiempo de marcado. **No hay tono de ring en el v1**, así que el
+          receptor ve la notificación y la pantalla de llamada entrante; el
+          `ringing` no expira por sí solo.
+        - La API también cierra como `missed` cualquier llamada `ringing` que
+          tenga más de `RINGING_TIMEOUT_MS` al evaluarse, para que un cliente que
+          se cerró a la mitad no deje el traba bloqueado.
       requestBody:
         required: true
         content:
@@ -704,7 +733,12 @@ paths:
                 durationSeconds:
                   type: integer
                   minimum: 0
-                  description: Duración real en segundos. Obligatoria cuando `status` es `completed`.
+                  maximum: 14400
+                  description: |
+                    Duración real en segundos, **reportada por el cliente**.
+                    Obligatoria cuando `status` es `completed`. El máximo (4 h)
+                    es una salvaguarda contra valores absurdos; la API no puede
+                    verificar la duración real, solo que el número sea plausible.
                 mediaRelay:
                   type: string
                   enum: [p2p, turn]

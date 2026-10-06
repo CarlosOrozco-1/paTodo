@@ -21,7 +21,8 @@
     },
     "direction": {
       "type": "string",
-      "enum": ["outgoing", "incoming"],
+      "enum": ["outgoing"],
+      "description": "Siempre `outgoing`: el documento lo crea quien marca, en POST /createVoiceSession. Quien recibe deduce que la llamada es entrante de ser el `calleeId` de esa llamada, no de este campo.",
       "title": "Dirección",
       "description": "`outgoing` si la документа quien llama; `incoming` si la documenta el receptor (la API reescribe el registro cuando el receptor acepta o rechaza)."
     },
