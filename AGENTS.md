@@ -4,12 +4,12 @@
 
 ## Stack tecnológico
 
-- **Backend:** Firebase gestionado (Firestore, Auth, FCM, Realtime Database, Storage) + **API REST transaccional** propia en Express 5 + TypeScript (carpeta `api/`, desplegada en Render).
+- **Backend:** Firebase gestionado (Firestore, Auth, FCM, Storage) + **API REST transaccional** propia en Express 5 + TypeScript (carpeta `api/`, desplegada en Render). No se usa Realtime Database (ver `docs/llamadas-voz.md` §3).
 - **Frontend Web:** React + Vite + TypeScript
 - **Frontend Móvil:** Flutter
 - **Base de datos:** Cloud Firestore
 - **Autenticación:** Firebase Authentication (Email/Password) con roles (`client`/`worker`/`both`) como **Custom Claims** y replicados en `users/{uid}.role`
-- **Tiempo real:** Listeners nativos de Firestore + Firebase Realtime Database (para historial de ubicaciones)
+- **Tiempo real:** Listeners nativos de Firestore
 - **Documentación API:** OpenAPI 3 (`spec/openapi.yaml`) + JSON Schemas (`spec/schemas/`)
 
 ## Estructura del repositorio (monorepo)
@@ -136,7 +136,9 @@ Los roles se asignan mediante **Custom Claims** en Firebase Auth (claim `role`) 
 ## Colecciones principales
 
 - `users`, `vehicles`, `skills`, `categories`, `jobs`, `offers`, `reviews`, `notifications`, `conversations` (con subcolección `messages`), `activity` (log de acciones administrativas; escritura solo la API, lectura solo admin).
-- El historial de ubicaciones se maneja en **Firebase Realtime Database**, no en Firestore.
+- El historial de ubicaciones y la señalización de llamadas se manejan en **Firestore**
+  (`jobs/{jobId}/tracking/current` y `calls/{callId}/signals`), no en Realtime
+  Database: RTDB no está configurado en este proyecto. Ver `docs/llamadas-voz.md`.
 
 ## Estado actual del proyecto
 

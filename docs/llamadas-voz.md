@@ -1,215 +1,230 @@
-# Llamadas de voz desde la app — análisis técnico y evaluación
+# Llamadas de voz entre cliente y trabajador — decisión técnica
 
-> **Estado: evaluación previa, NO implementado.**
-> Todavía **no** existe contrato en `spec/`. Este documento sirve para decidir
-> arquitectura y provider. Cuando se apruebe, el flujo Spec-Driven Development
-> exige actualizar **primero** `spec/openapi.yaml` + `spec/schemas/calls.json`,
-> y después implementar en `api/` y los frontends.
+> **Estado: fases I y II listas y probadas; API (III) pendiente.**
+> Contrato: `spec/schemas/calls.json`, `spec/schemas/call-signal.json` y
+> `spec/openapi.yaml`. Reglas + tests + índice en `firestore.rules`,
+> `tests/rules/calls.test.mjs` y `firestore.indexes.json`.
+> Reparto: infraestructura (este equipo) y app (equipo de desarrollo app).
+> Nada desplegado todavía en Firebase.
 
-## 1. Resumen ejecutivo
+## 1. Objetivo y alcance
 
-| Decisión | Resultado |
-|---|---|
-| ¿Se puede hacer sin servidor? | **No.** Es imposible por seguridad, no por conveniencia (ver §3). |
-| ¿Hace falta Firebase premium (Blaze)? | **No para el backend**, si usamos Render. |
-| ¿Dónde va el backend? | **`api/` en Render** (misma API REST transaccional). Decisión firme. |
-| ¿Provider recomendado? | **Twilio Programmable Voice.** Alternativa nativa de Google: Calls, pero exige Blaze. |
-| ¿Costo? | Twilio es de pago (con_free tier limitado a números verificados). No es cero. |
+Vincular por llamada de voz a **quien solicita un trabajo y a quien lo aceptó**.
 
-## 2. Por qué el proyecto no puede usar Cloud Functions
+- ✅ Solo entre dos personas que **ya tienen la app** y comparten un trabajo.
+- ❌ **No** hay llamadas a números de teléfono (PSTN).
+- ❌ **No** hay video en el v1.
+- ✅ El chat sigue siendo el canal principal; la llamada es un extra.
 
-Confirmado con la documentación oficial de Firebase:
+### Por qué este caso es favorable para P2P
 
-- Cloud Functions for Firebase **requiere el plan Blaze** ("Since Cloud Functions for
-  Firebase requires that your project be on the Blaze pricing plan").
-- En la tabla de planes, "Access to Cloud Functions" está listada **solo** bajo Blaze.
-- En el plan Spark, los productos de pago de Google Cloud "are not available".
-- Incluso ya en Blaze, Cloud Functions es la **excepción sin tier gratuito** de uso
-  real: el almacenamiento del contenedor se factura desde el primer despliegue.
+No es "P2P genérico". Tres propiedades lo hacen viable:
 
-Además, `AGENTS.md` ya establece que **las Cloud Functions están descartadas** y que
-la lógica transaccional vive en la API REST de `api/`. Este módulo no es la excepción:
-necesita una clave secreta de un tercero, y esa es exactamente la razón por la que
-existe `api/`.
+1. **Ambos están mirando el teléfono.** El cliente acaba de publicar, el
+   trabajador acaba de aceptar. No es una llamada entre desconocidos.
+2. **Las llamadas son cortísimas.** "Estoy en la esquina", "¿puedes subir un
+   nivel?" Son de 20 s a 2 min. El volumen de relay es casi nulo.
+3. **La relación ya existe en Firestore.** La autorización se deriva del trabajo:
+   `job.clientId === caller || job.workerId === caller`.
 
-## 3. La razón real por la que se necesita servidor (no negociable)
+## 2. Decisión: WebRTC P2P + TURN de respaldo, **sin Twilio**
 
-Este es el punto que decide la arquitectura, y no tiene que ver con Firebase.
+Se descartó Twilio Programmable Voice para el v1. Motivos:
 
-Para que el SDK de voz del cliente se autentique, Twilio exige un **Access Token**
-firmado con la **API Key Secret**:
+- El Access Token del SDK de Twilio solo puede firmarse en un servidor con la API
+  Key Secret. Con P2P no hay token, no hay SDK de terceros y no hay costo por minuto.
+- El costo de Twilio es por minuto de **relay**, no por el audio directo. Con un
+  TURN propio el costo es ancho de banda, que es otro orden de magnitud.
+- **Privacidad mejor:** con P2P el audio se cifra extremo a extremo (DTLS-SRTP) y no
+  toca infraestructura de terceros.
+- Sin PSTN, no se necesita número de teléfono ni verificación de número.
 
-> "The signature section is a signed hash that serves to prove the authenticity of
-> the token. It is the result of hashing the JWT header and payload together with
-> your API key secret, **which should only be known to your application and Twilio**."
+Alternativas descartadas: **Google Cloud Calls** (exige plan Blaze y Cloud
+Functions, que el proyecto ya descartó) y **WebRTC directo sin TURN** (no conecta
+cuando ambos están tras CGNAT, que es el caso normal en datos móviles).
 
-Y el token se crea en el servidor:
+### Lo único que no se puede saltar: el TURN
 
-> "You create Access Tokens **on your server** to verify a user's identity and grant
-> access to client API features."
+El audio de WebRTC es gratis, pero la **conexión** no siempre lo es:
 
-Consecuencias directas:
+- **STUN** — gratis. Los servidores públicos de Google sirven.
+- **TURN** — relay. Cuando ambos usuarios están detrás de CGNAT (frecuente en LTE/5G)
+  **no existe ruta directa**: no es lentitud, es imposible. Sin TURN la llamada no
+  conecta, y falla justo cuando el trabajador va camino al trabajo.
 
-1. **El Access Token no se puede generar en el cliente.** Si el secreto viaja en el
-   bundle web o en el APK, queda expuesto: cualquiera que descargue la app puede
-   firmar tokens y hacer llamadas con la cuenta de PaTodo. Es una pérdida de dinero
-   directa, no un riesgo teórico.
-2. **El móvil tampoco lo evade.** Compilar el secreto en Flutter no lo protege; el
-   APK es un zip que se puede desensamblar.
-3. Por lo tanto hace falta **un servidor** que reciba el ID token de Firebase,
-   verifique quién llama, decida si tiene permiso, y **solo entonces** firme el token
-   de Twilio.
+Un relay `coturn` propio en una VM *always free* (Oracle A1 o GCP e2-micro) cuesta
+~$0 con el volumen de PaTodo: el audio comprimido son ~100 KB/min, o sea ~100 MB por
+1000 minutos. El costo real no es el ancho de banda, es **operarlo** (puerto UDP
+abierto, certificados) y **protegerlo**: un TURN abierto se llena de abuso en horas,
+así que exige credenciales siempre.
 
-`api/` ya tiene exactamente lo necesario: `requireAuth(request)` en
-`api/src/shared/auth.ts` (verifica el ID token de Firebase y devuelve el `uid`), el
-service account, `createAndSendNotification` para el push de llamada entrante, y
-`rateLimit` para acotar el abuso de tokens. **No hay que crear infraestructura nueva.**
+## 3. Señalización: **Firestore**, no Realtime Database
 
-## 4. Provider evaluado
+Decisión importante, y corrige una suposición de la documentación:
 
-### 4.1 Twilio Programmable Voice — recomendado
+> `AGENTS.md` afirmaba que el historial de ubicaciones va en Realtime Database.
+> **Verificado: era falso.** El tracking vive en Firestore
+> (`jobs/{jobId}/tracking/current`), `firebase.json` **no tiene** sección `database`,
+> y no hay `databaseURL` ni `databaseRef` en ningún frontend. RTDB no se usa.
+> La documentación ya está corregida en `AGENTS.md` y `docs/contexto-agente.md`.
 
-- **Cómo funciona:** el audio viaja por la red de Twilio, **no** es WebRTC crudo.
-  Twilio resuelve el NAT traversal y los relays (TURN), así que **no hace falta
-  escribir un servidor de señalización**. Esta es la ventaja enorme frente a
-  hacerlo a mano.
-- **Tokens:** `twilio.jwt.AccessToken` con `VoiceGrant` (Node.js, mismo lenguaje que `api/`).
-- **SDK cliente:** oficial para web (`@twilio/voice-sdk`); para Flutter,
-  `flutter_twilio` (comunitaria, envuelve los SDK nativos iOS/Android de Twilio).
-- **Llamada entrante cuando la app está cerrada:** VoIP Push en iOS (APNs) + registro
-  con `registerWithAccessToken`; FCM en Android (la app ya tiene `firebase_messaging`
-  funcionando desde el commit `a797d64`).
-- **Configuración por región:** el Access Token lleva una región y debe coincidir con
-  el edge de Voice configurado en la cuenta. A definir al crear la cuenta.
+Por eso la señalización va en **Firestore**, no en RTDB:
 
-### 4.2 Google Cloud Calls (Firebase) — descartada
+- Firestore ya alimenta todo el tiempo real del proyecto, con reglas escritas y
+  **60 tests de reglas en verde** en `tests/rules/` (59 pasan + 1 `todo`
+  preexistente), de los cuales 15 cubren llamadas y señalización.
+- RTDB sería infraestructura nueva: base de datos, archivo de reglas sin ejemplo
+  previo, y un target de deploy más.
+- La señalización son mensajes efímeros y pequeños; Firestore los maneja sin
+  problema y se limpian con la API al terminar la llamada.
 
-Es la alternativa nativa del ecosistema, pero **también exige Blaze**, así que no
-resuelve la restricción. Además obliga a desplegar Cloud Functions, que el proyecto
-ya descartó.
+> **Consultas a `calls` desde el cliente: no permitidas, a propósito.** Las reglas
+> autorizan a leer `calls/{callId}` documento por documento, pero no una consulta
+> a la colección (en un query `callId` no está ligado, así que la regla no puede
+> saber si quien pregunta es participante). El historial de llamadas de un trabajo
+> lo devuelve **la API** con el Admin SDK, que sí ignora las reglas; por eso existe
+> el índice `calls: jobId + createdAt`. El cliente nunca lista llamadas por su cuenta.
 
-### 4.3 WebRTC directo — descartada
+> Acción pendiente: corregir `AGENTS.md`, que hoy describe una base de datos que no
+> existe en el proyecto. **Hecho** en este cambio, junto con
+> `docs/contexto-agente.md`.
 
-Es la opción "sin depender de un tercero", pero obligaría a construir y mantener un servidor de
-señalización (WebSocket), resolución de ICE y una salida a Internet con puertos
-abiertos. El recorrido de NAT en redes móviles es el problema
-clásico de WebRTC y es exactamente lo que Twilio resuelve como producto. No compensa
-para el alcance de este proyecto.
-
-## 5. Arquitectura propuesta
+## 4. Arquitectura
 
 ```
    Cliente (web / móvil)
-        |  1. SDK de voz pide token
-        v
-   POST /createVoiceToken   ──►  api/ en Render
-        |  2. requireAuth (ID token de Firebase)
-        |  3. valida que el caller tiene relación laboral con el receptor
-        |  4. firma Access Token con la API Key Secret (solo en el servidor)
-        |  5. registra el intento en `calls` + FCM al receptor
-        v
-   Access Token (corto: TTL ~1 h)
-        |
-        v
-   Twilio Voice  ◄──── audio cifrado por la red de Twilio
+        │  1. POST /createVoiceSession { jobId }
+        ▼
+   api/ en Render ── valida que caller y callee son las dos partes del trabajo
+        │           ── crea calls/{callId} con status=ringing
+        │           ── genera credenciales TURN efímeras (HMAC, TTL corta)
+        │           ── FCM: notification al receptor
+        │  2. responde { callId, iceServers, signalingPath, expiresAt }
+        ▼
+   Señalización directa (Firestore)                    Audio
+   calls/{callId}/signals/*                    ◄──────►  WebRTC P2P
+   offer / answer / ice / hangup                        (DTLS-SRTP)
+        │  3. si no conecta (CGNAT)
+        ▼
+   relay TURN (coturn) — solo relay, nunca guarda audio
+        │
+        │  4. POST /endVoiceCall { callId, status, durationSeconds }
+        ▼
+   api/ escribe el desenlace y borra la señalización
 ```
 
-**Reglas de la regla:** el `API Key Secret` **solo** existe como variable de entorno
-en Render. Nunca en Firestore, nunca en el bundle, nunca en `spec/`.
+**Regla dura:** el secreto TURN (`TURN_SECRET`) vive **solo** como variable de
+entorno en Render. Nunca en el bundle, ni en Firestore, ni en `spec/`. El cliente
+solo recibe credenciales efímeras (usuario = timestamp de expiración,
+contraseña = HMAC-SHA1 del secreto).
 
-## 6. Modelo de datos propuesto (aún no en spec)
+**El audio nunca se almacena.** Ni PaTodo ni el relay guardan la conversación.
 
-Colección nueva `calls`. Sigue las convenciones del proyecto (nombres en inglés,
-contenido en español, `Timestamp` de Firestore).
+## 5. Modelo de datos
 
-| Campo | Tipo | Descripción |
+Dos piezas, con autores distintos:
+
+| Ruta | Quién escribe | Contenido | Limpieza |
+|---|---|---|---|
+| `calls/{callId}` | **solo la API** | Registro de la llamada: participantes, estado, duración. | Permanente (historial) |
+| `calls/{callId}/signals/{signalId}` | los clientes | Señalización efímera (SDP / ICE). | La API la borra en `endVoiceCall` |
+
+`calls/{callId}` — contrato en `spec/schemas/calls.json`:
+
+- `jobId` — trabajo que une a los dos (siempre presente).
+- `callerId` / `calleeId` — los dos `uid`.
+- `direction` — `outgoing` | `incoming`.
+- `status` — `ringing` → `in_progress` → `completed`, o `declined` | `canceled` |
+  `missed` | `failed`.
+- `startedAt` / `endedAt` / `durationSeconds`.
+- `mediaRelay` — `p2p` | `turn`. **Métrica clave**: dice cuántas veces el TURN
+  salvó una llamada, y si el TURN todavía se justifica.
+- `createdAt` / `updatedAt` — `Timestamp` de Firestore.
+
+**El cliente nunca escribe `calls/{callId}` directamente** (igual que `activity`): las
+reglas lo prohíben y la API valida que la transición de estado sea legal. Así nadie
+fabrica historial de llamadas falso.
+
+## 6. Endpoints
+
+`POST /createVoiceSession` — el que llama pide permiso para marcar.
+
+- Auth `requireAuth`. Body `{ jobId }`.
+- Valida: el trabajo existe y está `accepted`/`in_progress`; quien llama es
+  `clientId` o `workerId`; el receptor es la otra parte; ninguno suspendido; no
+  hay ya una llamada activa entre los dos.
+- Devuelve `callId`, `calleeId`, `iceServers`, `signalingPath`, `expiresAt`.
+
+`POST /endVoiceCall` — se reporta el desenlace. Body `{ callId, status, durationSeconds }`.
+Solo el caller o el callee, y solo transiciones legales.
+
+Errores: `400` falta `jobId` · `403` no es parte del trabajo · `404` trabajo inexistente
+· `409` ya hay una llamada activa · `429` rate limit.
+
+## 7. Fases
+
+### Nuestra parte — infraestructura
+
+| # | Fase | Entregable | Depende de | Estado |
+|---|---|---|---|---|
+| I | **Contrato (SDD)** | `spec/schemas/calls.json`, `spec/schemas/call-signal.json`, endpoints en `spec/openapi.yaml` | — | **Hecha** (sin desplegar) |
+| II | **Reglas** | `calls` + `signals` en `firestore.rules`, tests en `tests/rules/calls.test.mjs` (15 casos), índice de `calls` en `firestore.indexes.json` | I | **Hecha** (sin desplegar) |
+| III | **API** | `api/src/routes/calls.ts`, tipo de notificación, credenciales TURN efímeras, vars de entorno en Render | I, II | Pendiente |
+| IV | **TURN** | `coturn` en VM *always free*, credenciales, runbook de operación y rotación | — (paralelo) | Pendiente |
+| V | **Prueba E2E** | Script que abre una sesión, verifica credenciales y transiciones, y limpia | III, IV | Pendiente |
+
+> Las fases I y II están escritas y probadas contra el emulador, pero **no están
+> desplegadas**: `firebase deploy --only firestore:rules,indexes` desde la raíz.
+> Hasta ese deploy, ningún cliente puede usar las llamadas y los tests de rules
+> de producción seguirían contando 45 casos, no 60.
+
+### Su parte — equipo de desarrollo app
+
+Van en paralelo con I–III; necesitan el contrato de la fase I para empezar.
+
+| # | Fase | Entregable |
 |---|---|---|
-| `callerId` | string | `uid` de quien llama. |
-| `calleeId` | string | `uid` de quien recibe. |
-| `jobId` | string \| null | Trabajo relacionado, si aplica. |
-| `conversationId` | string \| null | Conversación desde la que se llamó. |
-| `status` | enum | `ringing` → `in_progress` → `completed` \| `declined` \| `canceled` \| `failed`. |
-| `direction` | enum | `outgoing` \| `incoming`. |
-| `durationSeconds` | number | Duración real al terminar. |
-| `twilioCallSid` | string \| null | SID del recurso en Twilio (para trazas y soporte). |
-| `failureCode` | string \| null | Código de Twilio si falló. |
-| `createdAt` / `updatedAt` | Timestamp | Reglas del proyecto. |
+| A | **Base de voz** | `flutter_webrtc`, sesión de audio, permisos de micrófono |
+| B | **Señalización** | Listener + escritura en `calls/{callId}/signals`, flujo offer/answer/ICE |
+| C | **Llamada saliente** | Botón en el chat/oferta, pantalla de marcado, pedir `/createVoiceSession` |
+| D | **Llamada entrante Android** | FCM en prioridad alta + full-screen intent (el timbre con la app cerrada) |
+| E | **UI de llamada** | Ringing / conectado / colgado, duración, silencio, altavoz |
+| F | **Cierre** | `/endVoiceCall` en todos los desenlaces |
+| G | **iOS en background** | **Diferido.** Exige VoIP Push nativo (Swift + clave APNs + CallKit). No es v1. |
 
-Notes de seguridad para `firestore.rules`: lectura solo si `callerId` o `calleeId` es
-el propio usuario; **escritura solo la API** (igual que `activity`), para que nadie
-fabrique un historial de llamadas falso.
+### Dependencia que hay que respetar
 
-## 7. Endpoint REST propuesto (aún no en spec)
+**No empiecen la fase C hasta que la fase I esté commiteada y publicada.** Si la app
+desarrolla contra un contrato que después cambia, se rompe la integración. La fase I
+es corta y bloquea todo lo demás.
 
-`POST /createVoiceToken`
+## 8. Beneficio para el equipo app (P2P no trae SDK de terceros)
 
-- **Auth:** `requireAuth` (Bearer ID token de Firebase).
-- **Body:** `{ calleeId: string, jobId?: string }`.
-- **Respuesta:** `{ token, identity, expiresIn, callId }`.
-- **Errores:** `400` falta `calleeId`; `403` no hay relación laboral válida
-  (solo `client` ↔ `worker` con un `job` `accepted`/`in_progress`); `404` receptor
-  inexistente o sin teléfono; `429` rate limit por abuse de tokens.
+Con Twilio tendrían que instalar un SDK propietario y aprender su modelo de tokens.
+Con P2P:
 
-El token debe ser de **vida corta** (TTL ~1 h) y con `identity = uid`, que es lo que
-recomienda Twilio.
+- **Web**: `RTCPeerConnection` nativo del navegador. Cero dependencias.
+- **Móvil**: `flutter_webrtc`, que envuelve los SDK nativos de WebRTC del sistema.
 
-## 8. Requisitos por plataforma
+El audio lo rutea el sistema operativo. No hay vendor lock-in: si mañana se quiere
+Twilio, se cambia el punto donde hoy está el TURN, y la app no se entera.
 
-| Plataforma | Requisito |
+## 9. Riesgos y pendientes
+
+| Riesgo / pendiente | Mitigación |
 |---|---|
-| Web | HTTPS obligatorio (`getUserMedia` no funciona en contexto inseguro), permiso de micrófono, `twilio-voice.js`. |
-| Android | permiso `RECORD_AUDIO`, y FCM para la llamada entrante (ya integrado). |
-| iOS | permiso de micrófono (`NSMicrophoneUsageDescription`), **VoIP Push** vía APNs: requiere Push Credential de Twilio configurado en la app. |
+| TURN abierto abused | Credenciales obligatorias (HMAC), nunca anónimas. Monitorear uso. |
+| Nadie opera el TURN | Runbook y responsable asignado (fase IV). Sin esto, las llamadas fallan en la calle. |
+| Ring en iOS con la app cerrada | Fuera del v1 (fase G). Se avisa al usuario: "abre la app". |
+| Sin fallback telefónico | El chat sigue disponible como canal principal. |
+| Llamadas abandonadas sin cerrar | Señalización huérfana ocupa pocos KB. Se limpia con `endVoiceCall`; barrido manual si hiciera falta. |
+| `AGENTS.md` menciona RTDB | Corregir: no se usa. Decisión documentada en §3. |
+| Twilio como fallback futuro | La capa de llamadas queda donde está el TURN; cambiar de proveedor no toca la app. |
 
-## 9. Costos (a verificar en la consola antes de decidir)
+## 10. Conclusión
 
-Twilio Programmable Voice **no es un producto gratuito**:
-
-- El free tier solo permite llamar a **números verificados**, útil para una demo
-  interna pero inservible en producción.
-- Producción requiere plan de pago: se cobra por minuto según destino. Las tarifas
-  cambian, así que hay que confirmarlas en la consola de Twilio **antes** de
-  comprometer el número de usuarios.
-- `api/` en Render puede seguir en su plan gratuito: el endpoint es de bajo tráfico
-  (solo emite tokens).
-
-**Conclusión de costo:** el backend no cuesta dinero extra en Render; el costo real es
-el minuto de voz de Twilio. Eso hay que modelarlo antes de liberar la función.
-
-## 10. Riesgos
-
-| Riesgo | Mitigación |
-|---|---|
-| Filtración del API Key Secret | Solo en Render como env var; nunca en cliente, spec ni Firestore. |
-| Abuso de tokens (granja de llamadas) | `rateLimit` por usuario, TTL corto, y validación de relación laboral en cada token. |
-| `flutter_twilio` es comunitaria | El SDK nativo de Twilio sí es oficial; la comunidad solo lo envuelve. Riesgo de mantenimiento asumido y aislado en el móvil. |
-| Cold start de Render (20-50 s) | El token se pide **antes** de marcar; la llamada se initiates desde el SDK de Twilio, no desde la API. |
-| Número de teléfono real del usuario | El flujo ya lo pide el registro; reutilizar `users/{uid}.phoneNumber`. |
-
-## 11. Tareas pendientes (para cuando se apruebe)
-
-Nada de esto está hecho. En orden:
-
-1. **Decisión de negocio:** ¿llamada de app a app (WebRTC/SIP de Twilio) o a
-   teléfono real ( PSTN)? Define si hace falta Twilio Voice o Twilio Verify + Call.
-2. **Cuenta de Twilio** (región, credenciales, Push Credential para iOS) y decidir
-   dónde se guardan las secrets en Render.
-3. **Spec primero:** `spec/schemas/calls.json`, `POST /createVoiceToken` en
-   `spec/openapi.yaml`, `spec/schemas/user.json` si `phoneNumber` cambia.
-4. **API:** `api/src/routes/calls.ts`, dependencia `twilio`, `/voice` en
-   `createAndSendNotification`, y vars de entorno en Render.
-5. **Reglas:** colección `calls` en `firestore.rules` + tests en `tests/rules/`, y
-   `firebase deploy --only firestore:rules`.
-6. **Web:** `twilio-voice.js`, pantalla de llamada, botón en el chat.
-7. **Móvil:** `flutter_twilio`, permisos, pantalla de llamada entrante/saliente.
-8. **Diagrama:** `docs/diagramas/07-modulo-llamadas.md`, siguiendo la convención de
-   los demás módulos.
-
-## 12. Conclusión
-
-La decisión no es "Firebase vs Render" por gusto técnico, sino que **el Access Token
-de Twilio solo puede firmarse en un servidor**. Como el proyecto ya tiene ese
-servidor (`api/` en Render) y ya descartó Cloud Functions, Render es el destino
-natural y no hay que construir nada nuevo. El bloqueo real no es técnico sino de
-**costo de Twilio** y de una **decisión de negocio** pendiente (§11.1): sin esas dos
-respuestas, el módulo no debería implementarse todavía.
+La decisión no fue "Firebase vs Render" sino **qué hace falta un servidor**. Con P2P
+solo hace falta para tres cosas concretas: autorizar la llamada (los datos ya están
+en el trabajo), entregar credenciales TURN efímeras (contienen un secreto) y
+registrar el desenlace. `api/` en Render ya tiene las tres cosas. No hay que crear
+infraestructura nueva, no hay costo por minuto, y la app no depende de un proveedor.

@@ -152,6 +152,107 @@ service cloud.firestore {
       }
     }
 
+    // ===================== calls =====================
+    // Llamadas de voz entre el cliente y el trabajador de un mismo trabajo.
+    // Decisión técnica en docs/llamadas-voz.md (WebRTC P2P + relay TURN, sin
+    // costo por minuto y sin llamadas a números de teléfono).
+    //
+    // Reparto de escrituras, a propósito:
+    //   - calls/{callId}          lo escribe SOLO la API (createVoiceSession /
+    //                              endVoiceCall). Así nadie se fabrica historial
+    //                              de llamadas ni salta las transiciones de estado.
+    //   - calls/{callId}/signals  lo escriben los DOS participantes, y solo
+    //                              mientras la llamada está activa. Aquí viaja el
+    //                              intercambio WebRTC (offer/answer/ICE), que es
+    //                              efímero y la API borra al cerrar la llamada.
+    // El audio nunca pasa por Firestore.
+    match /calls/{callId} {
+      function callPath() {
+        return /databases/$(database)/documents/calls/$(callId);
+      }
+
+      function jobPath() {
+        // Ojo: callPath() es una ruta, no un documento. Para leer el jobId hay
+        // que pasar por get(); escribir callPath().data construiria la ruta
+        // /jobs/undefined y negaria toda la senalizacion sin motivo apparent.
+        return /databases/$(database)/documents/jobs/$(get(callPath()).data.jobId);
+      }
+
+      // Cualquier helper que use jobPath() debe comprobar antes exists(callPath()):
+      // desreferenciar el documento inexistente lanza un error de evaluacion (no un
+      // false) y terminaria en un PERMISSION_DENIED confuso en lugar de un
+      // rechazo limpio.
+      function callExists() {
+        return exists(callPath());
+      }
+
+      // El trabajo debe seguir vigente: no se llama a un trabajo cancelado,
+      // pendiente o ya completado.
+      function jobIsActive() {
+        return callExists()
+               && exists(jobPath())
+               && get(jobPath()).data.status in ['accepted', 'assigned', 'in_progress'];
+      }
+
+      // Solo las dos partes del trabajo pueden ver la llamada.
+      function isCallParticipant() {
+        return signedIn()
+               && callExists()
+               && (request.auth.uid == get(callPath()).data.callerId
+                   || request.auth.uid == get(callPath()).data.calleeId);
+      }
+
+      // La llamada está activa o a punto de empezar: solo en estos estados tiene
+      // sentido señalizar. Al cerrarse, la API borra signals.
+      function callIsLive() {
+        return callExists()
+               && get(callPath()).data.status in ['ringing', 'in_progress'];
+      }
+
+      allow read: if signedIn() && notSuspended() && isCallParticipant();
+
+      // Crear, modificar y borrar el registro es responsabilidad exclusiva de
+      // la API REST: la autorización, las transiciones válidas y el borrado de
+      // la señalización ocurren allí, no aquí.
+      allow create, update, delete: if false;
+
+      // ---- Señalización WebRTC (efímera) ----
+      match /signals/{signalId} {
+        // offer/answer/cancel llevan la descripción de sesión; ice lleva un
+        // candidato. El límite de 16 KiB cubre un SDP largo y frena de paso
+        // que alguien use esta ruta para escribir basura.
+        function isValidSignal() {
+          let data = request.resource.data;
+          return smallEnough()
+                 && data.keys().hasAll(['from', 'type', 'payload', 'createdAt'])
+                 && data.keys().hasOnly(['from', 'type', 'payload', 'createdAt'])
+                 && data.from is string
+                 && data.from == request.auth.uid
+                 && data.type in ['offer', 'answer', 'ice', 'cancel']
+                 && data.payload is string
+                 && data.payload.size() > 0
+                 && data.payload.size() <= 16384
+                 && data.createdAt is timestamp
+                 && data.createdAt == request.time;
+        }
+
+        allow read: if signedIn() && notSuspended() && isCallParticipant();
+
+        // Solo se agrega: los mensajes de señalización no se editan ni se
+        // borran desde el cliente (los borra la API al cerrar la llamada).
+        // `from` debe ser el propio UID, así que un cliente no puede enviar
+        // señalización en nombre del otro.
+        allow create: if signedIn()
+                      && notSuspended()
+                      && jobIsActive()
+                      && callIsLive()
+                      && isCallParticipant()
+                      && isValidSignal();
+
+        allow update, delete: if false;
+      }
+    }
+
     // ===================== offers =====================
     match /offers/{offerId} {
       // El trabajador que creó la oferta puede leerla.

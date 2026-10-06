@@ -25,8 +25,9 @@ Flujo core (happy path):
 
 ## 2. Arquitectura (vigente)
 
-- **Backend gestionado: Firebase** (Auth, Firestore, FCM, Realtime Database,
-  Storage). **No hay Cloud Functions** (archivadas en `docs/functions-legacy/`).
+- **Backend gestionado: Firebase** (Auth, Firestore, FCM, Storage). **No hay Cloud
+  Functions** (archivadas en `docs/functions-legacy/`) ni **Realtime Database**
+  (no configurada; el tracking y las llamadas usan Firestore).
 - **API REST transaccional propia**: Express 5 + TypeScript en `api/`,
   desplegada en **Render** (`https://patodo.onrender.com`). Lógica de servidor
   crítica (transacciones, notificaciones, rutas OSRM, búsqueda geo).
@@ -60,12 +61,16 @@ Flujo core (happy path):
   `docs/auth-google.md` (origin/client_id `377828600122-…`, CORS en Render,
   400 en `/createUser`), y pendientes para el equipo web (modal "Completa tu
   perfil" con teléfono + rol `both`).
-- **Llamadas de voz (evaluado, NO implementado):** análisis técnico en
-  `docs/llamadas-voz.md`. Requiere un servidor porque el Access Token del SDK de
-  voz solo puede firmarse en backend (el secreto nunca puede ir en el cliente);
-  por eso iría en `api/` (Render) y no en Cloud Functions, que además exigen el
-  plan Blaze. Falta la decisión de negocio app↔app vs. app→teléfono y el costo de
-  Twilio.
+- **Llamadas de voz (contrato en Firestore, API pendiente):** decisión técnica en
+  `docs/llamadas-voz.md`. Se descartó Twilio: el v1 es **WebRTC P2P** con relay
+  TURN de respaldo, entre cliente y trabajador del mismo trabajo, sin llamadas a
+  números de teléfono. La señalización va en **Firestore** (`calls/{callId}`
+  escrito solo por la API, `calls/{callId}/signals` escrito por los dos
+  participantes; el audio nunca pasa por Firestore). El TURN solo se puede
+  aparecer porque la API entrega credenciales efímeras firmadas: el secreto vive
+  únicamente en Render. Android recibe la llamada entrante por FCM; iOS con la
+  app cerrada (VoIP Push) queda fuera del v1. Estado: fases I y II hechas
+  (spec + reglas + tests + índice); falta la API.
 
 ## 4. Endpoints de la API REST
 
@@ -78,6 +83,8 @@ Flujo core (happy path):
 | POST | `/completeJob` | Cliente o trabajador asignado |
 | POST | `/createReview` | Participante de un trabajo completado |
 | POST | `/computeRoute` | Cliente dueño o trabajador asignado (preview para no asignados) |
+| POST | `/createVoiceSession` | Cliente o trabajador de un trabajo `accepted`/`in_progress` (contrato listo, API pendiente) |
+| POST | `/endVoiceCall` | Participante de la llamada (API pendiente) |
 | GET | `/jobs/nearby` | Trabajador / `both` (geo-búsqueda por geohash + haversine) |
 | GET | `/admin/stats` | Admin (dashboard: conteos, rating, actividad semanal) |
 | GET | `/admin/users` | Admin (lista paginada; `role?`, `status?`, `search?`) |
@@ -107,8 +114,10 @@ Colecciones: `users`, `vehicles`, `skills`, `categories`, `jobs`, `offers`,
 - **Suspensión de cuentas:** el campo `users/{uid}.status` (`active`/
   `suspended`) lo controla la API (`/admin/suspendUser`); un usuario suspendido
   conserva lectura pero pierde todas sus escrituras (regla `notSuspended()`).
-- **Historial de ubicaciones** vive en **Firebase Realtime Database** (no en
-  Firestore). La ruta calculada se guarda en `jobs/{jobId}.route`.
+- **Historial de ubicaciones** y **señalización de llamadas** viven en
+  **Firestore** (no en Realtime Database, que no está configurado en este
+  proyecto): `jobs/{jobId}/tracking/current` y `calls/{callId}/signals`. La ruta
+  calculada se guarda en `jobs/{jobId}.route`.
 - Geopoints con campo `geohash` (geofire-common) para búsquedas por proximidad.
 - UUIDs/IDs de catálogo estables = slug (ej. `categoryId: "mecanica"`).
 

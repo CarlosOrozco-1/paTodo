@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CallSignal",
+  "description": "Mensaje de señalización WebRTC dentro de la subcolección efímera calls/{callId}/signals. Solo contiene el intercambio técnico que hace posible la conexión (oferta, respuesta y candidatos ICE); nunca contiene audio. A diferencia de calls/{callId}, aquí SÍ escriben los clientes: las reglas de Firestore permiten crear mensajes únicamente a los dos participantes del trabajo y solo mientras la llamada está activa. Los mensajes son de solo agregado (append-only) y la API los borra al cerrar la llamada en POST /endVoiceCall. El ID del documento lo genera el cliente.",
+  "type": "object",
+  "properties": {
+    "from": {
+      "type": "string",
+      "title": "Emisor",
+      "description": "UID del participante que envía el mensaje. Las reglas exigen que coincida con el UID autenticado: un cliente no puede enviar señalización en nombre del otro."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["offer", "answer", "ice", "cancel"],
+      "title": "Tipo de mensaje",
+      "description": "`offer`: descripción de la sesión que propone quien marca. `answer`: respuesta de quien recibe. `ice`: candidato de red (se envían varios por llamada). `cancel`: quien marca cuelga antes de que el otro responda."
+    },
+    "payload": {
+      "type": "string",
+      "title": "Contenido",
+      "description": "Descripción de sesión o candidato ICE, tal como lo genera el motor WebRTC y lo entrega en JSON. En la práctica es el resultado de JSON.stringify de un objeto RTCSessionDescription o RTCIceCandidate."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Creación",
+      "description": "Momento en que se creó el mensaje. En Firestore es un valor Timestamp."
+    }
+  },
+  "required": ["from", "type", "payload", "createdAt"],
+  "additionalProperties": false
+}

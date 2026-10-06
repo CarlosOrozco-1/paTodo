@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Call",
+  "description": "Documento de llamada de voz en Firestore. Registro de una llamada de audio entre el cliente y el trabajador de un mismo trabajo: no cliente-cliente ni trabajador-trabajador. Solo puede crearlos y modificarlos la API REST (POST /createVoiceSession y POST /endVoiceCall): las reglas de Firestore prohíben toda escritura desde el cliente para que nadie pueda fabricar historial de llamadas ni saltarse las transiciones de estado. El audio nunca se almacena; este documento solo guarda metadatos. La señalización WebRTC (offer/answer/ICE) va aparte, en la subcolección efímera calls/{callId}/signals, que escriben los participantes y la API borra al terminar. ID del documento generado por la API.",
+  "type": "object",
+  "properties": {
+    "jobId": {
+      "type": "string",
+      "title": "Trabajo que une a los dos",
+      "description": "ID del trabajo compartido por el cliente y el trabajador (referencia a la colección jobs). Siempre presente: solo pueden llamarse las dos partes de un mismo trabajo. El trabajo debe estar en estado accepted o in_progress para autorizar la llamada."
+    },
+    "callerId": {
+      "type": "string",
+      "title": "Quien marca",
+      "description": "UID del participante que inicia la llamada (referencia a users)."
+    },
+    "calleeId": {
+      "type": "string",
+      "title": "Quien recibe",
+      "description": "UID del participante al que se marca (referencia a users). Siempre distinto de callerId y, en un trabajo, la contraparte: si quien llama es el cliente, quien recibe es el trabajador asignado, y viceversa."
+    },
+    "direction": {
+      "type": "string",
+      "enum": ["outgoing", "incoming"],
+      "title": "Dirección",
+      "description": "`outgoing` si la документа quien llama; `incoming` si la documenta el receptor (la API reescribe el registro cuando el receptor acepta o rechaza)."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ringing", "in_progress", "completed", "declined", "canceled", "missed", "failed"],
+      "title": "Estado de la llamada",
+      "description": "Ciclo de vida: `ringing` (esperando respuesta) → `in_progress` (conectada) → `completed` (terminada normalmente). Finales alternativos: `declined` (rechazada por quien recibe), `canceled` (cancelada por quien marca antes de responder), `missed` (sin respuesta) y `failed` (fallo técnico de conexión). Las transiciones válidas las valida la API."
+    },
+    "mediaRelay": {
+      "type": "string",
+      "enum": ["p2p", "turn"],
+      "title": "Ruta del medio",
+      "description": "Cómo se transportó el audio: `p2p` si fue conexión directa entre los dispositivos, `turn` si fue necesario el relay (típicamente cuando ambos están detrás de CGNAT). Es la métrica que permite decidir si el relay TURN sigue justificándose: si casi siempre es `p2p`, se puede retirar."
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Inicio de la conexión",
+      "description": "Momento en que la llamada se conectó. Se escribe al pasar a in_progress."
+    },
+    "endedAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Fin de la llamada",
+      "description": "Momento en que terminó, sea el desenlace que sea."
+    },
+    "durationSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "title": "Duración en segundos",
+      "description": "Duración real de la llamada conectada. Es 0 (o se omite) si nunca se conectó."
+    },
+    "failureCode": {
+      "type": "string",
+      "title": "Código de fallo",
+      "description": "Motivo técnico cuando status es `failed` (por ejemplo, `ice-failed` si no hubo candidatos de red válidos). Opcional."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Creación",
+      "description": "Momento en que se creó el documento. En Firestore es un valor Timestamp."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Última actualización",
+      "description": "Momento de la última actualización del registro. En Firestore es un valor Timestamp."
+    }
+  },
+  "required": ["jobId", "callerId", "calleeId", "direction", "status", "createdAt", "updatedAt"],
+  "additionalProperties": false
+}

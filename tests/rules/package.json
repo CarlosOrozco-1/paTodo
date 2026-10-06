@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Pruebas de autorizacion de firestore.rules contra el emulador de Firestore",
   "scripts": {
-    "test": "node --test --test-concurrency=1 users.test.mjs reviews.test.mjs messages.test.mjs tracking.test.mjs",
+    "test": "node --test --test-concurrency=1 users.test.mjs reviews.test.mjs messages.test.mjs tracking.test.mjs calls.test.mjs",
     "test:emulator": "firebase emulators:exec --config ../../firebase.test.json --only firestore --project demo-pa-todo \"npm test\""
   },
   "devDependencies": {

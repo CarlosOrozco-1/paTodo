@@ -80,6 +80,14 @@
         { "fieldPath": "jobId", "order": "ASCENDING" },
         { "fieldPath": "reviewerId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "calls",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "jobId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

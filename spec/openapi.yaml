@@ -49,6 +49,8 @@ tags:
     description: Cálculo y almacenamiento de rutas
   - name: payments
     description: Pagos (demo/metodológico, sin dinero real)
+  - name: voice
+    description: Llamadas de voz entre cliente y trabajador (WebRTC P2P, sin costo por minuto)
   - name: admin
     description: Panel de administración (solo rol `admin`)
 
@@ -547,6 +549,188 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           description: El trabajo ya fue pagado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '412':
+          $ref: '#/components/responses/FailedPrecondition'
+
+  # ===================== VOZ =====================
+  /createVoiceSession:
+    post:
+      tags: [voice]
+      summary: Autorizar una llamada de voz y devolver los servidores ICE
+      description: |
+        Paso previo obligatorio para marcar: el cliente pide permiso para
+        llamar y la API responde con lo que la app necesita para iniciar la
+        llamada WebRTC. La llamada es de **audio entre el cliente y el
+        trabajador de un mismo trabajo**; no hay llamadas a números de
+        teléfono (PSTN) ni llamada entre dos clientes o dos trabajadores.
+
+        La API valida y hace lo siguiente:
+
+        - Comprueba que el trabajo existe y está en `accepted` o `in_progress`.
+        - Comprueba que quien llama (`callerId`) es el `clientId` **o** el
+          `workerId` de ese trabajo, y que quien recibe (`calleeId`) es la
+          contraparte. Nadie más puede llamar a ese usuario.
+        - Rechaza si hay una llamada activa (`ringing` o `in_progress`) entre
+          los dos para ese trabajo.
+        - Crea el documento en `calls` con `status: ringing` y
+          `direction: outgoing`.
+        - Devuelve **credenciales TURN efímeras** (usuario = marca de tiempo de
+          expiración, contraseña = HMAC del secreto). El secreto TURN nunca
+          sale del servidor: si no está configurado, la respuesta solo incluye
+          STUN y la llamada funciona igual mientras haya ruta directa.
+        - Crea una notificación `voice_call_incoming` para el receptor.
+
+        **La señalización no pasa por la API.** El cliente escribe la oferta,
+        la respuesta y los candidatos ICE directamente en la subcolección
+        `calls/{callId}/signals`, cuya escritura permiten las reglas solo a los
+        dos participantes. El audio viaja directamente entre dispositivos
+        (WebRTC, cifrado DTLS-SRTP) y solo pasa por el relay TURN cuando no hay
+        ruta directa. **El audio nunca se almacena.**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jobId:
+                  type: string
+                  description: ID del trabajo entre cuyas partes se quiere llamar (colección jobs).
+              required: [jobId]
+      responses:
+        '201':
+          description: Sesión autorizada. Devuelve el registro de la llamada y la configuración de conexión.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  callId:
+                    type: string
+                    description: ID del documento creado en la colección calls.
+                  jobId:
+                    type: string
+                    description: ID del trabajo de la llamada.
+                  calleeId:
+                    type: string
+                    description: UID del participante que va a recibir la llamada.
+                  direction:
+                    type: string
+                    enum: [outgoing]
+                    description: Siempre outgoing: este endpoint lo ejecuta quien marca.
+                  signalingPath:
+                    type: string
+                    description: Ruta en Firestore donde se escribe la señalización, `calls/{callId}/signals`.
+                  iceServers:
+                    type: array
+                    description: Servidores ICE para el motor WebRTC. Incluye STUN siempre, y TURN si hay credenciales configuradas.
+                    items:
+                      type: object
+                      properties:
+                        urls:
+                          type: string
+                          description: URL del servidor (por ejemplo `turn:turn.patodo.app:3478`).
+                        username:
+                          type: string
+                          description: Usuario. En TURN es una credencial efímera con hora de expiración.
+                        credential:
+                          type: string
+                          description: Contraseña de la credencial efímera.
+                      required: [urls]
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    description: Momento en que expiran las credenciales. El cliente debe pedir una sesión nueva si expiraron.
+                  call:
+                    $ref: './schemas/calls.json'
+                  signaling:
+                    $ref: './schemas/call-signal.json'
+                required: [callId, jobId, calleeId, direction, signalingPath, iceServers, expiresAt, call]
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Ya hay una llamada activa entre las dos partes de ese trabajo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '412':
+          $ref: '#/components/responses/FailedPrecondition'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /endVoiceCall:
+    post:
+      tags: [voice]
+      summary: Registrar el desenlace de una llamada de voz
+      description: |
+        Cierra la llamada: guarda el estado final, la duración y **borra la
+        señalización** de `calls/{callId}/signals` (mensajes efímeros que ya
+        no sirven). Solo pueden llamarlo las dos partes del trabajo, y solo con
+        una transición de estado válida:
+
+        - `ringing` → `in_progress` → `completed` (camino normal)
+        - `ringing` → `declined` | `canceled` | `missed`
+        - `in_progress` → `completed` | `failed`
+
+        El cliente **no** escribe en `calls` directamente: las reglas de
+        Firestore lo prohíben y esta API es la única que valida la transición,
+        de modo que nadie puede inventarse historial de llamadas ni marcar como
+        `completed` una llamada que nunca se conectó.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                callId:
+                  type: string
+                  description: ID del documento en la colección calls.
+                status:
+                  type: string
+                  enum: [in_progress, completed, declined, canceled, missed, failed]
+                  description: Estado final (o `in_progress` para marcar que la llamada se conectó).
+                durationSeconds:
+                  type: integer
+                  minimum: 0
+                  description: Duración real en segundos. Obligatoria cuando `status` es `completed`.
+                mediaRelay:
+                  type: string
+                  enum: [p2p, turn]
+                  description: Cómo se transportó el audio. Permite medir si el relay TURN sigue siendo necesario.
+                failureCode:
+                  type: string
+                  description: Motivo técnico, solo si `status` es `failed` (por ejemplo `ice-failed`).
+              required: [callId, status]
+      responses:
+        '200':
+          description: Desenlace registrado y señalización eliminada.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/calls.json'
+        '400':
+          $ref: '#/components/responses/InvalidArgument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: La transición de estado no es válida para el estado actual de la llamada.
           content:
             application/json:
               schema:
