@@ -52,8 +52,8 @@
   process/.style={rectangle,draw,rounded corners,align=center,inner sep=4pt},
   startstop/.style={rectangle,draw,rounded corners=4pt,fill=gray!15,align=center,minimum width=22mm,inner sep=4pt},
   io/.style={trapezium,trapezium left angle=70,trapezium right angle=110,draw,align=center,inner sep=3pt},
-  usecase/.style={ellipse,draw,align=center,minimum height=8mm,inner sep=2pt,font=\small},
-  actor/.style={ellipse,draw,align=center,minimum height=9mm,minimum width=16mm,font=\small},
+  usecase/.style={ellipse,draw,fill=blue!8,align=center,minimum height=8mm,inner sep=2pt,font=\small},
+  actor/.style={ellipse,draw,fill=orange!10,align=center,minimum height=9mm,minimum width=16mm,font=\small},
   entity/.style={rectangle,draw,align=center,font=\small\bfseries,inner sep=4pt},
   attr/.style={ellipse,draw,align=left,font=\scriptsize,inner sep=2pt}
 }
@@ -129,7 +129,7 @@ Aceptación de Software --- DERCAS\par}
 \vfill
 \end{titlepage}
 
-% --- ├ìndice ---------------------------------------------------------
+% --- Índice ---------------------------------------------------------
 \tableofcontents
 \newpage
 
@@ -538,59 +538,50 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[node distance=2.5cm]
-    % Actores
-    \node[actor] (cliente) at (0,-5.8) {Cliente};
-    \node[actor] (trabajador) at (0,-9.4) {Trabajador};
-    \node[actor] (ambos) at (0,-13.0) {Ambos};
-    \node[actor] (admin) at (0,-16.6) {Administrador};
+\begin{tikzpicture}[node distance=2.5cm,font=\small]
+    % Actores (alineados a la izquierda)
+    \node[actor] (cliente) at (0, 7.5) {Cliente};
+    \node[actor] (trabajador) at (0, 3.5) {Trabajador};
+    \node[actor] (ambos) at (0, -1.0) {Ambos};
+    \node[actor] (admin) at (0, -8.0) {Administrador};
 
-    % Autenticación
-    \node[usecase] (cu1) at (8.5,0.7) {UC-01 Registrarse / Iniciar sesión};
-    \node[usecase] (cu2) at (8.5,-1.3) {UC-02 Crear perfil de usuario};
-    \node[usecase] (cu3) at (8.5,-3.3) {UC-03 Refrescar token de sesión};
+    % UCs de Cliente y Trabajador (Centro, x=6.5)
+    \node[usecase] (cu4) at (6.5, 8.5) {UC-04 Publicar trabajo};
+    \node[usecase] (cu6) at (6.5, 7.0) {UC-06 Cancelar trabajo};
+    \node[usecase] (cu7) at (6.5, 5.5) {UC-07 Completar trabajo};
+    \node[usecase] (cu9) at (6.5, 4.0) {UC-09 Aceptar oferta};
+    \node[usecase] (cu12) at (6.5, 2.5) {UC-12 Crear reseña};
+    \node[usecase] (cu15) at (6.5, 1.0) {UC-15 Iniciar llamada};
+    \node[usecase] (cu16) at (6.5, -0.5) {UC-16 Finalizar llamada};
+    \node[usecase] (cu10) at (6.5, -2.0) {UC-10 Calcular ruta prev.};
+    \node[usecase] (cu11) at (6.5, -3.5) {UC-11 Calcular ruta of.};
 
-    % Trabajos
-    \node[usecase] (cu4) at (8.5,-5.8) {UC-04 Publicar trabajo};
-    \node[usecase] (cu5) at (8.5,-7.8) {UC-05 Buscar trabajos cercanos};
-    \node[usecase] (cu6) at (8.5,-9.8) {UC-06 Cancelar trabajo};
-    \node[usecase] (cu7) at (8.5,-11.8) {UC-07 Completar trabajo};
-
-    % Ofertas
-    \node[usecase] (cu8) at (8.5,-14.3) {UC-08 Enviar oferta};
-    \node[usecase] (cu9) at (8.5,-16.3) {UC-09 Aceptar oferta};
-
-    % Voz
-    \node[usecase] (cu15) at (17.0,0.2) {UC-15 Iniciar llamada de voz};
-    \node[usecase] (cu16) at (17.0,-1.8) {UC-16 Finalizar llamada de voz};
-
-    % Rutas
-    \node[usecase] (cu10) at (17.0,-4.5) {UC-10 Calcular ruta (vista previa)};
-    \node[usecase] (cu11) at (17.0,-6.5) {UC-11 Calcular ruta oficial};
-
-    % Social
-    \node[usecase] (cu12) at (17.0,-9.0) {UC-12 Crear reseña};
-    \node[usecase] (cu13) at (17.0,-11.0) {UC-13 Enviar mensaje / Chat};
-    \node[usecase] (cu14) at (17.0,-13.0) {UC-14 Recibir notificaciones};
-
-    % Administración
-    \node[usecase] (cu17) at (25.5,-4.0) {UC-17 Consultar panel de métricas};
-    \node[usecase] (cu18) at (25.5,-6.0) {UC-18 Gestionar usuarios (listar/filtrar)};
-    \node[usecase] (cu19) at (25.5,-8.0) {UC-19 Cambiar rol de usuario};
-    \node[usecase] (cu20) at (25.5,-10.0) {UC-20 Promover/revocar administrador};
-    \node[usecase] (cu21) at (25.5,-12.0) {UC-21 Suspender/activar cuenta};
-    \node[usecase] (cu22) at (25.5,-14.0) {UC-22 Verificar profesional};
-    \node[usecase] (cu23) at (25.5,-16.0) {UC-23 Mantener catálogo};
-    \node[usecase] (cu24) at (25.5,-18.0) {UC-24 Consultar registro de auditoría};
+    % UCs de Ambos y Admin (Derecha, x=13.0)
+    \node[usecase] (cu1) at (13.0, 7.5) {UC-01 Registro/Login};
+    \node[usecase] (cu2) at (13.0, 6.0) {UC-02 Crear perfil};
+    \node[usecase] (cu3) at (13.0, 4.5) {UC-03 Refrescar token};
+    \node[usecase] (cu5) at (13.0, 3.0) {UC-05 Buscar cercanos};
+    \node[usecase] (cu8) at (13.0, 1.5) {UC-08 Enviar oferta};
+    \node[usecase] (cu13) at (13.0, 0.0) {UC-13 Chat};
+    \node[usecase] (cu14) at (13.0, -1.5) {UC-14 Notificaciones};
+    
+    \node[usecase] (cu17) at (13.0, -4.0) {UC-17 Panel métricas};
+    \node[usecase] (cu18) at (13.0, -5.5) {UC-18 Gestionar usuarios};
+    \node[usecase] (cu19) at (13.0, -7.0) {UC-19 Cambiar rol};
+    \node[usecase] (cu20) at (13.0, -8.5) {UC-20 Promover admin};
+    \node[usecase] (cu21) at (13.0, -10.0) {UC-21 Suspender/activar};
+    \node[usecase] (cu22) at (13.0, -11.5) {UC-22 Verificar prof.};
+    \node[usecase] (cu23) at (13.0, -13.0) {UC-23 Mantener catálogo};
+    \node[usecase] (cu24) at (13.0, -14.5) {UC-24 Auditoría};
 
     % Límite del sistema
-    \node[draw,fit=(cu1)(cu24),inner sep=14pt,label=above:{\textbf{PaTodo}}] (sis) {};
+    \node[draw,fit=(cu4)(cu24),inner sep=18pt,label=above:{\textbf{PaTodo}}] (sis) {};
 
-    % Relaciones
-    \foreach \a in {cu4,cu6,cu7,cu9,cu12,cu15,cu16} \draw[flowarrow] (cliente) -- (\a);
-    \foreach \a in {cu5,cu8,cu10,cu15,cu16} \draw[flowarrow] (trabajador) -- (\a);
-    \foreach \a in {cu1,cu2,cu3,cu4,cu5,cu8,cu13,cu14} \draw[flowarrow] (ambos) -- (\a);
-    \foreach \a in {cu17,cu18,cu19,cu20,cu21,cu22,cu23,cu24} \draw[flowarrow] (admin) -- (\a);
+    % Relaciones (Usando out/in para no cruzar tanto)
+    \foreach \a in {cu4,cu6,cu7,cu9,cu12,cu15,cu16} \draw[flowarrow] (cliente.east) to[out=0,in=180] (\a.west);
+    \foreach \a in {cu5,cu8,cu10,cu15,cu16} \draw[flowarrow] (trabajador.east) to[out=0,in=180] (\a.west);
+    \foreach \a in {cu1,cu2,cu3,cu4,cu5,cu8,cu13,cu14} \draw[flowarrow] (ambos.east) to[out=0,in=180] (\a.west);
+    \foreach \a in {cu17,cu18,cu19,cu20,cu21,cu22,cu23,cu24} \draw[flowarrow] (admin.east) to[out=0,in=180] (\a.west);
 \end{tikzpicture}}%
 \captionof{figure}{Diagrama de casos de uso del sistema.}
 \label{fig:casosdeuso}
@@ -1092,18 +1083,18 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \centering
 \begin{tikzpicture}[x=1cm,y=0.85cm,font=\small]
     % Participantes
-    \foreach \x/\name/\id in {0/Cliente/a,5.0/SDK\ cliente/b,10.0/Reglas\ de\ seguridad/c,15.0/Cloud\ Firestore/d}
+    \foreach \x/\name/\id in {0/Cliente/a,4.5/SDK\ cliente/b,9.0/Reglas\ de\ seguridad/c,13.5/Cloud\ Firestore/d}
         \node[draw,rounded corners,fill=gray!12,minimum width=2.1cm,minimum height=0.8cm,align=center] (p\id) at (\x,0) {\name};
     \draw[dashed] (pa.south) -- (0,-5.6);
-    \draw[dashed] (pb.south) -- (5.0,-5.6);
-    \draw[dashed] (pc.south) -- (10.0,-5.6);
-    \draw[dashed] (pd.south) -- (15.0,-5.6);
+    \draw[dashed] (pb.south) -- (4.5,-5.6);
+    \draw[dashed] (pc.south) -- (9.0,-5.6);
+    \draw[dashed] (pd.south) -- (13.5,-5.6);
 
-    \draw[-{Latex}] (pa) -- node[above,align=center,font=\scriptsize]{escribe trabajo en estado pendiente\\(con su identificador)} (pb);
-    \draw[-{Latex}] (pb) -- node[above,font=\scriptsize]{solicita autorización} (pc);
-    \draw[-{Latex}] (pc) -- node[above,align=center,font=\scriptsize]{valida rol, suspensión\\y propiedad} (pd);
-    \draw[dashed,-{Latex}] (pd) -- node[above,font=\scriptsize]{trabajo creado} (pa);
-    \node[draw,rounded corners,align=center,font=\scriptsize,fill=red!8,text width=7cm] (err) at (5.7,-4.4) {Si falta el rol, la cuenta está suspendida o el identificador del cliente no coincide, las reglas rechazan la escritura con error de permisos insuficientes.};
+    \draw[-{Latex}] (0,-1.5) -- node[above,align=center,font=\scriptsize]{escribe trabajo en estado pendiente} (4.5,-1.5);
+    \draw[-{Latex}] (4.5,-2.5) -- node[above,font=\scriptsize]{solicita autorización} (9.0,-2.5);
+    \draw[-{Latex}] (9.0,-3.5) -- node[above,align=center,font=\scriptsize]{valida rol, suspensión y propiedad} (13.5,-3.5);
+    \draw[dashed,-{Latex}] (13.5,-4.5) -- node[above,font=\scriptsize]{trabajo creado} (0,-4.5);
+    \node[draw,rounded corners,align=center,font=\scriptsize,fill=red!8,text width=7cm] (err) at (6.75,-5.2) {Si falta el rol, la cuenta está suspendida o el identificador no coincide, las reglas rechazan la escritura.};
 \end{tikzpicture}
 \captionof{figure}{Secuencia de publicación de un trabajo con validación en las reglas de seguridad.}
 \label{fig:seq-publicacion}
@@ -1114,22 +1105,19 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[x=1cm,y=0.8cm,font=\small]
-    \foreach \x/\name/\id in {0/Cliente/a,5.0/API\ REST/b,10.0/Cloud\ Firestore/c,15.0/Notificación\ push/d}
+    \foreach \x/\name/\id in {0/Cliente/a,4.5/API\ REST/b,9.0/Cloud\ Firestore/c,13.5/Notificación\ push/d}
         \node[draw,rounded corners,fill=gray!12,minimum width=2.1cm,minimum height=0.8cm,align=center] (p\id) at (\x,0) {\name};
-    \draw[dashed] (pa.south) -- (0,-6.2);
-    \draw[dashed] (pb.south) -- (5.0,-6.2);
-    \draw[dashed] (pc.south) -- (10.0,-6.2);
-    \draw[dashed] (pd.south) -- (15.0,-6.2);
+    \draw[dashed] (pa.south) -- (0,-7.8);
+    \draw[dashed] (pb.south) -- (4.5,-7.8);
+    \draw[dashed] (pc.south) -- (9.0,-7.8);
+    \draw[dashed] (pd.south) -- (13.5,-7.8);
 
-    \draw[-{Latex}] (pa) -- node[above,font=\scriptsize]{acepta oferta (token de identidad)} (pb);
-    \draw[-{Latex}] (pb) -- node[above,font=\scriptsize]{verifica token y propiedad del trabajo} (pc);
-    \draw[-{Latex}] (pb) -- node[above,font=\scriptsize]{inicia transacción} (pc);
-    \node[draw,rounded corners,align=left,font=\scriptsize,fill=blue!6,text width=5.4cm] (tr) at (5.7,-3.0) {En la misma transacción:\\oferta elegida $\rightarrow$ aceptada\\resto de ofertas $\rightarrow$ rechazadas\\trabajo $\rightarrow$ aceptado + trabajador asignado\\conversación $\rightarrow$ creada y activa};
-    \draw[-{Latex}] (pc) -- node[below,font=\scriptsize]{confirma la transacción} (pb);
-    \draw[-{Latex}] (pb) -- node[above,font=\scriptsize]{registra notificación} (pc);
-    \draw[-{Latex}] (pb) -- node[above,font=\scriptsize]{envía aviso al trabajador} (pd);
-    \draw[-{Latex}] (pb) -- node[below,font=\scriptsize]{trabajo aceptado} (pa);
-    \node[draw,rounded corners,align=center,font=\scriptsize,fill=red!8,text width=8.0cm] (err) at (5.7,-5.5) {Si la validación falla (trabajo ya aceptado, llamante que no es el dueño o cuenta suspendida), la transacción se revierte en su totalidad: no queda ningún trabajo aceptado sin trabajador asignado.};
+    \draw[-{Latex}] (0,-1.5) -- node[above,font=\scriptsize]{acepta oferta (token)} (4.5,-1.5);
+    \draw[-{Latex}] (4.5,-2.5) -- node[above,font=\scriptsize]{verifica y arranca transacción} (9.0,-2.5);
+    \node[draw,rounded corners,align=left,font=\scriptsize,fill=blue!6,text width=4.0cm] (tr) at (6.75,-4.0) {En transacción:\\oferta elegida $\rightarrow$ aceptada\\resto $\rightarrow$ rechazadas\\trabajo $\rightarrow$ aceptado\\conversación $\rightarrow$ activa};
+    \draw[-{Latex}] (9.0,-5.5) -- node[above,font=\scriptsize]{confirma transacción} (4.5,-5.5);
+    \draw[-{Latex}] (4.5,-6.5) -- node[above,font=\scriptsize]{envía aviso} (13.5,-6.5);
+    \draw[-{Latex}] (4.5,-7.2) -- node[above,font=\scriptsize]{trabajo aceptado} (0,-7.2);
 \end{tikzpicture}
 \captionof{figure}{Secuencia de aceptación de oferta y asignación del trabajador.}
 \label{fig:seq-aceptacion}
@@ -1140,20 +1128,18 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[x=1cm,y=0.8cm,font=\small]
-    \foreach \x/\name/\id in {0/Parte\\participante/a,5.0/API\ REST/b,10.0/Cloud\ Firestore/c,15.0/Perfil\\evaluado/d}
+    \foreach \x/\name/\id in {0/Participante/a,4.5/API\ REST/b,9.0/Cloud\ Firestore/c,13.5/Perfil\ evaluado/d}
         \node[draw,rounded corners,fill=gray!12,minimum width=2.2cm,minimum height=0.8cm,align=center] (p\id) at (\x,0) {\name};
     \draw[dashed] (pa.south) -- (0,-6.4);
-    \draw[dashed] (pb.south) -- (5.0,-6.4);
-    \draw[dashed] (pc.south) -- (10.0,-6.4);
-    \draw[dashed] (pd.south) -- (15.0,-6.4);
+    \draw[dashed] (pb.south) -- (4.5,-6.4);
+    \draw[dashed] (pc.south) -- (9.0,-6.4);
+    \draw[dashed] (pd.south) -- (13.5,-6.4);
 
-    \draw[-{Latex}] (pa) -- node[above,font=\scriptsize]{completa el trabajo} (pb);
-    \draw[-{Latex}] (pb) -- node[above,font=\scriptsize]{marca completado y libera el seguimiento} (pc);
-    \draw[-{Latex}] (pa) -- node[above,font=\scriptsize]{califica (puntuación y comentario)} (pb);
-    \draw[-{Latex}] (pb) -- node[above,font=\scriptsize]{valida participación y unicidad} (pc);
-    \draw[-{Latex}] (pb) -- node[above,font=\scriptsize]{recalcula calificación promedio} (pd);
-    \draw[-{Latex}] (pd) -- node[above,font=\scriptsize]{perfil actualizado} (pa);
-    \node[draw,rounded corners,align=center,font=\scriptsize,fill=red!8,text width=8.4cm] (err) at (5.7,-5.6) {La reseña solo se registra si el autor participó en el trabajo, si el trabajo está completado y si el autor no ha calificado previamente. Las reseñas registradas no pueden modificarse ni eliminarse.};
+    \draw[-{Latex}] (0,-1.5) -- node[above,font=\scriptsize]{completa el trabajo} (4.5,-1.5);
+    \draw[-{Latex}] (4.5,-2.5) -- node[above,font=\scriptsize]{marca completado} (9.0,-2.5);
+    \draw[-{Latex}] (0,-3.5) -- node[above,font=\scriptsize]{califica (puntuación y reseña)} (4.5,-3.5);
+    \draw[-{Latex}] (4.5,-4.5) -- node[above,font=\scriptsize]{valida y persiste} (9.0,-4.5);
+    \draw[-{Latex}] (4.5,-5.5) -- node[above,font=\scriptsize]{recalcula promedio} (13.5,-5.5);
 \end{tikzpicture}
 \captionof{figure}{Secuencia de finalización del trabajo y creación de la reseña.}
 \label{fig:seq-finalizacion}
@@ -1164,20 +1150,19 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[x=1cm,y=0.8cm,font=\small]
-    \foreach \x/\name/\id in {0/Trabajador/a,5.0/API\ REST/b,10.0/Búsqueda\ geográfica/c,15.0/Cloud\ Firestore/d}
+    \foreach \x/\name/\id in {0/Trabajador/a,4.5/API\ REST/b,9.0/Búsqueda\ geo/c,13.5/Cloud\ Firestore/d}
         \node[draw,rounded corners,fill=gray!12,minimum width=2.2cm,minimum height=0.8cm,align=center] (p\id) at (\x,0) {\name};
-    \draw[dashed] (pa.south) -- (0,-5.6);
-    \draw[dashed] (pb.south) -- (5.0,-5.6);
-    \draw[dashed] (pc.south) -- (10.0,-5.6);
-    \draw[dashed] (pd.south) -- (15.0,-5.6);
+    \draw[dashed] (pa.south) -- (0,-7.0);
+    \draw[dashed] (pb.south) -- (4.5,-7.0);
+    \draw[dashed] (pc.south) -- (9.0,-7.0);
+    \draw[dashed] (pd.south) -- (13.5,-7.0);
 
-    \draw[-{Latex}] (pa) -- node[above,font=\scriptsize]{solicita trabajos cercanos (radio, categoría)} (pb);
-    \draw[-{Latex}] (pb) -- node[above,font=\scriptsize]{calcula límites del área} (pc);
-    \draw[-{Latex}] (pc) -- node[above,font=\scriptsize]{consulta trabajos pendientes por geocódigo} (pd);
-    \draw[-{Latex}] (pd) -- node[above,font=\scriptsize]{candidatos dentro del área} (pc);
-    \draw[-{Latex}] (pc) -- node[above,align=center,font=\scriptsize]{descarta los que exceden el radio\\y ordena por distancia} (pb);
-    \draw[-{Latex}] (pb) -- node[below,font=\scriptsize]{listado con distancia en línea recta} (pa);
-    \node[draw,rounded corners,align=center,font=\scriptsize,fill=red!8,text width=7.6cm] (err) at (5.7,-4.4) {El cliente no puede ejecutar esta búsqueda; solo los roles trabajador y ambos están habilitados, y las coordenadas y el radio se validan antes de consultar.};
+    \draw[-{Latex}] (0,-1.5) -- node[above,font=\scriptsize]{solicita trabajos cercanos} (4.5,-1.5);
+    \draw[-{Latex}] (4.5,-2.5) -- node[above,font=\scriptsize]{calcula límites} (9.0,-2.5);
+    \draw[-{Latex}] (9.0,-3.5) -- node[above,font=\scriptsize]{consulta geocódigo} (13.5,-3.5);
+    \draw[-{Latex}] (13.5,-4.5) -- node[above,font=\scriptsize]{candidatos del área} (9.0,-4.5);
+    \draw[-{Latex}] (9.0,-5.5) -- node[above,font=\scriptsize]{filtra por radio} (4.5,-5.5);
+    \draw[-{Latex}] (4.5,-6.5) -- node[above,font=\scriptsize]{listado ordenado} (0,-6.5);
 \end{tikzpicture}
 \captionof{figure}{Secuencia de la búsqueda de trabajos cercanos por proximidad geográfica.}
 \label{fig:seq-busqueda}
@@ -1192,21 +1177,20 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=3.5cm, on grid, auto]
+\begin{tikzpicture}[node distance=2.2cm, on grid, auto]
     \node[startstop] (inicio) {Creado};
     \node[process,below=of inicio] (pendiente) {Pendiente};
     \node[process,below=of pendiente] (aceptado) {Aceptado};
     \node[process,below=of aceptado] (ejecucion) {En ejecución};
-    \node[process,below=of ejecucion] (completado) {Completado\\{\scriptsize(estado final)}};
-    \node[process,right=5.5cm of completado] (cancelado) {Cancelado\\{\scriptsize(estado final)}};
+    \node[process,below=of ejecucion] (completado) {Completado\\{\scriptsize(final)}};
+    \node[process,right=5.5cm of completado] (cancelado) {Cancelado\\{\scriptsize(final)}};
 
     \draw[flowarrow] (inicio) -- (pendiente);
-    \draw[flowarrow] (pendiente) -- node[right,align=center]{el cliente acepta\\una oferta} (aceptado);
-    \draw[flowarrow] (pendiente) -| node[pos=0.75,above]{\scriptsize el cliente cancela} (cancelado);
-    \draw[flowarrow] (aceptado) -- node[right,align=center]{\scriptsize se reportan\\ubicaciones} (ejecucion);
+    \draw[flowarrow] (pendiente) -- node[right,align=center]{cliente acepta\\una oferta} (aceptado);
+    \draw[flowarrow] (pendiente) -| node[pos=0.75,above]{\scriptsize cancelado} (cancelado);
+    \draw[flowarrow] (aceptado) -- node[right,align=center]{\scriptsize ubicaciones} (ejecucion);
     \draw[flowarrow] (ejecucion) -- (completado);
-    \draw[flowarrow] (aceptado) -- node[right,align=center]{\scriptsize el cliente\\cancela} (cancelado);
-    \draw[flowarrow] (completado) -- ++(-1.5,0) node[left,align=center]{\scriptsize se habilita\\la calificación};
+    \draw[flowarrow] (aceptado) -- node[right,align=center]{\scriptsize cancelado} (cancelado);
 \end{tikzpicture}
 \captionof{figure}{Diagrama de estados de un trabajo. Los estados finales son completado y cancelado.}
 \label{fig:est-trabajo}
@@ -1216,12 +1200,12 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=3.8cm, on grid, auto]
+\begin{tikzpicture}[node distance=2.2cm, on grid, auto]
     \node[startstop] (inicio) {Recibida};
     \node[process,below=of inicio] (pendiente) {Pendiente};
-    \node[process,below=of pendiente] (aceptada) {Aceptada\\\scriptsize(el cliente elige esta oferta)};
-    \node[process,below=of pendiente, xshift=-4.5cm] (rechazada) {Rechazada\\\scriptsize(al aceptar otra oferta)};
-    \node[process,below=of pendiente, xshift=4.5cm] (retirada) {Retirada\\\scriptsize(el trabajador la retira)};
+    \node[process,below=of pendiente] (aceptada) {Aceptada};
+    \node[process,below=of pendiente, xshift=-4.0cm] (rechazada) {Rechazada};
+    \node[process,below=of pendiente, xshift=4.0cm] (retirada) {Retirada};
 
     \draw[flowarrow] (inicio) -- (pendiente);
     \draw[flowarrow] (pendiente) -- (aceptada);
@@ -1273,7 +1257,8 @@ principales y sus relaciones.
 \begin{tikzpicture}[font=\scriptsize, node distance=1.0cm and 1.6cm]
 
     % USUARIO
-    \node[entity] (users) at (0,0) {
+    % USUARIOS (Centro-Izquierda)
+    \node[entity] (users) at (-5.5, 0) {
         \begin{tabular}{|l|}
         \hline
         \rowcolor{blue!10} \textbf{USUARIOS} \\ \hline
@@ -1286,8 +1271,8 @@ principales y sus relaciones.
         \end{tabular}
     };
 
-    % TRABAJO
-    \node[entity, right=2cm of users] (jobs) {
+    % TRABAJO (Centro)
+    \node[entity] (jobs) at (0, 0) {
         \begin{tabular}{|l|}
         \hline
         \rowcolor{green!12} \textbf{TRABAJOS} \\ \hline
@@ -1303,8 +1288,8 @@ principales y sus relaciones.
         \end{tabular}
     };
 
-    % OFERTA
-    \node[entity, below=1.5cm of jobs] (offers) {
+    % OFERTA (Centro-Abajo)
+    \node[entity] (offers) at (0, -4.5) {
         \begin{tabular}{|l|}
         \hline
         \rowcolor{orange!14} \textbf{OFERTAS} \\ \hline
@@ -1316,19 +1301,19 @@ principales y sus relaciones.
         \end{tabular}
     };
 
-    % RESE├æA
-    \node[entity, below=1.5cm of offers] (reviews) {
+    % RESEÑA (Centro-Abajo-Abajo)
+    \node[entity] (reviews) at (0, -8.0) {
         \begin{tabular}{|l|}
         \hline
-        \rowcolor{purple!10} \textbf{RESE├æAS} \\ \hline
+        \rowcolor{purple!10} \textbf{RESEÑAS} \\ \hline
         \textit{id (clave)} \\
         puntuación (1--5) \\
         comentario \\ \hline
         \end{tabular}
     };
 
-    % CONVERSACION
-    \node[entity, above=1.5cm of jobs] (convs) {
+    % CONVERSACION (Centro-Arriba)
+    \node[entity] (convs) at (0, 4.5) {
         \begin{tabular}{|l|}
         \hline
         \rowcolor{teal!12} \textbf{CONVERSACIONES} \\ \hline
@@ -1338,8 +1323,8 @@ principales y sus relaciones.
         \end{tabular}
     };
 
-    % MENSAJES
-    \node[entity, above=1.5cm of convs] (msgs) {
+    % MENSAJES (Centro-Arriba-Arriba)
+    \node[entity] (msgs) at (0, 8.0) {
         \begin{tabular}{|l|}
         \hline
         \rowcolor{teal!8} \textbf{MENSAJES} \\ \hline
@@ -1350,8 +1335,8 @@ principales y sus relaciones.
         \end{tabular}
     };
 
-    % NOTIFICACIONES
-    \node[entity, right=1.5cm of jobs] (notifs) {
+    % NOTIFICACIONES (Centro-Derecha)
+    \node[entity] (notifs) at (5.5, 0) {
         \begin{tabular}{|l|}
         \hline
         \rowcolor{gray!20} \textbf{NOTIFICACIONES} \\ \hline
@@ -1362,16 +1347,16 @@ principales y sus relaciones.
         \end{tabular}
     };
 
-    % CATALOGOS
-    \node[entity, right=1.5cm of users] (cats) {
+    % CATALOGOS (Izquierda-Arriba)
+    \node[entity] (cats) at (-5.5, 4.5) {
         \begin{tabular}{|l|}
         \hline
-        \rowcolor{yellow!18} \textbf{CATEGOR├ìAS} \\ \hline
+        \rowcolor{yellow!18} \textbf{CATEGORÍAS} \\ \hline
         \textit{código (clave)} \\ \hline
         \end{tabular}
     };
 
-    \node[entity, above=1.5cm of cats] (skills) {
+    \node[entity] (skills) at (-5.5, 8.0) {
         \begin{tabular}{|l|}
         \hline
         \rowcolor{yellow!14} \textbf{HABILIDADES} \\ \hline
@@ -1380,18 +1365,18 @@ principales y sus relaciones.
         \end{tabular}
     };
 
-    % VEHICULOS
-    \node[entity, below=1.5cm of cats] (vehis) {
+    % VEHICULOS (Izquierda-Abajo)
+    \node[entity] (vehis) at (-5.5, -4.5) {
         \begin{tabular}{|l|}
         \hline
-        \rowcolor{cyan!10} \textbf{VEH├ìCULOS} \\ \hline
+        \rowcolor{cyan!10} \textbf{VEHÍCULOS} \\ \hline
         \textit{id (clave)} \\
         tipo, marca, placa \\ \hline
         \end{tabular}
     };
 
-    % LLAMADAS
-    \node[entity, right=1.5cm of convs] (calls) {
+    % LLAMADAS (Derecha-Arriba)
+    \node[entity] (calls) at (5.5, 4.5) {
         \begin{tabular}{|l|}
         \hline
         \rowcolor{red!10} \textbf{LLAMADAS} \\ \hline
@@ -1402,16 +1387,17 @@ principales y sus relaciones.
         \end{tabular}
     };
 
-    % ACTIVIDAD
-    \node[entity, right=1.5cm of reviews] (act) {
+    % ACTIVIDAD (Izquierda-Abajo-Abajo)
+    \node[entity] (act) at (-5.5, -8.0) {
         \begin{tabular}{|l|}
         \hline
-        \rowcolor{gray!15} \textbf{AUDITOR├ìA} \\ \hline
+        \rowcolor{gray!15} \textbf{AUDITORÍA} \\ \hline
         \textit{id (clave)} \\
         acción \\ \hline
         \end{tabular}
     };
 
+    % Relaciones
     % Relaciones
     \draw[thick] (users) -- node[above,font=\scriptsize]{publica} (jobs);
     \draw[thick] (users) -- node[below,sloped,font=\scriptsize]{envía} (offers);
@@ -1421,12 +1407,18 @@ principales y sus relaciones.
     \draw[thick] (users) -- node[above,sloped,font=\scriptsize]{escala} (reviews);
     \draw[thick] (jobs) -- node[left,font=\scriptsize]{origina} (reviews);
     \draw[thick] (jobs) -- node[above,font=\scriptsize]{origina} (calls);
-    \draw[thick] (users) -- node[above,sloped,font=\scriptsize]{recibe} (notifs);
-    \draw[thick] (cats) -- node[above,font=\scriptsize]{clasifica} (jobs);
+    
+    % Curva por debajo para evitar cruzar TRABAJOS
+    \draw[thick] (users.south east) to[out=-25,in=-155] node[below,font=\scriptsize]{recibe} (notifs.south west);
+    
+    \draw[thick] (cats) -- node[above,sloped,font=\scriptsize]{clasifica} (jobs);
     \draw[thick] (cats) -- node[right,font=\scriptsize]{agrupa} (skills);
-    \draw[thick] (users) -- node[left,font=\scriptsize]{requiere} (skills);
-    \draw[thick] (users) -- node[below,sloped,font=\scriptsize]{registra} (vehis);
-    \draw[thick] (users) -- node[below,sloped,font=\scriptsize]{ejecuta} (act);
+    
+    % Curvas por la izquierda para evitar cruzar CATEGORÍAS y VEHÍCULOS
+    \draw[thick] (users.north west) to[out=135,in=225] node[left,font=\scriptsize]{requiere} (skills.south west);
+    \draw[thick] (users.south west) to[out=225,in=135] node[left,font=\scriptsize]{ejecuta} (act.north west);
+    
+    \draw[thick] (users) -- node[right,font=\scriptsize]{registra} (vehis);
 \end{tikzpicture}}%
 \captionof{figure}{Diagrama entidad-relación de PaTodo (modelo de documentos en la base de datos). Los atributos mostrados son los principales de cada entidad.}
 \label{fig:er}
