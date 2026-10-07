@@ -4,7 +4,7 @@
 
 ## Stack tecnológico
 
-- **Backend:** Firebase gestionado (Firestore, Auth, FCM, Storage) + **API REST transaccional** propia en Express 5 + TypeScript (carpeta `api/`, desplegada en Render). No se usa Realtime Database (ver `docs/llamadas-voz.md` §3).
+- **Backend:** Firebase gestionado (Firestore, Auth, FCM, Storage) + **API REST transaccional** propia en Express 5 + TypeScript (carpeta `api/`, desplegada en Render). No se usa Realtime Database (ver `docs/voz/llamadas-voz.md` §3).
 - **Frontend Web:** React + Vite + TypeScript
 - **Frontend Móvil:** Flutter
 - **Base de datos:** Cloud Firestore
@@ -64,7 +64,7 @@ patodo/
   - No desplegar el índice a la par del código puede romper consultas con
     `where + orderBy` (error `FAILED_PRECONDITION: The query requires an index`).
 - **Frontend web** se publica por Firebase Hosting (`https://pa-todo.web.app`):
-  el procedimiento exacto está en `docs/web-actualizacion.md`. Cuando el equipo
+  el procedimiento exacto está en `docs/deploy/web-actualizacion.md`. Cuando el equipo
   pida "actualiza la web", seguir ese documento (build local + deploy hostelado;
   probar primero con un canal de vista previa si se requiere).
 - **Guardián del build web** (obligatorio, no opcional): `npm run build` en
@@ -95,7 +95,7 @@ patodo/
 
 Estrategia para integrar código de otros desarrolladores **sin romper** el
 trabajo local ni generar conflictos a ciegas. Documentación detallada en
-`docs/trabajo-git.md`.
+`docs/git/trabajo-git.md`.
 
 - Ramas:
   - `desa` (remoto): rama de trabajo principal con upstream.
@@ -129,7 +129,7 @@ trabajo local ni generar conflictos a ciegas. Documentación detallada en
 - `worker`: envía ofertas a trabajos.
 - `both`: puede actuar como cliente y trabajador.
 - `admin`: super usuario (panel admin, suspender/activar cuentas, promover
-  admins, verificar profesionales, mantener el catálogo). Ver `docs/admin.md`.
+  admins, verificar profesionales, mantener el catálogo). Ver `docs/admin/admin.md`.
 
 Los roles se asignan mediante **Custom Claims** en Firebase Auth (claim `role`) y se replican en el campo `users/{uid}.role`. Las reglas de Firestore leen `request.auth.token.role`, así que el cliente debe refrescar el ID token (`getIdToken(true)`) tras crear el perfil o cambiar de rol. Lo asigna `POST /createUser`; para usuarios previos existe `npm run sync-claims` en `api/`. El claim `admin` lo asigna `npm run create-admin` (primer admin) y `POST /admin/makeAdmin` (los siguientes); `POST /admin/removeAdmin` lo revoca y **no puede usarse sobre uno mismo**.
 
@@ -138,7 +138,7 @@ Los roles se asignan mediante **Custom Claims** en Firebase Auth (claim `role`) 
 - `users`, `vehicles`, `skills`, `categories`, `jobs`, `offers`, `reviews`, `notifications`, `conversations` (con subcolección `messages`), `activity` (log de acciones administrativas; escritura solo la API, lectura solo admin).
 - El historial de ubicaciones y la señalización de llamadas se manejan en **Firestore**
   (`jobs/{jobId}/tracking/current` y `calls/{callId}/signals`), no en Realtime
-  Database: RTDB no está configurada en este proyecto. Ver `docs/llamadas-voz.md`.
+  Database: RTDB no está configurada en este proyecto. Ver `docs/voz/llamadas-voz.md`.
 - `calls` (registro de llamadas de voz) y `callLocks` (cerrojo transaccional por
   trabajo, escrito y borrado solo por la API) los administra únicamente la API;
   los clientes solo agregan mensajes a `calls/{callId}/signals`. El cerrojo evita
@@ -156,10 +156,10 @@ Los roles se asignan mediante **Custom Claims** en Firebase Auth (claim `role`) 
   validada contra producción, reglas con suspensión de cuentas
   (`notSuspended()`) y log `activity`, panel web conectado al API
   (dashboard, usuarios, verificación, trabajos, promover/revocar admin) y
-  catálogo `categories`/`skills` editable solo por admin (ver `docs/admin.md`).
-- Frontend web publicado en `https://pa-todo.web.app` (ver `docs/web-actualizacion.md`).
+  catálogo `categories`/`skills` editable solo por admin (ver `docs/admin/admin.md`).
+- Frontend web publicado en `https://pa-todo.web.app` (ver `docs/deploy/web-actualizacion.md`).
 - Contexto consolidado para redactar documentación (DERCAS):
-  `docs/contexto-agente.md`.
+  `docs/dercas-interno/contexto-agente.md`.
 
 ## Integración de los frontends (equipos web y móvil)
 
@@ -172,7 +172,7 @@ Los equipos web y móvil tienen **sus propios repositorios**. En el monorepo:
 
 Antes de tocar esas carpetas o de integrar algo, leer:
 
-- `docs/api-conexion.md` → cómo conectar Firebase y la API REST (URLs por entorno,
+- `docs/api/api-conexion.md` → cómo conectar Firebase y la API REST (URLs por entorno,
   división "quién escribe qué", trazo de ruta §5.1).
 - `frontend-web/README.md` y `frontend-mobile/README.md` → base de conexión local.
 - `spec/openapi.yaml` y `spec/schemas/` → contrato exacto (no inventar campos).

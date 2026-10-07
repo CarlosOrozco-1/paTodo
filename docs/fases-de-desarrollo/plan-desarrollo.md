@@ -4,7 +4,7 @@
 
 Plataforma de servicios bajo demanda que conecta a clientes con trabajadores cercanos, permitiendo publicar trabajos, recibir ofertas y negociar precios. Similar a InDrive, pero orientado a servicios domésticos y de emergencia (plomería, mecánica, jardinería, etc.).
 
-**Tecnologías principales:** *(actualizadas a la arquitectura vigente; ver `docs/arquitectura.md`)*
+**Tecnologías principales:** *(actualizadas a la arquitectura vigente; ver `docs/arquitectura/arquitectura.md`)*
 - Backend gestionado: **Firebase** (Auth, Firestore, FCM, Realtime Database, Storage)
 - API transaccional: **Express 5 + TypeScript** (`api/`), desplegada en **Render**
 - Autenticación: **Firebase Authentication** (Email/Password **y Google Sign-In**); la API verifica el ID token con el Admin SDK
@@ -71,7 +71,7 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 ---
 
 ### Fase 3: Configuración de Firebase (Firestore, Auth y emuladores) ✅
-- [x] Crear el proyecto `pa-todo` en Firebase Console (ver `docs/firebase-setup.md`).
+- [x] Crear el proyecto `pa-todo` en Firebase Console (ver `docs/firebase/firebase-setup.md`).
 - [x] Habilitar Firebase Authentication (Email/Password).
 - [x] Crear la base de Firestore `(default)`, edición Standard, región `nam5`.
 - [x] Guardar el service account como secreto (`FIREBASE_SERVICE_ACCOUNT`), nunca versionado.
@@ -95,7 +95,7 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 - [x] Implementar el health check `GET /` y `POST /createUser`. El registro/login lo gestiona el SDK de Firebase Auth en el cliente.
 - [x] Configurar CORS por allowlist (`CORS_ORIGINS`) para React + Flutter.
 
-**Entregable:** API base funcionando (health check + `POST /createUser`). Docs de ejecución: `docs/ejecucion.md`. Arquitectura: `docs/arquitectura.md`.
+**Entregable:** API base funcionando (health check + `POST /createUser`). Docs de ejecución: `docs/deploy/ejecucion.md`. Arquitectura: `docs/arquitectura/arquitectura.md`.
 
 ---
 
@@ -178,7 +178,7 @@ Adoptamos un enfoque basado en especificaciones formales antes de escribir códi
 
 ### Fase 11: Despliegue
 - [x] Desplegar la API Express en Render (plan gratuito): `https://patodo.onrender.com`
-- [x] Servir el frontend web (build estático de Vite) con Firebase Hosting: `https://pa-todo.web.app` (procedimiento en `docs/web-actualizacion.md`)
+- [x] Servir el frontend web (build estático de Vite) con Firebase Hosting: `https://pa-todo.web.app` (procedimiento en `docs/deploy/web-actualizacion.md`)
 - [x] Desplegar `firestore.rules` e índices con `firebase deploy`
 - [ ] Publicar app Android (Play Store) y iOS (App Store / TestFlight)
 - [ ] Configurar variables de entorno de producción (`FIREBASE_SERVICE_ACCOUNT`, `CORS_ORIGINS`, `PORT`)

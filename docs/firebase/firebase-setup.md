@@ -94,7 +94,7 @@ firebase deploy --only firestore:rules,firestore:indexes
 
 ## Verificación final
 
-1. Levanta los emuladores y la API: `npx firebase emulators:start --only auth,firestore` y `cd api && npm start` (ver `docs/ejecucion.md`).
+1. Levanta los emuladores y la API: `npx firebase emulators:start --only auth,firestore` y `cd api && npm start` (ver `docs/deploy/ejecucion.md`).
 2. Comprueba el health check: `curl http://127.0.0.1:3000/` -> `{"status":"ok","service":"patodo-api"}`.
 3. Ejecuta la prueba E2E del flujo completo: `cd api && bash tests/e2e.sh`.
 

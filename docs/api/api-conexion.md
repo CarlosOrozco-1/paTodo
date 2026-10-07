@@ -40,7 +40,7 @@ const firebaseConfig = {
 - Web Flutter: usar el `firebaseConfig` de arriba.
 - Autenticación habilitada: **Email/Password** (y **Google Sign-In** en la web:
   `client_id` `377828600122-r6kc7b5surfos5ha27fbs4lb9ue7672t.apps.googleusercontent.com`;
-  ver `docs/auth-google.md`).
+  ver `docs/autenticacion/auth-google.md`).
 
 ## 3. URLs por entorno
 
@@ -299,7 +299,7 @@ connectAuthEmulator(getAuth(), "http://127.0.0.1:9099");
 connectFirestoreEmulator(getFirestore(), "127.0.0.1", 8081);
 ```
 
-Guía completa de pruebas: `docs/api-emulador.md`. Pruebas automatizadas:
+Guía completa de pruebas: `docs/api/api-emulador.md`. Pruebas automatizadas:
 `api/tests/e2e.sh` (flujo completo) y `api/tests/security.sh` (autorización y reglas).
 
 > **Catálogo de categorías y skills:** las colecciones `categories` y `skills`

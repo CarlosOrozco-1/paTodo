@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 /**
  * Credenciales ICE para WebRTC: STUN siempre, TURN si está configurado.
  *
- * Decisión técnica en docs/llamadas-voz.md: el audio va directo entre
+ * Decisión técnica en docs/voz/llamadas-voz.md: el audio va directo entre
  * dispositivos (P2P) y el TURN es solo el respaldo cuando no hay ruta
  * directa (CGNAT). Nada de esto pasa por la API: la API solo firma
  * credenciales y se las entrega al cliente.

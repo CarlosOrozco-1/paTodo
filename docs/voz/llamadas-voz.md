@@ -67,7 +67,7 @@ Decisión importante, y corrige una suposición de la documentación:
 > **Verificado: era falso.** El tracking vive en Firestore
 > (`jobs/{jobId}/tracking/current`), `firebase.json` **no tiene** sección `database`,
 > y no hay `databaseURL` ni `databaseRef` en ningún frontend. RTDB no se usa.
-> La documentación ya está corregida en `AGENTS.md` y `docs/contexto-agente.md`.
+> La documentación ya está corregida en `AGENTS.md` y `docs/dercas-interno/contexto-agente.md`.
 
 Por eso la señalización va en **Firestore**, no en RTDB:
 
@@ -93,7 +93,7 @@ Por eso la señalización va en **Firestore**, no en RTDB:
 
 > Acción pendiente: corregir `AGENTS.md`, que hoy describe una base de datos que no
 > existe en el proyecto. **Hecho** en este cambio, junto con
-> `docs/contexto-agente.md`.
+> `docs/dercas-interno/contexto-agente.md`.
 
 ## 4. Arquitectura
 
@@ -202,7 +202,7 @@ Errores: `400` falta `jobId` · `403` no es parte del trabajo · `404` trabajo i
 | I | **Contrato (SDD)** | `spec/schemas/calls.json`, `spec/schemas/call-signal.json`, endpoints en `spec/openapi.yaml` | — | **Hecha y desplegada** |
 | II | **Reglas** | `calls` + `signals` + `callLocks` en `firestore.rules`, tests en `tests/rules/calls.test.mjs` (16 casos) | I | **Hecha y desplegada** |
 | III | **API** | `api/src/routes/calls.ts`, tipo de notificación, credenciales TURN efímeras, vars de entorno en Render | I, II | **Hecha y desplegada** |
-| IV | **TURN** | Runbook en `docs/turn-coturn.md` + `npm run verify:turn` (validados contra coturn 4.18.0 real); falta la VM | — (paralelo) | **Parcial** (sin VM) |
+| IV | **TURN** | Runbook en `docs/voz/turn-coturn.md` + `npm run verify:turn` (validados contra coturn 4.18.0 real); falta la VM | — (paralelo) | **Parcial** (sin VM) |
 | V | **Prueba E2E** | `api/test/calls.e2e.js`: abre sesiones simultáneas y verifica transiciones | III, IV | **Parcial** (sin TURN real) |
 
 ### Cómo probar la voz

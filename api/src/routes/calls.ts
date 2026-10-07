@@ -10,7 +10,7 @@ export const callsRouter = Router();
 
 /**
  * Llamadas de voz por WebRTC entre el cliente y el trabajador de un mismo
- * trabajo. Decisión técnica y alcance en docs/llamadas-voz.md.
+ * trabajo. Decisión técnica y alcance en docs/voz/llamadas-voz.md.
  *
  * Reparto de escrituras (ver firestore.rules, match /calls):
  * - `calls/{callId}` lo escribe SOLO esta API. Las reglas lo prohíben a los

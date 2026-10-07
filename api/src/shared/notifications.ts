@@ -119,7 +119,7 @@ export async function createAndSendNotification(
  * Lo que NO puede hacer la API es abrir la pantalla: eso lo decide el
  * dispositivo. El equipo de desarrollo app debe declarar en AndroidManifest el
  * permiso USE_FULL_SCREEN_INTENT y crear el canal de notificación con
- * IMPORTANCE_HIGH (fase D en docs/llamadas-voz.md).
+ * IMPORTANCE_HIGH (fase D en docs/voz/llamadas-voz.md).
  */
 export async function sendIncomingCallPush(input: {
   userId: string;

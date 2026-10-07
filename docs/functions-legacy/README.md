@@ -25,7 +25,7 @@ backend a una **API REST Express** autohosteada.
 - La API está en [`api/`](../../api/): Express + TypeScript + `firebase-admin`,
   con los mismos endpoints transaccionales.
 - La API se despliega en **Render** (plan gratuito):
-  `https://patodo.onrender.com` (ver [`docs/api-emulador.md`](../api-emulador.md)
+  `https://patodo.onrender.com` (ver [`docs/api/api-emulador.md`](../api-emulador.md)
   para pruebas locales y la colección de Postman en `docs/postman/`).
 - La autenticación, Firestore, FCM y las reglas de seguridad siguen en Firebase
   gestionado; solo la lógica de servidor cambió de Cloud Functions → API.

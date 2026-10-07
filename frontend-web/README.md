@@ -57,5 +57,5 @@ npm run lint            # oxlint
    entra vía redirección a `/cliente` (los roles de ruta no incluyen `both`).
    Pendiente de alinear con el monorepo cuando se soporte el flujo combinado.
 
-Contrato de la API: `../docs/api-conexion.md`. Spec OpenAPI: `../spec/openapi.yaml`.
+Contrato de la API: `../docs/api/api-conexion.md`. Spec OpenAPI: `../spec/openapi.yaml`.
 Guía por rol y órdenes: `../AGENTS.md`.
