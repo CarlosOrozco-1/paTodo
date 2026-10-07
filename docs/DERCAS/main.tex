@@ -251,7 +251,7 @@ El desarrollo se apoya, además, en un modelo de desarrollo orientado a especifi
 
 
 
-Cliente (\texttt{client}) & Usuario que contrata servicios. Publica trabajos, revisa las ofertas recibidas, acepta o rechaza ofertas, cancela trabajos no finalizados, conversa con el trabajador asignado, sigue su ubicación, finaliza el trabajo y califica al profesional. \\ \hline
+Cliente (\texttt{client}) & Usuario que contrata servicios. Publica trabajos, revisa las ofertas recibidas, acepta la oferta que mejor le convenga, cancela trabajos no finalizados, conversa con el trabajador asignado, sigue su ubicación, finaliza el trabajo y califica al profesional. \\ \hline
 
 Trabajador (\texttt{worker}) & Usuario que ofrece servicios. Consulta los trabajos cercanos a su ubicación mediante búsqueda geográfica, calcula la ruta hacia el trabajo, envía ofertas, gestiona sus propias ofertas (editar o retirar), reporta su ubicación durante el trayecto, finaliza el trabajo y califica al cliente. \\ \hline
 
@@ -282,7 +282,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \textbf{Actores} & Cliente, Trabajador, API REST \\ \hline
 \textbf{Entradas} & Correo electrónico, contraseña, o credenciales de Google; nombre, teléfono y rol seleccionado. \\ \hline
 \textbf{Salidas} & Sesión iniciada con ID token; documento de usuario creado; Custom Claim \texttt{role} asignado. \\ \hline
-\textbf{Especificaciones de funcionamiento} & El registro y el inicio de sesión se resuelven directamente contra Firebase Authentication desde el cliente. La creación del perfil se realiza mediante \texttt{POST /createUser}, que valida que el \texttt{uid} y el correo coincidan con los del token, crea el documento de usuario y asigna el rol como \textit{Custom Claim}. Al finalizar, el cliente debe refrescar su ID token (\texttt{getIdToken(true)}) para que el rol viaje en las peticiones. Los usuarios previos a la assignment del rol se actualizan con la utilidad de sincronización de claims. \\ \hline
+\textbf{Especificaciones de funcionamiento} & El registro y el inicio de sesión se resuelven directamente contra Firebase Authentication desde el cliente. La creación del perfil se realiza mediante \texttt{POST /createUser}, que valida que el \texttt{uid} y el correo coincidan con los del token, crea el documento de usuario y asigna el rol como \textit{Custom Claim}. Al finalizar, el cliente debe refrescar su ID token (\texttt{getIdToken(true)}) para que el rol viaje en las peticiones. Los usuarios previos a la asignación del rol se actualizan con la utilidad de sincronización de claims. \\ \hline
 \textbf{Restricciones adicionales} & Un usuario no puede publicar trabajos con el rol \texttt{worker} ni enviar ofertas con el rol \texttt{client}. No puede crearse un segundo perfil para el mismo \texttt{uid}. El teléfono es obligatorio para completar el perfil. \\ \hline
 \end{longtable}
 
@@ -394,7 +394,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \textbf{Actores} & Cliente, Trabajador, API REST \\ \hline
 \textbf{Entradas} & \texttt{jobId} para iniciar; \texttt{callId}, estado final y duración para finalizar. Mensajes de señalización (oferta, respuesta, candidatas de conexión, colgado). \\ \hline
 \textbf{Salidas} & Sesión de llamada creada con identificador, contraparte, servidores de conexión y ruta de señalización; historial de llamadas con estado, duración y tipo de relevo de medios. \\ \hline
-\textbf{Especificaciones de funcionamiento} & La solicitud de sesión se procesa mediante \texttt{POST /createVoiceSession}, que valida que el trabajo exista, se encuentre aceptado o en curso, que el llamante sea el cliente o el trabajador del trabajo y que ninguno esté suspendido. La API registra la llamada en estado \textit{lamiendo} y toma un cerrojo transaccional por trabajo, devolviendo al cliente los servidores de conexión con credenciales de tiempo limitado. La señalización (oferta, respuesta y candidatas de conexión) la escriben los dos participantes en los documentos de la llamada. Al finalizar, \texttt{POST /endVoiceCall} valida que el llamante sea parte de la llamada y que la transición de estado sea válida, escribe el desenlace y elimina la señalización y el cerrojo. \\ \hline
+\textbf{Especificaciones de funcionamiento} & La solicitud de sesión se procesa mediante \texttt{POST /createVoiceSession}, que valida que el trabajo exista, se encuentre aceptado o en curso, que el llamante sea el cliente o el trabajador del trabajo y que ninguno esté suspendido. La API registra la llamada en estado \textit{llamando} y toma un cerrojo transaccional por trabajo, devolviendo al cliente los servidores de conexión con credenciales de tiempo limitado. La señalización (oferta, respuesta y candidatas de conexión) la escriben los dos participantes en los documentos de la llamada. Al finalizar, \texttt{POST /endVoiceCall} valida que el llamante sea parte de la llamada y que la transición de estado sea válida, escribe el desenlace y elimina la señalización y el cerrojo. \\ \hline
 \textbf{Restricciones adicionales} & Solo puede existir una llamada activa por trabajo: un segundo intento concurrente se rechaza con conflicto. No se permiten llamadas a números telefónicos; el audio se establece directamente entre los participantes y \textbf{nunca} se almacena. El audio viaja cifrado. Las llamadas entrantes en segundo plano solo están soportadas en Android; en iOS quedan fuera de la primera versión. Una llamada que no se atiende dentro del tiempo de espera configurado se cierra automáticamente como perdida y libera el cerrojo. \\ \hline
 \end{longtable}
 
@@ -410,6 +410,20 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \textbf{Salidas} & Trabajo en estado \texttt{completed}; reseña registrada; calificación promedio y número de reseñas actualizados en el perfil del evaluado; notificación a la contraparte. \\ \hline
 \textbf{Especificaciones de funcionamiento} & La finalización se ejecuta mediante \texttt{POST /completeJob}, en una transacción que valida que el llamante sea el cliente o el trabajador asignado y que el trabajo esté aceptado. La calificación se registra mediante \texttt{POST /createReview}, que valida que el autor sea participante del trabajo, que el trabajo esté completado y que el autor no haya calificado previamente ese mismo trabajo; escribe la reseña, recalcula la calificación promedio y el conteo del perfil del evaluado y genera la notificación correspondiente. \\ \hline
 \textbf{Restricciones adicionales} & Solo los participantes de un trabajo completado pueden calificar, y una sola vez por trabajo y por persona. Las reseñas son inmutables: no pueden modificarse ni eliminarse. La calificación influye directamente en la reputación del profesional. \\ \hline
+\end{longtable}
+
+% ---------------------------------------------------------------------
+\subsection{Pago simulado del trabajo}
+
+\begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\hline
+\textbf{Nombre} & Pago simulado del trabajo \\ \hline
+\textbf{Descripción} & Cuando el trabajo está aceptado, en ejecución o completado, el cliente registra el pago del servicio mediante un módulo demostrativo que no mueve dinero real. \\ \hline
+\textbf{Actores} & Cliente, API REST \\ \hline
+\textbf{Entradas} & \texttt{jobId} y método de pago (\texttt{demo\_card}, \texttt{demo\_cash} o \texttt{demo\_bank}). \\ \hline
+\textbf{Salidas} & Documento de pago en estado \texttt{pagado} con la marca \texttt{isDemo}, asociado al trabajo; comisión de plataforma y pago neto calculados; notificación al trabajador. \\ \hline
+\textbf{Especificaciones de funcionamiento} & El pago se registra mediante \texttt{POST /createPayment}, que valida que el llamante sea el cliente dueño del trabajo, que exista un trabajador asignado y que el estado del trabajo permita el pago. En una transacción calcula el monto a partir del precio de la oferta aceptada o del precio propuesto, aplica la comisión de plataforma del 10 \% para obtener el pago neto, crea el pago con estado \texttt{pagado} y la marca \texttt{isDemo}, lo asocia al trabajo y notifica al trabajador. \\ \hline
+\textbf{Restricciones adicionales} & El módulo es demostrativo: no procesa tarjetas reales ni transfiere dinero. Solo el cliente dueño del trabajo puede pagarlo, y un trabajo ya pagado rechaza un segundo intento. \\ \hline
 \end{longtable}
 
 % ---------------------------------------------------------------------
@@ -454,6 +468,15 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \includegraphics[width=0.72\textwidth]{figuras/registro-y-autenticacion.png}
     \captionof{figure}{Diagrama de flujo del proceso de registro y autenticación de un usuario.}
     \label{fig:registro}
+\end{figure}
+
+\subsection{Configuración del catálogo de servicios}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-catalogo.png}
+    \captionof{figure}{Diagrama de flujo del proceso de mantenimiento del catálogo de categorías y habilidades. La lectura es pública y la escritura corresponde al administrador.}
+    \label{fig:catalogo}
 \end{figure}
 
 \subsection{Publicación de un trabajo}
@@ -501,6 +524,31 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \label{fig:ejecucion}
 \end{figure}
 
+\subsection{Conversación y coordinación}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-conversacion.png}
+    \captionof{figure}{Diagrama de flujo del proceso de mensajería entre cliente y trabajador dentro de la conversación del trabajo.}
+    \label{fig:conversacion}
+\end{figure}
+
+\subsection{Llamada de voz entre las partes}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-llamada-voz-1.png}
+    \captionof{figure}{Diagrama de flujo de la solicitud y el establecimiento de una llamada de voz.}
+    \label{fig:llamada1}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-llamada-voz-2.png}
+    \captionof{figure}{Diagrama de flujo del cierre de la llamada de voz y la actualización del historial.}
+    \label{fig:llamada2}
+\end{figure}
+
 \subsection{Finalización y calificación}
 
 \begin{figure}[H]
@@ -508,6 +556,33 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \includegraphics[width=0.72\textwidth]{figuras/finalizacion-y-calificacion.png}
     \captionof{figure}{Diagrama de flujo del proceso de finalización del trabajo y calificación de las partes.}
     \label{fig:finalizacion}
+\end{figure}
+
+\subsection{Pago simulado del trabajo}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-pago.png}
+    \captionof{figure}{Diagrama de flujo del registro del pago simulado del trabajo y de las validaciones que lo acompañan.}
+    \label{fig:pago}
+\end{figure}
+
+\subsection{Notificaciones}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-notificaciones.png}
+    \captionof{figure}{Diagrama de flujo de la creación, la entrega y la lectura de una notificación.}
+    \label{fig:notificaciones}
+\end{figure}
+
+\subsection{Administración del sistema}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-administracion.png}
+    \captionof{figure}{Diagrama de flujo de una operación administrativa y de las verificaciones de autorización que la preceden.}
+    \label{fig:administracion}
 \end{figure}
 
 \subsection{Flujo general del sistema}
@@ -562,7 +637,7 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \node[usecase] (cu3) at (13.0, 4.5) {UC-03 Refrescar token};
     \node[usecase] (cu5) at (13.0, 3.0) {UC-05 Buscar cercanos};
     \node[usecase] (cu8) at (13.0, 1.5) {UC-08 Enviar oferta};
-    \node[usecase] (cu13) at (13.0, 0.0) {UC-13 Chat};
+    \node[usecase] (cu13) at (13.0, 0.0) {UC-13 Seguimiento y chat};
     \node[usecase] (cu14) at (13.0, -1.5) {UC-14 Notificaciones};
     
     \node[usecase] (cu17) at (13.0, -4.0) {UC-17 Panel métricas};
@@ -772,13 +847,13 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \item El servicio crea la conversación privada entre ambas partes en estado activa.
     \item El servicio notifica la asignación al trabajador y notifica al cliente.
 \end{enumerate} \\ \hline
-\textbf{Requerimientos Simultáneos} & La operación es atómica: si la transacción falla, ninguno de los cambios se aplica, evitando trabajos aceptados sin trabajador asignado. \\ \hline
+\textbf{Requerimientos especiales} & La operación es atómica: si la transacción falla, ninguno de los cambios se aplica, evitando trabajos aceptados sin trabajador asignado. \\ \hline
 \textbf{Salida} & Trabajo aceptado con trabajador asignado, conversación creada y notificaciones enviadas. \\ \hline
 \textbf{Excepciones} & El trabajo ya fue aceptado por otro usuario: la operación se rechaza por conflicto. El usuario no es el dueño del trabajo: se rechaza por permisos insuficientes. \\ \hline
 \end{longtable}
 
 % ---------------------------------------------------------------------
-\subsection{Casos de uso del módulo de rutas y seguimiento}
+\subsection{Casos de uso del módulo de rutas}
 
 \subsubsection{Caso de uso ``UC-10: Calcular ruta (vista previa)''}
 
@@ -823,6 +898,35 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \textbf{Excepciones} & El trabajo no está aceptado o el usuario no participa: se rechaza la operación. Falta de ubicación del trabajador: se rechaza indicando que debe actualizar su ubicación. \\ \hline
 \end{longtable}
 
+\subsection{Casos de uso del módulo de finalización}
+
+\subsubsection{Caso de uso ``UC-12: Crear reseña''}
+
+\begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\hline
+\textbf{Descripción} & Tras completar el trabajo, el cliente y el trabajador califican mutuamente el servicio prestado. \\ \hline
+\textbf{Actores primarios} & Cliente, Trabajador. \\ \hline
+\textbf{Contexto} & Detalle de un trabajo completado. \\ \hline
+\textbf{Condiciones previas} & El trabajo debe estar completado y el usuario debe haber participado en él sin haber publicado ya una reseña. \\ \hline
+\textbf{Flujo básico} &
+\begin{enumerate}
+    \item El usuario abre el detalle de un trabajo completado y selecciona la opción de calificar.
+    \item El usuario asigna una puntuación de una a cinco estrellas.
+    \item Opcionalmente, el usuario escribe un comentario.
+    \item La aplicación envía la calificación al servicio REST.
+    \item El servicio verifica la participación, el estado del trabajo y que no exista ya una reseña del mismo autor para ese trabajo.
+    \item El servicio registra la reseña, recalcula la calificación promedio y el número de reseñas del perfil del evaluado.
+    \item El servicio notifica la nueva reseña a la contraparte.
+\end{enumerate} \\ \hline
+\textbf{Requerimientos especiales} & La puntuación va de 1 a 5. Las reseñas son inmutables: una vez registradas no pueden modificarse ni eliminarse. \\ \hline
+\textbf{Salida} & Reseña registrada, calificación promedio del perfil actualizada y notificación a la contraparte. \\ \hline
+\textbf{Excepciones} & El usuario no participó en el trabajo, el trabajo no está completado o ya lo ha calificado previamente: se rechaza la operación indicando el motivo. \\ \hline
+\end{longtable}
+
+% ---------------------------------------------------------------------
+% ---------------------------------------------------------------------
+\subsection{Casos de uso del módulo de seguimiento y chat}
+
 \subsubsection{Caso de uso ``UC-13: Seguimiento en tiempo real y chat''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
@@ -846,32 +950,7 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \end{longtable}
 
 % ---------------------------------------------------------------------
-\subsection{Casos de uso del módulo de finalización}
 
-\subsubsection{Caso de uso ``UC-12: Crear reseña''}
-
-\begin{longtable}{|P{3.3cm}|L{11.2cm}|}
-\hline
-\textbf{Descripción} & Tras completar el trabajo, el cliente y el trabajador califican mutuamente el servicio prestado. \\ \hline
-\textbf{Actores primarios} & Cliente, Trabajador. \\ \hline
-\textbf{Contexto} & Detalle de un trabajo completado. \\ \hline
-\textbf{Condiciones previas} & El trabajo debe estar completado y el usuario debe haber participado en él sin haber publicado ya una reseña. \\ \hline
-\textbf{Flujo básico} &
-\begin{enumerate}
-    \item El usuario abre el detalle de un trabajo completado y selecciona la opción de calificar.
-    \item El usuario asigna una puntuación de una a cinco estrellas.
-    \item Opcionalmente, el usuario escribe un comentario.
-    \item La aplicación envía la calificación al servicio REST.
-    \item El servicio verifica la participación, el estado del trabajo y que no exista ya una reseña del mismo autor para ese trabajo.
-    \item El servicio registra la reseña, recalcula la calificación promedio y el número de reseñas del perfil del evaluado.
-    \item El servicio notifica la nueva reseña a la contraparte.
-\end{enumerate} \\ \hline
-\textbf{Requerimientos especiales} & La puntuación va de 1 a 5. Las reseñas son inmutables: una vez registradas no pueden modificarse ni eliminarse. \\ \hline
-\textbf{Salida} & Reseña registrada, calificación promedio del perfil actualizada y notificación a la contraparte. \\ \hline
-\textbf{Excepciones} & El usuario no participó en el trabajo, el trabajo no está completado o ya calificación previamente: se rechaza la operación indicando el motivo. \\ \hline
-\end{longtable}
-
-% ---------------------------------------------------------------------
 \subsection{Casos de uso del módulo de comunicación por voz}
 
 \subsubsection{Caso de uso ``UC-15: Iniciar llamada de voz''}
@@ -1178,21 +1257,20 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[node distance=2.2cm, on grid, auto]
-    \node[startstop] (inicio) {Creado};
-    \node[process,below=of inicio] (pendiente) {Pendiente};
+    \node[startstop] (pendiente) {Pendiente};
     \node[process,below=of pendiente] (aceptado) {Aceptado};
-    \node[process,below=of aceptado] (ejecucion) {En ejecución};
-    \node[process,below=of ejecucion] (completado) {Completado\\{\scriptsize(final)}};
+    \node[process,below=of aceptado, xshift=-4.0cm] (ejecucion) {En ejecución\\{\scriptsize(prevista)}};
+    \node[process,below=of aceptado] (completado) {Completado\\{\scriptsize(final)}};
     \node[process,right=5.5cm of completado] (cancelado) {Cancelado\\{\scriptsize(final)}};
 
-    \draw[flowarrow] (inicio) -- (pendiente);
     \draw[flowarrow] (pendiente) -- node[right,align=center]{cliente acepta\\una oferta} (aceptado);
-    \draw[flowarrow] (pendiente) -| node[pos=0.75,above]{\scriptsize cancelado} (cancelado);
-    \draw[flowarrow] (aceptado) -- node[right,align=center]{\scriptsize ubicaciones} (ejecucion);
-    \draw[flowarrow] (ejecucion) -- (completado);
-    \draw[flowarrow] (aceptado) -- node[right,align=center]{\scriptsize cancelado} (cancelado);
+    \draw[flowarrow] (pendiente) -| node[pos=0.75,above]{\scriptsize cancelación} (cancelado);
+    \draw[flowarrow,dashed] (aceptado) -- node[left,align=center]{\scriptsize se inicia\\la ejecución} (ejecucion);
+    \draw[flowarrow] (ejecucion) -- node[below,align=center,font=\scriptsize]{finaliza} (completado);
+    \draw[flowarrow] (aceptado) -- node[right,align=center]{\scriptsize finaliza} (completado);
+    \draw[flowarrow] (aceptado) -- node[right,align=center]{\scriptsize cancela} (cancelado);
 \end{tikzpicture}
-\captionof{figure}{Diagrama de estados de un trabajo. Los estados finales son completado y cancelado.}
+\captionof{figure}{Diagrama de estados de un trabajo. Los estados finales son completado y cancelado. La transición hacia en ejecución está prevista en el esquema de datos, pero la API no la asigna automáticamente: un trabajo aceptado puede completarse directamente.}
 \label{fig:est-trabajo}
 \end{figure}
 
@@ -1221,8 +1299,7 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[node distance=3.8cm, on grid, auto]
-    \node[startstop] (inicio) {Solicitada};
-    \node[process,below=of inicio] (llamando) {Llamando};
+    \node[startstop] (llamando) {Llamando};
     \node[process,below=of llamando] (curso) {En curso};
     \node[process,below=of curso, xshift=-3.5cm] (perdida) {Perdida\\{\scriptsize(agota la espera)}};
     \node[process,below=of curso, xshift=0cm] (rechazada) {Rechazada};
@@ -1230,7 +1307,6 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \node[process,below=of curso, xshift=0cm, yshift=-2.5cm] (finalizada) {Finalizada\\{\scriptsize(colgar)}};
     \node[process,right=6.0cm of curso] (cancelada) {Cancelada};
 
-    \draw[flowarrow] (inicio) -- (llamando);
     \draw[flowarrow] (llamando) -- node[right,align=center]{\scriptsize la contraparte\\acepta} (curso);
     \draw[flowarrow] (llamando) -- node[left]{\scriptsize expira la espera} (perdida);
     \draw[flowarrow] (llamando) -- node[above,xshift=0.5cm]{\scriptsize rechaza} (rechazada);
@@ -1397,7 +1473,6 @@ principales y sus relaciones.
         \end{tabular}
     };
 
-    % Relaciones
     % Relaciones
     \draw[thick] (users) -- node[above,font=\scriptsize]{publica} (jobs);
     \draw[thick] (users) -- node[below,sloped,font=\scriptsize]{envía} (offers);
@@ -1619,7 +1694,7 @@ Funcionalidades de tiempo real, mensajería y notificaciones & Completado \\ \hl
 Interfaz web & Completado y publicado \\ \hline
 Interfaz móvil & En desarrollo \\ \hline
 Módulo de administración & Completado \\ \hline
-Comunicación de voz & En desarrollo \\ \hline
+Comunicación de voz & Backend completado y probado; interfaz móvil en desarrollo \\ \hline
 \end{longtable}
 
 % =====================================================================
@@ -1669,6 +1744,7 @@ técnica en \texttt{docs/}.}
 \hline
 \endfoot
 
+GET & \texttt{/} & Health check del servicio. \\ \hline
 POST & \texttt{/createUser} & Crea el perfil del usuario autenticado y asigna su rol. \\ \hline
 POST & \texttt{/acceptOffer} & Acepta una oferta: asigna al trabajador y abre la conversación. \\ \hline
 POST & \texttt{/cancelJob} & Cancela un trabajo pendiente o aceptado. \\ \hline
@@ -1704,8 +1780,11 @@ GET & \texttt{/admin/activityLog} & Registro de acciones administrativas. \\ \hl
 \endfoot
 
 Trabajo & \textit{Pendiente} $\rightarrow$ \textit{Aceptado} (al aceptar una oferta);
-\textit{Pendiente} $\rightarrow$ \textit{Cancelado}; \textit{Aceptado} $\rightarrow$ \textit{Completado};
+\textit{Pendiente} $\rightarrow$ \textit{Cancelado}; \textit{Aceptado} $\rightarrow$ \textit{En ejecución} (transición prevista en el esquema, hoy no se asigna automáticamente);
+\textit{Aceptado} $\rightarrow$ \textit{Completado}; \textit{En ejecución} $\rightarrow$ \textit{Completado};
 \textit{Aceptado} $\rightarrow$ \textit{Cancelado}. Los estados \textit{Completado} y \textit{Cancelado} son finales. \\ \hline
+
+Pago & \textit{Pagado} al registrarse el pago simulado del trabajo: único estado previsto, sin transiciones posteriores. \\ \hline
 
 Oferta & \textit{Pendiente} $\rightarrow$ \textit{Aceptada} (al aceptar el cliente esa oferta);
 \textit{Pendiente} $\rightarrow$ \textit{Rechazada} (al aceptar el cliente otra oferta);
