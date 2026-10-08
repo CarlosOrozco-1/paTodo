@@ -91,6 +91,17 @@ patodo/
 - Los logs de Android (`InsetsState`, `VRI`, `Choreographer`) son ruido del
   sistema operativo del emulador/dispositivo, NO errores de la app o del backend.
 
+## Documento DERCAS (LaTeX APA 7)
+
+- `docs/DERCAS/main.tex` se compila con `pdflatex` (MiKTeX), **dos pasadas**
+  para el índice; no usa biber ni `main.bib`. Dependencias instaladas en
+  MiKTeX: clase `apa7`, fuentes `newtx` (Times), paquetes `scalerel`,
+  `threeparttable` y `babel-spanish`.
+- `docs/DERCAS/main.pdf` está versionado: regenerarlo con
+  `pdflatex -interaction=nonstopmode main.tex` (×2) tras editar. Si el visor
+  o texlab mantiene `main.pdf`/`main.toc` bloqueados, compilar con
+  `-jobname=otro` y cerrar la vista previa antes de regenerar `main.pdf`.
+
 ## Flujo de trabajo con Git (respaldo e integración)
 
 Estrategia para integrar código de otros desarrolladores **sin romper** el
