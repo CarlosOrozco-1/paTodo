@@ -16,11 +16,27 @@ apego al código.
 
 ## Llamadas de voz
 
-- [ ] **TURN en la VM (fase IV):** coturn arriba en el servidor Ubuntu
-      (`systemctl is-active coturn` = `active`), puertos abiertos
-      (`3478/udp+tcp`, `49160-49200/udp`) en la nube y en el SO, variables
-      `TURN_URLS` y `TURN_SECRET` definidas en Render, y
-      `npm run verify:turn` con salida `TODO CORRECTO` (exit 0).
+- [ ] **TURN en la VM (fase IV):** falta la validación externa y la puesta
+      en Render. Estado al 09-oct-2026:
+      - [x] Servidor coturn en la VM: `active`/`enabled`, `ufw` inactivo,
+            escucha en `10.0.0.232:3478` (única dirección).
+      - [x] Config aplicada en `/etc/turnserver.conf`: `use-auth-secret`,
+            `listening-ip=10.0.0.232`, `external-ip=161.153.28.223/10.0.0.232`,
+            `realm=patodo`, rango relay `49160-49200`, `syslog` (se eliminó el
+            `log-file`, que fallaba por permisos).
+      - [ ] Desde Internet el puerto **no responde** (TCP y UDP `3478` mudos;
+            ping OK). Verificar en Oracle Console que la Security List/NSG con
+            `UDP 3478`, `TCP 3478` y `UDP 49160-49200` esté asociada a la
+            subred del VNIC de la instancia.
+      - [ ] `TURN_URLS=turn:161.153.28.223:3478`, `TURN_SECRET` y
+            `TURN_TTL_SECONDS=3600` en Render (→ redeploy automático).
+      - [ ] `npm run verify:turn` desde `api/` con salida `TODO CORRECTO`
+            (exit 0).
+      - [ ] El secreto TURN quedó expuesto en un chat (09-oct): **rotarlo**
+            tras validar (coturn acepta 2 `static-auth-secret` a la vez).
+      - [ ] Nota (Windows): el `firebase-tools` global está roto
+            (`ERR_REQUIRE_ESM` de `stream-chain`); los E2E de la API se corren
+            con `npx -y firebase-tools@latest emulators:exec ...`.
 - [ ] **Validación en tiempo real de las llamadas (fase V):** prueba E2E con
       dos clientes reales (web o móvil) en el mismo trabajo: se crea la
       llamada (`201`), la otra recibe el push entrante, el audio se conecta y
