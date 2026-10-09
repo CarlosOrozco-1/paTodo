@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/notifications/notification_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../chat/presentation/chat_notification_router.dart';
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
@@ -28,17 +29,17 @@ class NotificationsScreen extends StatelessWidget {
             );
           }
 
-          final notifications = List.of(snapshot.data?.docs ?? [])
-            ..sort(
-              (a, b) => NotificationService.createdAt(
-                b.data(),
-              ).compareTo(NotificationService.createdAt(a.data())),
-            );
+          final notifications = List.of(snapshot.data?.docs ?? [])..sort(
+            (a, b) => NotificationService.createdAt(
+              b.data(),
+            ).compareTo(NotificationService.createdAt(a.data())),
+          );
           if (notifications.isEmpty) {
             return const _NotificationState(
               icon: Icons.notifications_none_rounded,
               title: 'Aún no tienes notificaciones',
-              message: 'Aquí verás las propuestas y actualizaciones de tus trabajos.',
+              message:
+                  'Aquí verás las propuestas y actualizaciones de tus trabajos.',
             );
           }
 
@@ -46,8 +47,9 @@ class NotificationsScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
             itemCount: notifications.length,
             separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, index) =>
-                _NotificationTile(document: notifications[index]),
+            itemBuilder:
+                (context, index) =>
+                    _NotificationTile(document: notifications[index]),
           );
         },
       ),
@@ -65,17 +67,23 @@ class NotificationBell extends StatelessWidget {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: NotificationService.instance.watchMine(),
       builder: (context, snapshot) {
-        final unread = (snapshot.data?.docs ?? [])
-            .where((document) => !NotificationService.isRead(document.data()))
-            .length;
+        final unread =
+            (snapshot.data?.docs ?? [])
+                .where(
+                  (document) => !NotificationService.isRead(document.data()),
+                )
+                .length;
         return Stack(
           clipBehavior: Clip.none,
           children: [
             IconButton(
               tooltip: 'Notificaciones',
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-              ),
+              onPressed:
+                  () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen(),
+                    ),
+                  ),
               icon: Icon(Icons.notifications_none_rounded, color: color),
             ),
             if (unread > 0)
@@ -83,7 +91,10 @@ class NotificationBell extends StatelessWidget {
                 top: 7,
                 right: 7,
                 child: Container(
-                  constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                  constraints: const BoxConstraints(
+                    minWidth: 17,
+                    minHeight: 17,
+                  ),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
@@ -132,6 +143,13 @@ class _NotificationTile extends StatelessWidget {
             } catch (_) {
               // El aviso permanece disponible aunque no se pueda marcar.
             }
+          }
+          if (notification['type'] == 'new_message') {
+            final data = Map<String, dynamic>.from(
+              notification['data'] as Map? ?? const {},
+            );
+            data['type'] = 'new_message';
+            await openChatFromNotification(data);
           }
         },
         child: Padding(

@@ -23,6 +23,8 @@ export interface NotificationPayload {
     jobId?: string;
     offerId?: string;
     conversationId?: string;
+    senderName?: string;
+    messagePreview?: string;
   };
 }
 
@@ -114,6 +116,8 @@ export async function createAndSendNotification(
       jobId: payload.data?.jobId ?? "",
       offerId: payload.data?.offerId ?? "",
       conversationId: payload.data?.conversationId ?? "",
+      senderName: payload.data?.senderName ?? "",
+      messagePreview: payload.data?.messagePreview ?? "",
     },
   });
 

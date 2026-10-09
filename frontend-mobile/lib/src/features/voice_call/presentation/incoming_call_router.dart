@@ -20,17 +20,18 @@ Future<void> openIncomingCall(Map<String, dynamic> data) async {
   final callId = data['callId']?.toString() ?? '';
   final jobId = data['jobId']?.toString() ?? '';
   if (callId.isEmpty || jobId.isEmpty) return;
-  if (FirebaseAuth.instance.currentUser == null) return;
-  if (VoiceCallSession.active != null) return;
-
   NavigatorState? navigator;
-  for (var i = 0; i < 100 && navigator == null; i++) {
+  User? user;
+  for (var i = 0; i < 100 && (navigator == null || user == null); i++) {
     navigator = appNavigatorKey.currentState;
-    if (navigator == null) {
+    user = FirebaseAuth.instance.currentUser;
+    if (navigator == null || user == null) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
   }
-  if (navigator == null) return;
+  if (navigator == null || user == null || VoiceCallSession.active != null) {
+    return;
+  }
 
   _opening = true;
   try {
@@ -45,9 +46,10 @@ Future<void> openIncomingCall(Map<String, dynamic> data) async {
               jobId: jobId,
               callId: callId,
               isOutgoing: false,
-              title: (callerName != null && callerName.isNotEmpty)
-                  ? callerName
-                  : 'Llamada entrante',
+              title:
+                  (callerName != null && callerName.isNotEmpty)
+                      ? callerName
+                      : 'Llamada entrante',
               roleLabel: callerRole,
             ),
       ),

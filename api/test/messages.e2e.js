@@ -132,6 +132,11 @@ async function waitForServer() {
     .get();
   check(alerts.size === 1, "el cliente recibe el aviso persistente", "hay " + alerts.size);
   check(alerts.docs[0]?.data().data?.conversationId === "conversation-message", "el aviso abre la conversacion correcta");
+  check(
+    alerts.docs[0]?.data().title === "Luis te envio un mensaje" &&
+      alerts.docs[0]?.data().body === "Ya voy en camino.",
+    "el aviso incluye remitente y vista previa"
+  );
 
   const forbidden = await send(strangerToken, {
     conversationId: "conversation-message",

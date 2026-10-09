@@ -91,6 +91,7 @@ class IncomingCallNotificationService {
         category: AndroidNotificationCategory.call,
         fullScreenIntent: true,
         playSound: true,
+        audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
         enableVibration: true,
         visibility: NotificationVisibility.public,
         ongoing: true,

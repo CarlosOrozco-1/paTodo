@@ -13,6 +13,27 @@ interface SendMessageBody {
   content?: string;
 }
 
+function displayNameOf(user: Record<string, unknown>): string {
+  const profile =
+    user.profile && typeof user.profile === "object"
+      ? (user.profile as Record<string, unknown>)
+      : {};
+  const first = String(profile.firstName ?? user.firstName ?? "").trim();
+  const last = String(profile.lastName ?? user.lastName ?? "").trim();
+  const fullName = `${first} ${last}`.trim();
+  if (fullName) return fullName;
+  for (const candidate of [profile.fullName, profile.name, user.displayName, user.name]) {
+    const value = typeof candidate === "string" ? candidate.trim() : "";
+    if (value) return value;
+  }
+  return "Tu contacto";
+}
+
+function notificationPreview(content: string): string {
+  const limit = 160;
+  return content.length <= limit ? content : `${content.slice(0, limit - 1)}…`;
+}
+
 /**
  * POST /sendMessage
  *
@@ -38,6 +59,7 @@ messagesRouter.post("/sendMessage", async (request, response) => {
     const messageRef = conversationRef.collection("messages").doc();
     let recipientId = "";
     let jobId = "";
+    let senderName = "Tu contacto";
 
     await db.runTransaction(async (transaction) => {
       const conversationDoc = await transaction.get(conversationRef);
@@ -74,6 +96,9 @@ messagesRouter.post("/sendMessage", async (request, response) => {
       }
       jobId = conversation.jobId;
 
+      const senderDoc = await transaction.get(db.collection("users").doc(uid));
+      senderName = displayNameOf(senderDoc.data() ?? {});
+
       transaction.set(messageRef, {
         senderId: uid,
         content,
@@ -93,9 +118,14 @@ messagesRouter.post("/sendMessage", async (request, response) => {
     await sendNotificationSafely({
       userId: recipientId,
       type: "new_message",
-      title: "Nuevo mensaje",
-      body: "Tienes un nuevo mensaje sobre tu servicio.",
-      data: { conversationId, jobId },
+      title: `${senderName} te envio un mensaje`,
+      body: notificationPreview(content),
+      data: {
+        conversationId,
+        jobId,
+        senderName,
+        messagePreview: notificationPreview(content),
+      },
     });
 
     const message = await messageRef.get();

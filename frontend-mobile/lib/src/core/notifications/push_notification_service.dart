@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import '../../../firebase_options.dart';
+import '../../features/chat/presentation/chat_notification_router.dart';
 import '../../features/voice_call/presentation/incoming_call_router.dart';
 import 'incoming_call_notification_service.dart';
 
@@ -103,6 +104,10 @@ class PushNotificationService {
   static bool _isIncomingCall(Map<String, dynamic> data) =>
       data['type'] == 'voice_call_incoming';
 
+  static bool _isChatMessage(Map<String, dynamic> data) =>
+      data['type'] == 'new_message' &&
+      (data['conversationId']?.toString().isNotEmpty ?? false);
+
   void _handleMessage(RemoteMessage message) {
     if (_isIncomingCall(message.data)) {
       unawaited(openIncomingCall(message.data));
@@ -123,6 +128,8 @@ class PushNotificationService {
     debugPrint('PUSH_OPENED_FROM_BACKGROUND: ${message.data}');
     if (_isIncomingCall(message.data)) {
       unawaited(openIncomingCall(message.data));
+    } else if (_isChatMessage(message.data)) {
+      unawaited(openChatFromNotification(message.data));
     }
   }
 

@@ -306,8 +306,9 @@ paths:
         Envía un mensaje de texto a una conversación activa. Solo pueden usarlo
         las dos partes del trabajo asociado (cliente y trabajador asignado).
         La API escribe el mensaje, actualiza el resumen de la conversación y
-        crea/envía una notificación `new_message` al otro participante para que
-        pueda recibir el aviso con la aplicación en segundo plano o cerrada.
+        crea/envía una notificación `new_message` al otro participante con el
+        nombre del remitente y una vista previa del texto. Al tocar el aviso,
+        la aplicación abre esa conversación incluso si estaba cerrada.
       requestBody:
         required: true
         content:
