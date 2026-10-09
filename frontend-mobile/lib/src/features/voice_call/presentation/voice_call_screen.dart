@@ -111,7 +111,14 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                     phase: state.phase,
                   ),
                   const SizedBox(height: 46),
-                  _Avatar(initials: _initials(state.otherName ?? widget.title)),
+                  _Avatar(
+                    initials: _initials(
+                      state.otherName ??
+                          (widget.title != 'Llamada entrante'
+                              ? widget.title
+                              : (widget.roleLabel ?? 'C')),
+                    ),
+                  ),
                   const SizedBox(height: 22),
                   Text(
                     _displayName(state),
@@ -124,10 +131,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                   ),
                   const SizedBox(height: 7),
                   Text(
-                    widget.roleLabel ??
-                        (widget.isOutgoing
-                            ? 'Contacto del servicio'
-                            : 'Contacto'),
+                    _roleText(state),
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppTheme.primaryGreen,
                       fontSize: 15,
@@ -165,8 +170,37 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   }
 
   String _displayName(VoiceCallState state) {
-    if (state.otherName != null) return state.otherName!;
-    return widget.isOutgoing ? widget.title : 'Llamada entrante';
+    if (widget.isOutgoing) {
+      return state.otherName ?? widget.title;
+    }
+    // En llamada entrante mientras suena se muestra "Llamada entrante"
+    if (state.phase == VoiceCallPhase.incomingRinging) {
+      return 'Llamada entrante';
+    }
+    // Una vez conectada o finalizada, se muestra el nombre de la otra persona
+    return state.otherName ??
+        (widget.title != 'Llamada entrante'
+            ? widget.title
+            : 'Llamada en curso');
+  }
+
+  String _roleText(VoiceCallState state) {
+    if (widget.isOutgoing) {
+      return widget.roleLabel ?? state.otherRole ?? 'Trabajador';
+    }
+    // En llamada entrante se muestra "Cliente: (Nombre)" si está disponible
+    final name =
+        state.otherName ??
+        (widget.title != 'Llamada entrante' ? widget.title : null);
+    final role = state.otherRole ?? widget.roleLabel ?? 'Cliente';
+
+    if (state.phase == VoiceCallPhase.incomingRinging) {
+      if (name != null && name.isNotEmpty) {
+        return '$role: $name';
+      }
+      return role;
+    }
+    return role;
   }
 
   String _statusText(VoiceCallState state) {
@@ -343,7 +377,7 @@ class _CallTypeBadge extends StatelessWidget {
           ),
           const SizedBox(width: 7),
           Text(
-            incoming ? 'Llamada entrante' : 'Llamada de servicio',
+            incoming ? 'Llamada entrante' : 'Llamada saliente',
             style: const TextStyle(color: Colors.white70, fontSize: 13),
           ),
         ],

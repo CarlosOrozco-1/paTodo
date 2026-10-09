@@ -39,6 +39,7 @@ class VoiceCallState {
   const VoiceCallState({
     required this.phase,
     this.otherName,
+    this.otherRole,
     this.errorMessage,
     this.finalStatus,
     this.muted = false,
@@ -48,6 +49,7 @@ class VoiceCallState {
 
   final VoiceCallPhase phase;
   final String? otherName;
+  final String? otherRole;
   final String? errorMessage;
   final String? finalStatus;
   final bool muted;
@@ -57,6 +59,7 @@ class VoiceCallState {
   VoiceCallState copyWith({
     VoiceCallPhase? phase,
     String? otherName,
+    String? otherRole,
     String? errorMessage,
     String? finalStatus,
     bool? muted,
@@ -66,6 +69,7 @@ class VoiceCallState {
     return VoiceCallState(
       phase: phase ?? this.phase,
       otherName: otherName ?? this.otherName,
+      otherRole: otherRole ?? this.otherRole,
       errorMessage: errorMessage ?? this.errorMessage,
       finalStatus: finalStatus ?? this.finalStatus,
       muted: muted ?? this.muted,
@@ -237,9 +241,51 @@ class VoiceCallSession {
         return;
       }
       final callerId = data['callerId'] as String?;
-      final name = callerId == null ? null : await _displayNameOf(callerId);
+
+      String? role;
+      String? name;
+
+      // 1. Averiguar rol y nombre por medio del trabajo asociado
+      try {
+        final jobDoc = await _db.collection('jobs').doc(jobId).get();
+        final jobData = jobDoc.data();
+        if (jobData != null) {
+          final clientId = jobData['clientId'] as String?;
+          final workerId = jobData['workerId'] as String?;
+          if (callerId != null) {
+            if (callerId == clientId) {
+              role = 'Cliente';
+              name = jobData['clientName'] as String?;
+            } else if (callerId == workerId) {
+              role = 'Trabajador';
+              name = jobData['workerName'] as String?;
+            }
+          } else {
+            if (_uid == workerId) {
+              role = 'Cliente';
+              name = jobData['clientName'] as String?;
+            } else if (_uid == clientId) {
+              role = 'Trabajador';
+              name = jobData['workerName'] as String?;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('VOICE_JOB_LOOKUP_ERROR: $e');
+      }
+
+      // 2. Si hay callerId, consultar users para obtener el nombre más actualizado
+      if (callerId != null) {
+        final userName = await _displayNameOf(callerId);
+        if (userName != null && userName.isNotEmpty) {
+          name = userName;
+        }
+      }
+
+      role ??= 'Cliente';
+
       if (_finished || _disposed) return;
-      _update(_state.copyWith(otherName: name));
+      _update(_state.copyWith(otherName: name, otherRole: role));
       VoiceCallRingService.instance.startIncoming();
 
       // Si quien marca cuelga antes de que el usuario responda, la pantalla
@@ -722,10 +768,23 @@ class VoiceCallSession {
       final snapshot = await _db.collection('users').doc(userId).get();
       final data = snapshot.data();
       if (data == null) return null;
-      final first = (data['firstName'] as String?)?.trim() ?? '';
-      final last = (data['lastName'] as String?)?.trim() ?? '';
+      final profile = Map<String, dynamic>.from(data['profile'] as Map? ?? {});
+      final first =
+          (profile['firstName'] ?? data['firstName'] ?? '').toString().trim();
+      final last =
+          (profile['lastName'] ?? data['lastName'] ?? '').toString().trim();
       final full = '$first $last'.trim();
-      return full.isEmpty ? null : full;
+      if (full.isNotEmpty) return full;
+      for (final candidate in [
+        profile['fullName'],
+        profile['name'],
+        data['displayName'],
+        data['name'],
+      ]) {
+        final str = candidate?.toString().trim() ?? '';
+        if (str.isNotEmpty) return str;
+      }
+      return null;
     } catch (_) {
       return null;
     }

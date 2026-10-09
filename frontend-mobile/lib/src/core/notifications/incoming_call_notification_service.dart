@@ -72,10 +72,13 @@ class IncomingCallNotificationService {
 
     await initialize();
     final callerName = (data['callerName'] ?? 'Tu contacto').toString();
+    final callerRole = (data['callerRole'] ?? 'Contacto').toString();
     final payload = jsonEncode({
       'type': 'voice_call_incoming',
       'callId': callId,
       'jobId': jobId,
+      'callerName': callerName,
+      'callerRole': callerRole,
     });
 
     const details = NotificationDetails(

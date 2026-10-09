@@ -335,6 +335,7 @@ void sendIncomingCallPush({
       callId: callRef.id,
       jobId: body.jobId,
       callerName,
+      callerRole: uid === clientId ? "Cliente" : "Trabajador",
     }).catch((error: unknown) => {
       console.error(`No se pudo enviar el push de llamada a ${calleeId}:`, error);
     });

@@ -141,6 +141,7 @@ export async function sendIncomingCallPush(input: {
   callId: string;
   jobId: string;
   callerName: string;
+  callerRole: "Cliente" | "Trabajador";
 }): Promise<void> {
   const title = "Llamada entrante";
   const body = `${input.callerName} te está llamando.`;
@@ -163,6 +164,7 @@ export async function sendIncomingCallPush(input: {
       title,
       body,
       callerName: input.callerName,
+      callerRole: input.callerRole,
       jobId: input.jobId,
       callId: input.callId,
       direction: "incoming",

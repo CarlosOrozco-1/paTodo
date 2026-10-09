@@ -34,6 +34,8 @@ Future<void> openIncomingCall(Map<String, dynamic> data) async {
 
   _opening = true;
   try {
+    final callerName = data['callerName']?.toString();
+    final callerRole = data['callerRole']?.toString() ?? 'Cliente';
     await IncomingCallNotificationService.instance.cancelForCall(callId);
     await navigator.push<void>(
       MaterialPageRoute(
@@ -43,7 +45,10 @@ Future<void> openIncomingCall(Map<String, dynamic> data) async {
               jobId: jobId,
               callId: callId,
               isOutgoing: false,
-              title: 'Llamada entrante',
+              title: (callerName != null && callerName.isNotEmpty)
+                  ? callerName
+                  : 'Llamada entrante',
+              roleLabel: callerRole,
             ),
       ),
     );
