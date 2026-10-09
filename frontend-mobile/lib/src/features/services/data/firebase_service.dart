@@ -166,6 +166,24 @@ class FirebaseService {
     await _api.dio.post('/cancelJob', data: {'jobId': jobId});
   }
 
+  /// Envía la reseña transaccional al API. El servidor valida que el trabajo
+  /// esté finalizado, evita duplicados y actualiza la reputación recibida.
+  Future<void> createReview({
+    required String jobId,
+    required int rating,
+    String? comment,
+  }) async {
+    await _api.dio.post(
+      '/createReview',
+      data: {
+        'jobId': jobId,
+        'rating': rating,
+        if (comment != null && comment.trim().isNotEmpty)
+          'comment': comment.trim(),
+      },
+    );
+  }
+
   /// Jobs pendientes en tiempo real (vista trabajador).
   Stream<List<ServiceJob>> getPendingJobs() {
     return _firestore

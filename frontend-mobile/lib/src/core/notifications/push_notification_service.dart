@@ -7,6 +7,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import '../../../firebase_options.dart';
+import '../../features/voice_call/presentation/incoming_call_router.dart';
+import 'incoming_call_notification_service.dart';
 
 /// Atiende los mensajes push y guarda el token del dispositivo del usuario.
 /// La API usa `users/{uid}.fcmTokens` para entregar avisos incluso con la app
@@ -29,10 +31,17 @@ class PushNotificationService {
     if (_started) return;
     _started = true;
 
-    FirebaseMessaging.onMessage.listen(_showForegroundMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      debugPrint('PUSH_OPENED_FROM_BACKGROUND: ${message.data}');
-    });
+    await IncomingCallNotificationService.instance.initialize();
+    FirebaseMessaging.onMessage.listen(_handleMessage);
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleOpenedApp);
+
+    // Arranque en frío desde el toque en la notificación de llamada entrante.
+    try {
+      final initialMessage = await _messaging.getInitialMessage();
+      if (initialMessage != null) _handleOpenedApp(initialMessage);
+    } catch (error) {
+      debugPrint('PUSH_INITIAL_MESSAGE_ERROR: $error');
+    }
 
     _authSubscription = _auth.authStateChanges().listen(_configureForUser);
     _tokenSubscription = _messaging.onTokenRefresh.listen((token) {
@@ -40,6 +49,13 @@ class PushNotificationService {
       if (userId != null) unawaited(_saveToken(userId, token));
     });
 
+    await _configureForUser(_auth.currentUser);
+  }
+
+  /// Reintenta registrar el dispositivo cuando el perfil ya fue creado.
+  /// En el primer registro, authStateChanges puede ocurrir antes de que exista
+  /// `users/{uid}`, por lo que la escritura inicial del token no es posible.
+  Future<void> registerCurrentDevice() async {
     await _configureForUser(_auth.currentUser);
   }
 
@@ -57,6 +73,9 @@ class PushNotificationService {
           settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional;
       if (!allowed) return;
+
+      await IncomingCallNotificationService.instance
+          .requestAndroidFullScreenPermission();
 
       // En iOS permite que los avisos se muestren también con la app abierta.
       await _messaging.setForegroundNotificationPresentationOptions(
@@ -81,7 +100,14 @@ class PushNotificationService {
     });
   }
 
-  void _showForegroundMessage(RemoteMessage message) {
+  static bool _isIncomingCall(Map<String, dynamic> data) =>
+      data['type'] == 'voice_call_incoming';
+
+  void _handleMessage(RemoteMessage message) {
+    if (_isIncomingCall(message.data)) {
+      unawaited(openIncomingCall(message.data));
+      return;
+    }
     final notification = message.notification;
     final title = notification?.title ?? 'PaTodo';
     final body = notification?.body ?? 'Tienes una nueva actualización.';
@@ -91,6 +117,13 @@ class PushNotificationService {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  void _handleOpenedApp(RemoteMessage message) {
+    debugPrint('PUSH_OPENED_FROM_BACKGROUND: ${message.data}');
+    if (_isIncomingCall(message.data)) {
+      unawaited(openIncomingCall(message.data));
+    }
   }
 
   Future<void> dispose() async {
@@ -107,4 +140,9 @@ final appMessengerKey = GlobalKey<ScaffoldMessengerState>();
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   debugPrint('PUSH_BACKGROUND_RECEIVED: ${message.messageId}');
+  if (PushNotificationService._isIncomingCall(message.data)) {
+    await IncomingCallNotificationService.instance.showIncomingCall(
+      message.data,
+    );
+  }
 }

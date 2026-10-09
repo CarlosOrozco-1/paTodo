@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { db } from "../shared/admin";
-import { requireAuth } from "../shared/auth";
+import { getAuthenticatedUser, requireAuth } from "../shared/auth";
 import { httpError, handleError } from "../shared/errors";
 import { sendNotificationSafely } from "../shared/notifications";
 
@@ -11,6 +11,115 @@ interface AcceptOfferBody {
   jobId: string;
   offerId: string;
 }
+
+interface CreateOfferBody {
+  jobId: string;
+  price: number;
+  estimatedTime: string;
+  note?: string;
+}
+
+offersRouter.post("/createOffer", async (request, response) => {
+  try {
+    const authenticated = await getAuthenticatedUser(request);
+    const uid = authenticated.uid;
+    const role = authenticated.role as string | undefined;
+    const body = request.body as CreateOfferBody;
+    if (!body.jobId || !Number.isFinite(body.price) || body.price <= 0 || !body.estimatedTime?.trim()) {
+      throw httpError(400, "invalid-argument", "Faltan datos de la propuesta.");
+    }
+    if (role !== "worker" && role !== "both") {
+      throw httpError(403, "permission-denied", "Solo un profesional puede enviar propuestas.");
+    }
+
+    const jobRef = db.collection("jobs").doc(body.jobId);
+    const offerRef = db.collection("offers").doc();
+    let clientId = "";
+    let jobTitle = "Trabajo";
+
+    await db.runTransaction(async (transaction) => {
+      const jobDoc = await transaction.get(jobRef);
+      if (!jobDoc.exists) throw httpError(404, "not-found", "El trabajo no existe.");
+      const job = jobDoc.data()!;
+      if (job.status !== "pending") {
+        throw httpError(412, "failed-precondition", "Este trabajo ya no está disponible.");
+      }
+      if (job.clientId === uid) {
+        throw httpError(403, "permission-denied", "No puedes ofertar en tu propio trabajo.");
+      }
+      const existing = await transaction.get(
+        db.collection("offers").where("jobId", "==", body.jobId),
+      );
+      if (existing.docs.some((doc) => doc.data().workerId === uid && doc.data().status === "pending")) {
+        throw httpError(409, "already-exists", "Ya enviaste una solicitud para este trabajo.");
+      }
+      clientId = job.clientId;
+      jobTitle = job.details?.title ?? "Trabajo";
+      transaction.set(offerRef, {
+        jobId: body.jobId,
+        workerId: uid,
+        price: body.price,
+        estimatedTime: body.estimatedTime.trim(),
+        note: body.note?.trim() || null,
+        status: "pending",
+        currency: "GTQ",
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+
+    await sendNotificationSafely({
+      userId: clientId,
+      type: "offer_received",
+      title: "Nueva propuesta recibida",
+      body: `Recibiste una propuesta para "${jobTitle}".`,
+      data: { jobId: body.jobId, offerId: offerRef.id },
+    });
+    response.status(201).json({ id: offerRef.id, status: "pending" });
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+offersRouter.post("/rejectOffer", async (request, response) => {
+  try {
+    const uid = await requireAuth(request);
+    const body = request.body as { jobId?: string; offerId?: string };
+    if (!body.jobId || !body.offerId) {
+      throw httpError(400, "invalid-argument", "Faltan jobId u offerId.");
+    }
+    const jobRef = db.collection("jobs").doc(body.jobId);
+    const offerRef = db.collection("offers").doc(body.offerId);
+    let workerId = "";
+    let title = "Trabajo";
+    await db.runTransaction(async (transaction) => {
+      const jobDoc = await transaction.get(jobRef);
+      const offerDoc = await transaction.get(offerRef);
+      if (!jobDoc.exists || !offerDoc.exists) throw httpError(404, "not-found", "No encontramos la propuesta.");
+      const job = jobDoc.data()!;
+      const offer = offerDoc.data()!;
+      if (job.clientId !== uid || offer.jobId !== body.jobId) {
+        throw httpError(403, "permission-denied", "No puedes rechazar esta propuesta.");
+      }
+      if (job.status !== "pending" || offer.status !== "pending") {
+        throw httpError(412, "failed-precondition", "La propuesta ya fue procesada.");
+      }
+      workerId = offer.workerId;
+      title = job.details?.title ?? "Trabajo";
+      transaction.update(offerRef, { status: "rejected", updatedAt: FieldValue.serverTimestamp() });
+    });
+    await sendNotificationSafely({
+      userId: workerId,
+      type: "offer_rejected",
+      title: "Propuesta rechazada",
+      body: `La propuesta para "${title}" no fue seleccionada.`,
+      data: { jobId: body.jobId, offerId: body.offerId },
+    });
+    response.status(200).json({ id: body.offerId, status: "rejected" });
+  } catch (error) {
+    handleError(error, response);
+  }
+});
 
 /**
  * POST /acceptOffer

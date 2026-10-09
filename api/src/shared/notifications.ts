@@ -3,6 +3,7 @@ import { db, messaging } from "./admin";
 
 export type NotificationType =
   | "new_offer"
+  | "offer_received"
   | "offer_accepted"
   | "offer_rejected"
   | "new_message"
@@ -32,17 +33,25 @@ export interface NotificationPayload {
 async function pushToUser(
   userId: string,
   message: {
-    notification: { title: string; body: string };
+    notification?: { title: string; body: string };
     data: Record<string, string>;
     android?: { priority: "high" | "normal"; ttl?: number };
   }
 ): Promise<boolean> {
   const userDoc = await db.collection("users").doc(userId).get();
 
-  if (!userDoc.exists) return false;
+  if (!userDoc.exists) {
+    console.warn(`PUSH_SKIPPED_USER_NOT_FOUND: ${userId}`);
+    return false;
+  }
 
   const fcmTokens: string[] = userDoc.data()?.fcmTokens ?? [];
-  if (fcmTokens.length === 0) return false;
+  if (fcmTokens.length === 0) {
+    // DEV: el aviso ya quedó creado en Firestore; este log permite distinguir
+    // "sin token registrado" de un error real de FCM al depurar Render.
+    console.warn(`PUSH_SKIPPED_NO_DEVICE_TOKEN: ${userId}`);
+    return false;
+  }
 
   const pushResponse = await messaging.sendEachForMulticast({
     tokens: fcmTokens,
@@ -69,7 +78,13 @@ async function pushToUser(
     });
   }
 
-  return true;
+  const delivered = pushResponse.responses.filter((response) => response.success)
+    .length;
+  if (delivered === 0) {
+    console.warn(`PUSH_NOT_DELIVERED: ${userId}`);
+  }
+
+  return delivered > 0;
 }
 
 /**
@@ -143,9 +158,11 @@ export async function sendIncomingCallPush(input: {
   });
 
   await pushToUser(input.userId, {
-    notification: { title, body },
     data: {
       type: "voice_call_incoming",
+      title,
+      body,
+      callerName: input.callerName,
       jobId: input.jobId,
       callId: input.callId,
       direction: "incoming",

@@ -64,14 +64,15 @@ La fuente de verdad está en `firestore.rules` (ya desplegado y endurecido).
 | Registro/login, token, reset contraseña | **Firebase Auth SDK** | Cliente |
 | Crear perfil (`users/{uid}`) | **`POST /createUser`** | Cliente (con token; asigna el Custom Claim `role`) |
 | Publicar trabajo (`jobs`) | **Firestore SDK directo** | Cliente (rol `client`/`both`; regla: `clientId == uid` y `status: pending`) |
-| Crear oferta (`offers`) | **Firestore SDK directo** | Trabajador (rol `worker`/`both`; regla: `workerId == uid`, trabajo `pending` y ajeno) |
+| Crear oferta (`offers`) | **`POST /createOffer`** | Trabajador (rol `worker`/`both`; valida trabajo pendiente y avisa al cliente) |
 | Aceptar oferta | **`POST /acceptOffer`** | Cliente (dueño del job) |
 | Cancelar trabajo | **`POST /cancelJob`** | Cliente (dueño del job) |
 | Completar trabajo | **`POST /completeJob`** | Cliente (job o worker) |
 | Crear reseña | **`POST /createReview`** | Cliente (participante, job completado) |
 | Calcular ruta | **`POST /computeRoute`** | Cliente |
 | Compartir ubicación actual del trabajo (`jobs/{jobId}/tracking/current`) | **Firestore SDK directo** | Solo el trabajador asignado, mientras el trabajo está aceptado/en curso; lectura limitada al cliente dueño y trabajador asignado |
-| Mensajes (`conversations.messages`) | **Firestore SDK directo** | Cliente (participante, `senderId == uid`) |
+| Enviar mensajes (`conversations.messages`) | **`POST /sendMessage`** | Cliente o trabajador participante; crea el mensaje y avisa al otro usuario |
+| Señalización de llamadas (`conversations.calls`) | **Firestore SDK directo** | Cliente participante, solo trabajo `accepted`/`in_progress`; reglas limitan offer/answer e ICE |
 | Leer conversaciones/notificaciones propias | **Firestore SDK directo** | Cliente |
 | `users.role/stats`, `notifications`, `conversations`, `reviews` | **Solo la API** | API (roles/stats/estados) |
 | `users.status` (suspender/activar), `users.verified`, `users.role` (admin) | **`POST /admin/suspendUser`**, `activateUser`, `verifyWorker`, `makeAdmin`, `removeAdmin`, `PATCH /admin/users/{uid}/role` | Admin (token con claim `role: admin`) |
@@ -85,6 +86,15 @@ La fuente de verdad está en `firestore.rules` (ya desplegado y endurecido).
 > `role` del ID token. Las reglas de `jobs` y `offers` leen `request.auth.token.role`, por lo que
 > **hay que refrescar el token** (`getIdToken(true)`) después de `POST /createUser` o de cambiar de
 > rol. El cliente no puede modificar su propio `role` (la regla lo bloquea).
+
+Las llamadas de voz usan WebRTC de audio; Firestore solo intercambia la señalización
+(offer/answer e ICE) bajo `conversations/{conversationId}/calls`. La llamada solo
+puede iniciarse o contestarse cuando el trabajo está `accepted` o `in_progress`.
+La recepción requiere que quien contesta tenga abierto el chat; para llamadas
+entrantes en segundo plano o fuera del chat se necesita integrar notificaciones
+de llamada. La configuración
+actual usa STUN público y requiere un servidor TURN para conexiones fiables en
+redes móviles o NAT restrictivos.
 
 La ubicación de seguimiento se guarda como un documento único en
 `jobs/{jobId}/tracking/current`; el cliente asignado la observa con un listener
@@ -111,6 +121,8 @@ Contrato:
 |---|---|---|
 | `POST /createUser` | `{uid, email, role, profile, contact}` (`uid` y `email` deben coincidir con el token) | `201` o `409` si ya existe |
 | `POST /acceptOffer` | `{jobId, offerId}` | `200` job con `status: "accepted"` |
+| `POST /createOffer` | `{jobId, price, estimatedTime, note?}` | `201` propuesta creada y aviso al cliente |
+| `POST /sendMessage` | `{conversationId, content}` | `201` mensaje creado y aviso al otro participante |
 | `POST /cancelJob` | `{jobId, reason?}` | `200` job `status: "cancelled"` |
 | `POST /completeJob` | `{jobId}` | `200` job `status: "completed"` |
 | `POST /createReview` | `{jobId, rating(1-5), comment?}` | `201` review |

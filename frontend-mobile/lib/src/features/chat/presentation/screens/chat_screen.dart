@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../voice_call/data/voice_call_session.dart';
+import '../../../voice_call/presentation/voice_call_screen.dart';
 import '../../data/models/chat_message.dart';
 import '../../data/repositories/chat_repository.dart';
 
@@ -29,6 +31,8 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _conversationId;
   String? _conversationStatus;
   StreamSubscription<String?>? _conversationStatusSubscription;
+  StreamSubscription<String?>? _jobStatusSubscription;
+  String? _jobStatus;
   bool _loading = true;
   bool _sending = false;
 
@@ -37,6 +41,11 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _jobStatusSubscription = _repository.jobStatus(widget.jobId).listen((
+      status,
+    ) {
+      if (mounted) setState(() => _jobStatus = status);
+    }, onError: (Object error) => debugPrint('CHAT_JOB_STATUS_ERROR: $error'));
     _loadConversation();
   }
 
@@ -69,6 +78,46 @@ class _ChatScreenState extends State<ChatScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  bool get _canCall =>
+      _conversationId != null &&
+      _conversationStatus == 'active' &&
+      (_jobStatus == 'accepted' || _jobStatus == 'in_progress');
+
+  Future<void> _startCall() async {
+    if (!_canCall) return;
+    if (VoiceCallSession.active != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ya hay una llamada en curso. Espera a que termine.'),
+        ),
+      );
+      return;
+    }
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VoiceCallScreen(
+          jobId: widget.jobId,
+          isOutgoing: true,
+          title: widget.otherUserName,
+          roleLabel: widget.otherUserRole,
+        ),
+      ),
+    );
+  }
+
+  /// Invitaciones antiguas de Jitsi: solo se muestran, ya no se unen.
+  static String? _legacyCallRoom(String content) {
+    const prefix = '[[patodo-jitsi-call:';
+    const suffix = ']]';
+    if (!content.startsWith(prefix) || !content.endsWith(suffix)) return null;
+    final room = content.substring(
+      prefix.length,
+      content.length - suffix.length,
+    );
+    return room.isEmpty ? null : room;
   }
 
   Future<void> _send() async {
@@ -105,6 +154,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     unawaited(_conversationStatusSubscription?.cancel());
+    unawaited(_jobStatusSubscription?.cancel());
     _textController.dispose();
     super.dispose();
   }
@@ -126,6 +176,14 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip:
+                _canCall ? 'Llamar' : 'Disponible durante un servicio activo',
+            onPressed: _canCall ? _startCall : null,
+            icon: const Icon(Icons.call_rounded),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -220,11 +278,15 @@ class _ChatScreenState extends State<ChatScreen> {
           reverse: true,
           padding: const EdgeInsets.all(16),
           itemCount: messages.length,
-          itemBuilder:
-              (context, index) => _MessageBubble(
-                message: messages[index],
-                mine: messages[index].senderId == _userId,
-              ),
+          itemBuilder: (context, index) {
+            final message = messages[index];
+            final room = _legacyCallRoom(message.content);
+            return _MessageBubble(
+              message: message,
+              mine: message.senderId == _userId,
+              legacyCall: room != null,
+            );
+          },
         );
       },
     );
@@ -282,8 +344,13 @@ class _ChatScreenState extends State<ChatScreen> {
 class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool mine;
+  final bool legacyCall;
 
-  const _MessageBubble({required this.message, required this.mine});
+  const _MessageBubble({
+    required this.message,
+    required this.mine,
+    this.legacyCall = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -299,10 +366,29 @@ class _MessageBubble extends StatelessWidget {
           color: mine ? AppTheme.primaryGreen : Colors.white,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(
-          message.content,
-          style: TextStyle(color: mine ? Colors.white : AppTheme.textDark),
-        ),
+        child:
+            !legacyCall
+                ? Text(
+                  message.content,
+                  style: TextStyle(
+                    color: mine ? Colors.white : AppTheme.textDark,
+                  ),
+                )
+                : const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Llamada de voz',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Invitación antigua. Para llamar, usa el botón de llamada de la parte superior.',
+                      style: TextStyle(fontSize: 13, height: 1.3),
+                    ),
+                  ],
+                ),
       ),
     );
   }

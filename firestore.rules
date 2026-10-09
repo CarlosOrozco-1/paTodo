@@ -392,6 +392,35 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // La señalización de llamadas se limita a los dos participantes de un
+    // trabajo aceptado o en curso.
+    function callParticipants(conversationId) {
+      let conversation = get(
+        /databases/$(database)/documents/conversations/$(conversationId)
+      ).data;
+      let job = get(
+        /databases/$(database)/documents/jobs/$(conversation.jobId)
+      ).data;
+      return signedIn()
+             && notSuspended()
+             && conversation.status == 'active'
+             && request.auth.uid in conversation.participants
+             && (job.status == 'accepted' || job.status == 'in_progress')
+             && request.auth.uid in [job.clientId, job.workerId]
+             && conversation.participants.hasAll([job.clientId, job.workerId]);
+    }
+
+    function canReadCall(conversationId, callId) {
+      let call = get(
+        /databases/$(database)/documents/conversations/$(conversationId)/calls/$(callId)
+      ).data;
+      return signedIn()
+             && request.auth.uid in [call.callerId, call.calleeId]
+             && request.auth.uid in get(
+               /databases/$(database)/documents/conversations/$(conversationId)
+             ).data.participants;
+    }
+
     // ===================== conversations =====================
     match /conversations/{conversationId} {
       // Solo los participantes de la conversación pueden leerla.
@@ -403,6 +432,7 @@ service cloud.firestore {
       // Los participantes solo pueden tocar lastMessage/lastReadAt; la identidad,
       // el estado y el snapshot los controla la API.
       allow update: if signedIn()
+                    && resource.data.status == 'active'
                     && request.auth.uid in resource.data.participants
                     && smallEnough()
                     && request.resource.data.diff(resource.data).affectedKeys()
@@ -420,11 +450,108 @@ service cloud.firestore {
         // Solo los participantes pueden crear mensajes, asignándose como senderId.
         allow create: if signedIn()
                       && smallEnough()
-                      && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
+                      && get(
+                        /databases/$(database)/documents/conversations/$(conversationId)
+                      ).data.status == 'active'
+                      && request.auth.uid in get(
+                        /databases/$(database)/documents/conversations/$(conversationId)
+                      ).data.participants
                       && request.resource.data.senderId == request.auth.uid;
 
         // Los mensajes no se editan ni se eliminan.
         allow update, delete: if false;
+      }
+
+      // Señalización WebRTC de llamadas de audio. El documento de llamada no
+      // crea ni cambia el trabajo o la conversación.
+      match /calls/{callId} {
+        allow get: if canReadCall(conversationId, callId);
+        allow list: if callParticipants(conversationId)
+                    && resource.data.calleeId == request.auth.uid;
+
+        allow create: if callParticipants(conversationId)
+                      && request.resource.data.keys().hasOnly([
+                        'callerId', 'calleeId', 'status', 'createdAt', 'expiresAt'
+                      ])
+                      && request.resource.data.callerId == request.auth.uid
+                      && request.resource.data.calleeId in get(
+                        /databases/$(database)/documents/conversations/$(conversationId)
+                      ).data.participants
+                      && request.resource.data.calleeId != request.auth.uid
+                      && request.resource.data.status == 'ringing'
+                      && request.resource.data.expiresAt is timestamp
+                      && smallEnough();
+
+        allow update: if canReadCall(conversationId, callId)
+                      && smallEnough()
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                        'offer', 'answer', 'status', 'acceptedAt', 'endedAt'
+                      ])
+                      && (
+                        (resource.data.callerId == request.auth.uid
+                         && callParticipants(conversationId)
+                         && resource.data.status == 'ringing'
+                         && request.resource.data.status == 'ringing'
+                         && request.resource.data.diff(resource.data).affectedKeys()
+                              .hasOnly(['offer']))
+                        ||
+                        (resource.data.calleeId == request.auth.uid
+                         && resource.data.status == 'ringing'
+                         && request.resource.data.status in ['accepted', 'rejected']
+                         && (
+                           (request.resource.data.status == 'accepted'
+                            && callParticipants(conversationId)
+                            && request.resource.data.keys().hasAll(['answer'])
+                            && request.resource.data.diff(resource.data).affectedKeys()
+                                 .hasOnly(['answer', 'status', 'acceptedAt']))
+                           ||
+                           (request.resource.data.status == 'rejected'
+                            && request.resource.data.diff(resource.data).affectedKeys()
+                                 .hasOnly(['status']))
+                         ))
+                        ||
+                        (request.auth.uid in [resource.data.callerId, resource.data.calleeId]
+                         && resource.data.status in ['ringing', 'accepted']
+                         && request.resource.data.status == 'ended'
+                         && request.resource.data.diff(resource.data).affectedKeys()
+                              .hasOnly(['status', 'endedAt']))
+                      );
+
+        allow delete: if false;
+
+        match /{candidateCollection}/{candidateId} {
+          function candidateCallIsActive() {
+            return canReadCall(conversationId, callId)
+                   && callParticipants(conversationId)
+                   && get(
+                     /databases/$(database)/documents/conversations/$(conversationId)/calls/$(callId)
+                   ).data.status in ['ringing', 'accepted'];
+          }
+
+          allow read: if candidateCollection in ['callerCandidates', 'calleeCandidates']
+                      && canReadCall(conversationId, callId);
+
+          allow create: if candidateCollection in ['callerCandidates', 'calleeCandidates']
+                        && candidateCallIsActive()
+                        && request.resource.data.senderId == request.auth.uid
+                        && (
+                          (candidateCollection == 'callerCandidates'
+                           && get(
+                             /databases/$(database)/documents/conversations/$(conversationId)/calls/$(callId)
+                           ).data.callerId == request.auth.uid)
+                          ||
+                          (candidateCollection == 'calleeCandidates'
+                           && get(
+                             /databases/$(database)/documents/conversations/$(conversationId)/calls/$(callId)
+                           ).data.calleeId == request.auth.uid)
+                        )
+                        && request.resource.data.keys().hasOnly([
+                          'candidate', 'sdpMid', 'sdpMLineIndex', 'senderId'
+                        ])
+                        && smallEnough();
+
+          allow update, delete: if false;
+        }
       }
     }
   }

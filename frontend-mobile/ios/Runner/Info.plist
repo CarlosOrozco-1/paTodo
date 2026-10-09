@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>PaTodo usa tu ubicación para mostrar rutas, distancia y tiempo de llegada.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>PaTodo necesita acceso al micrófono para realizar llamadas de voz durante el servicio.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

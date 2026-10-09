@@ -19,38 +19,86 @@ class ProfileGate extends StatefulWidget {
 }
 
 class _ProfileGateState extends State<ProfileGate> {
-  late final StreamSubscription<DocumentSnapshot> _sub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _sub;
   bool? _hasProfile;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    final user = FirebaseAuth.instance.currentUser;
-    final uid = user?.uid;
+    _watchProfile();
+  }
+
+  void _watchProfile() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
-      _hasProfile = false;
+      _error = 'No encontramos tu sesión. Vuelve a iniciar sesión.';
       return;
     }
-    _hasProfile = null;
+
     _sub = FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
         .snapshots()
-        .listen((snap) {
-      if (!mounted) return;
-      // DEV: documento inexistente → requireCompleteProfile; creado → bienvenida.
-      setState(() => _hasProfile = snap.exists);
+        .listen(
+          (snap) {
+            if (!mounted) return;
+            // DEV: documento inexistente → requireCompleteProfile; creado → bienvenida.
+            setState(() {
+              _hasProfile = snap.exists;
+              _error = null;
+            });
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            debugPrint('PROFILE_GATE_FIRESTORE_ERROR: $error');
+            if (!mounted) return;
+            setState(
+              () =>
+                  _error =
+                      'No pudimos verificar tu perfil. Inténtalo de nuevo.',
+            );
+          },
+        );
+  }
+
+  Future<void> _retry() async {
+    await _sub?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _hasProfile = null;
+      _error = null;
     });
+    _watchProfile();
   }
 
   @override
   void dispose() {
-    _sub.cancel();
+    _sub?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_error!, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _retry,
+                  child: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     if (_hasProfile == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }

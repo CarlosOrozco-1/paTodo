@@ -43,6 +43,8 @@ tags:
     description: Búsquedas (trabajos cercanos por proximidad)
   - name: offers
     description: Aceptación y rechazo de ofertas
+  - name: messages
+    description: Mensajes entre el cliente y el trabajador asignado
   - name: reviews
     description: Creación de reseñas y actualización de reputación
   - name: routes
@@ -247,6 +249,99 @@ paths:
                 $ref: '#/components/schemas/Error'
 
   # ===================== OFERTAS =====================
+  /createOffer:
+    post:
+      tags: [offers]
+      summary: Enviar una propuesta para un trabajo
+      description: Solo un trabajador puede enviar una propuesta por trabajo pendiente. La API evita propuestas duplicadas y notifica al cliente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jobId: { type: string }
+                price: { type: number, minimum: 0.01 }
+                estimatedTime: { type: string }
+                note: { type: string }
+              required: [jobId, price, estimatedTime]
+      responses:
+        '201': { description: Propuesta creada. }
+        '400': { $ref: '#/components/responses/InvalidArgument' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { description: El trabajador ya tiene una propuesta pendiente. }
+        '412': { $ref: '#/components/responses/FailedPrecondition' }
+
+  /rejectOffer:
+    post:
+      tags: [offers]
+      summary: Rechazar una propuesta
+      description: Solo el cliente dueÃ±o del trabajo puede rechazar una propuesta pendiente. Notifica al trabajador.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jobId: { type: string }
+                offerId: { type: string }
+              required: [jobId, offerId]
+      responses:
+        '200': { description: Propuesta rechazada. }
+        '400': { $ref: '#/components/responses/InvalidArgument' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/FailedPrecondition' }
+
+  # ===================== MENSAJES =====================
+  /sendMessage:
+    post:
+      tags: [messages]
+      summary: Enviar un mensaje y avisar al otro participante
+      description: |
+        Envía un mensaje de texto a una conversación activa. Solo pueden usarlo
+        las dos partes del trabajo asociado (cliente y trabajador asignado).
+        La API escribe el mensaje, actualiza el resumen de la conversación y
+        crea/envía una notificación `new_message` al otro participante para que
+        pueda recibir el aviso con la aplicación en segundo plano o cerrada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conversationId, content]
+              properties:
+                conversationId:
+                  type: string
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+      responses:
+        '201':
+          description: Mensaje creado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  conversationId: { type: string }
+                  senderId: { type: string }
+                  content: { type: string }
+                  type: { type: string, example: text }
+                  createdAt: { type: string, format: date-time }
+        '400': { $ref: '#/components/responses/InvalidArgument' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/FailedPrecondition' }
+
   /acceptOffer:
     post:
       tags: [offers]
@@ -408,15 +503,56 @@ paths:
         '412':
           $ref: '#/components/responses/FailedPrecondition'
 
+  /jobs/{jobId}/arrivalCode:
+    get:
+      tags: [jobs]
+      summary: Obtener cÃ³digo de llegada
+      description: El cliente dueÃ±o obtiene un cÃ³digo de seis dÃ­gitos cuando el trabajador estÃ¡ cerca del lugar del servicio.
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: CÃ³digo de llegada. }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/FailedPrecondition' }
+
+  /verifyArrivalCode:
+    post:
+      tags: [jobs]
+      summary: Verificar llegada del trabajador
+      description: El trabajador asignado confirma el cÃ³digo a menos de 20 metros del servicio y finaliza el traslado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jobId: { type: string }
+                code: { type: string, minLength: 6, maxLength: 6 }
+              required: [jobId, code]
+      responses:
+        '200': { description: Llegada verificada, trabajo completado y vehículo utilizado guardado en el trabajo. }
+        '400': { $ref: '#/components/responses/InvalidArgument' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/FailedPrecondition' }
+
   /completeJob:
     post:
       tags: [jobs]
       summary: Marcar un trabajo como completado
       description: |
         El cliente o el trabajador asignado marca el trabajo como `completed`.
-        Actualiza la fecha de completado, cierra la conversación, incrementa
-        `stats.completedJobs` del trabajador, apaga su `availability.isOnline` y
-        notifica a la otra parte. Habilita las reseñas.
+        Actualiza la fecha de completado y guarda `vehicleUsed` desde el vehículo
+        activo del trabajador, cierra la conversación, incrementa
+        `stats.completedJobs`, apaga `availability.isOnline` y notifica a la otra
+        parte. Habilita las reseñas.
       requestBody:
         required: true
         content:
@@ -585,7 +721,10 @@ paths:
         - Crea **una sola** notificación `voice_call_incoming` para el receptor
           y envía el push con `android.priority: high`, porque una llamada
           entrante solo sirve si el teléfono despierta al instante. El `data`
-          lleva `type`, `jobId`, `callId` y `direction: incoming`.
+          lleva `type`, `callerName`, `jobId`, `callId` y `direction: incoming`. Es un push
+          de datos de prioridad alta (sin bloque `notification`) para que el
+          cliente Android pueda mostrar una alerta de llamada a pantalla
+          completa, con el dispositivo bloqueado o la app cerrada.
 
           Del lado del dispositivo (fase D del equipo de desarrollo app, no de la
           API): en Android hay que declarar el permiso

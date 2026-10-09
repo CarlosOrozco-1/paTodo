@@ -6,6 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:geolocator/geolocator.dart';
 import 'firebase_options.dart';
 import 'src/core/config/app_config.dart';
+import 'src/core/navigation/app_navigator.dart';
 import 'src/core/notifications/push_notification_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'src/shared/widgets/main_scaffold.dart';
@@ -63,6 +64,7 @@ class PaTodoApp extends StatelessWidget {
         final isDarkMode = ctrl.themeMode == ThemeMode.dark;
         return MaterialApp(
           title: 'PaTodo',
+          navigatorKey: appNavigatorKey,
           scaffoldMessengerKey: appMessengerKey,
           theme: ctrl.buildTheme(isDark: false),
           darkTheme: ctrl.buildTheme(isDark: true),
@@ -83,8 +85,7 @@ class PaTodoApp extends StatelessWidget {
             '/register': (_) => const RegisterScreen(),
             '/home': (_) => const _LocationRequirementGate(child: MainScreen()),
           },
-          home: _LocationRequirementGate(
-            child: StreamBuilder<User?>(
+          home: StreamBuilder<User?>(
             stream: FirebaseAuth.instance.authStateChanges(),
             builder: (_, snap) {
               if (snap.connectionState == ConnectionState.waiting) {
@@ -97,7 +98,6 @@ class PaTodoApp extends StatelessWidget {
               // el doc users/{uid} (centraliza todos los métodos de entrada).
               return const ProfileGate();
             },
-            ),
           ),
         );
       },
