@@ -1,6 +1,6 @@
 # Hallazgos y resoluciones — validación web (2026-10-03)
 
-Sesión de integración de cambios ajenos (flujo de `docs/trabajo-git.md`) y
+Sesión de integración de cambios ajenos (flujo de `docs/git/trabajo-git.md`) y
 validación de la **carga de skills desde Firebase** en el frontend web. Resumen
 de hallazgos y su resolución. Donde el equipo ya documentó algo, se enlaza en vez
 de duplicarlo.
@@ -16,7 +16,7 @@ Firebase Hosting no tiene variables de entorno.
 
 **Resolución:** `.env` local en `real` + `mode.ts` con `real` por defecto. El
 equipo además añadió un **guardián de build** que cancela el build si el bundle
-queda en demo. Detalle y procedimiento: `docs/web-actualizacion.md`
+queda en demo. Detalle y procedimiento: `docs/deploy/web-actualizacion.md`
 (§Validación automática del build).
 
 ## 2. `api/env` con el service account sin ignorar

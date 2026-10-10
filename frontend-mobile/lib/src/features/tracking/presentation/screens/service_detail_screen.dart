@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../chat/presentation/screens/chat_screen.dart';
+import '../../../reviews/presentation/review_worker_button.dart';
 import '../../../services/data/firebase_service.dart';
 import 'live_tracking_screen.dart';
 
@@ -368,6 +369,13 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                                   ),
                                 ),
                               ),
+                              if (isClient && status == 'completed') ...[
+                                const SizedBox(height: 10),
+                                ReviewWorkerButton(
+                                  jobId: widget.jobId,
+                                  workerName: workerName,
+                                ),
+                              ],
                             ],
                           )
                           : Column(

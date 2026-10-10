@@ -102,21 +102,21 @@ Proyecto `pa-todo`, base `(default)`, edición Standard, región `nam5`.
 |---|---|---|
 | API REST | Render (plan gratuito) | `https://patodo.onrender.com`; variables de entorno del servicio |
 | Reglas e índices | Firebase | `firebase deploy --only firestore:rules,firestore:indexes` |
-| Frontend web | Firebase Hosting (`frontend-web/dist`) | build de Vite + deploy ([`docs/web-actualizacion.md`](web-actualizacion.md)) |
+| Frontend web | Firebase Hosting (`frontend-web/dist`) | build de Vite + deploy ([`docs/deploy/web-actualizacion.md`](web-actualizacion.md)) |
 | App móvil | Play Store / App Store | build de Flutter |
 | Cloud Functions | **No se usan** | Su código está archivado en `docs/functions-legacy/` |
 
 Variables de entorno de la API: `FIREBASE_SERVICE_ACCOUNT` (JSON del service account en base64),
 `FIREBASE_PROJECT_ID` (por defecto `pa-todo`), `CORS_ORIGINS`, `PORT`, `OSRM_BASE_URL` y las de
 rate limit (`RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`). En local, `api/.env` añade
-`FIRESTORE_EMULATOR_HOST` y `FIREBASE_AUTH_EMULATOR_HOST` (ver [`docs/ejecucion.md`](ejecucion.md)).
+`FIRESTORE_EMULATOR_HOST` y `FIREBASE_AUTH_EMULATOR_HOST` (ver [`docs/deploy/ejecucion.md`](ejecucion.md)).
 Si no hay credenciales ni emuladores, la API **falla al arrancar** con un error explícito.
 
 ## 7. Referencias
 
-- Contexto consolidado para documentación (DERCAS): [`docs/contexto-agente.md`](contexto-agente.md)
-- Cómo levantar los servicios: [`docs/ejecucion.md`](ejecucion.md)
-- Conexión de los frontends: [`docs/api-conexion.md`](api-conexion.md)
-- Autenticación con Google en la web (fallos conocidos y soluciones): [`docs/auth-google.md`](auth-google.md)
-- Pruebas locales y emuladores: [`docs/api-emulador.md`](api-emulador.md)
-- Reglas de seguridad: [`docs/reglas-firebase.md`](reglas-firebase.md)
+- Contexto consolidado para documentación (DERCAS): [`docs/dercas-interno/contexto-agente.md`](contexto-agente.md)
+- Cómo levantar los servicios: [`docs/deploy/ejecucion.md`](ejecucion.md)
+- Conexión de los frontends: [`docs/api/api-conexion.md`](api-conexion.md)
+- Autenticación con Google en la web (fallos conocidos y soluciones): [`docs/autenticacion/auth-google.md`](auth-google.md)
+- Pruebas locales y emuladores: [`docs/api/api-emulador.md`](api-emulador.md)
+- Reglas de seguridad: [`docs/firebase/reglas-firebase.md`](reglas-firebase.md)

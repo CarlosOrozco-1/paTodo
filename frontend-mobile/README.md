@@ -7,7 +7,7 @@ para conectar con el backend de PaTodo**:
 - `lib/src/core/config/app_config.dart` → URL de la API y flags de emuladores por entorno.
 
 El equipo conectará Firebase (Auth + Firestore) y la API REST como se describe en
-`../docs/api-conexion.md`.
+`../docs/api/api-conexion.md`.
 
 ## Requisitos
 
@@ -41,6 +41,6 @@ El equipo conectará Firebase (Auth + Firestore) y la API REST como se describe 
    - `users.role/stats`, `reviews`, `notifications`, `conversations`, aceptar/
      cancelar/completar y rutas → **solo API**.
 4. **Rutas**: `POST /computeRoute` devuelve distancia, tiempo y el trazo geográfico
-   (trabajador → trabajo → destino opcional). Ver `../docs/api-conexion.md`.
+   (trabajador → trabajo → destino opcional). Ver `../docs/api/api-conexion.md`.
 
-Contrato completo: `../docs/api-conexion.md`. Spec OpenAPI: `../spec/openapi.yaml`.
+Contrato completo: `../docs/api/api-conexion.md`. Spec OpenAPI: `../spec/openapi.yaml`.

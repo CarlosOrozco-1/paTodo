@@ -76,14 +76,14 @@ Todos exigen `Authorization: Bearer <idToken>` salvo `GET /`.
 Formato de error: `{ error: string, code: string }` con el status HTTP real.
 
 Para probar el flujo completo paso a paso (registro, publicar, ofertar, aceptar, completar,
-reseñar) usa [`docs/api-emulador.md`](api-emulador.md) o la prueba automatizada:
+reseñar) usa [`docs/api/api-emulador.md`](api-emulador.md) o la prueba automatizada:
 
 ```bash
 cd api && bash tests/e2e.sh
 ```
 
 La conexión de los frontends (URLs, SDKs, quién escribe qué) está en
-[`docs/api-conexion.md`](api-conexion.md).
+[`docs/api/api-conexion.md`](api-conexion.md).
 
 Datos de ejemplo: `cd api && npm run seed` (crea un cliente y un trabajador de prueba).
 

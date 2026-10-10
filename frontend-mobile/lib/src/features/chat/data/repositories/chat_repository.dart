@@ -1,12 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../../core/network/api_client.dart';
 import '../models/chat_message.dart';
 
 class ChatRepository {
   final FirebaseFirestore _firestore;
+  final ApiClient _api;
 
-  ChatRepository({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  ChatRepository({FirebaseFirestore? firestore, ApiClient? api})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _api = api ?? ApiClient.create();
 
   Future<String?> findConversationId({
     required String jobId,
@@ -36,6 +39,14 @@ class ChatRepository {
         .map((snapshot) => snapshot.data()?['status'] as String?);
   }
 
+  Stream<String?> jobStatus(String jobId) {
+    return _firestore
+        .collection('jobs')
+        .doc(jobId)
+        .snapshots()
+        .map((snapshot) => snapshot.data()?['status'] as String?);
+  }
+
   Stream<List<ChatMessage>> messages(String conversationId) {
     return _firestore
         .collection('conversations')
@@ -56,24 +67,12 @@ class ChatRepository {
     final message = content.trim();
     if (message.isEmpty) return;
 
-    final conversation = _firestore
-        .collection('conversations')
-        .doc(conversationId);
-    final batch = _firestore.batch();
-    batch.set(conversation.collection('messages').doc(), {
-      'senderId': senderId,
-      'content': message,
-      'type': 'text',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    batch.update(conversation, {
-      'lastMessage': {
-        'content': message,
-        'senderId': senderId,
-        'createdAt': FieldValue.serverTimestamp(),
-      },
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    await batch.commit();
+    // La API toma senderId del token y avisa al otro participante incluso si
+    // tiene la app cerrada. El parámetro se conserva para la interfaz actual,
+    // pero nunca se envía ni se confía en él en el servidor.
+    await _api.dio.post(
+      '/sendMessage',
+      data: {'conversationId': conversationId, 'content': message},
+    );
   }
 }

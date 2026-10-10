@@ -132,6 +132,9 @@ class ProfileScreen extends StatelessWidget {
               builder: (_, snap) {
                 final data = snap.data?.data() as Map<String, dynamic>?;
                 final profile = data?['profile'] as Map<String, dynamic>?;
+                final stats = data?['stats'] as Map<String, dynamic>? ?? {};
+                final rating = (stats['rating'] as num?)?.toDouble() ?? 0;
+                final ratingCount = (stats['ratingCount'] as num?)?.toInt() ?? 0;
 
                 String displayName = '';
                 if (profile != null &&
@@ -164,6 +167,8 @@ class ProfileScreen extends StatelessWidget {
                         color: Colors.grey.shade600,
                       ),
                     ),
+                    const SizedBox(height: 18),
+                    _RatingSummary(rating: rating, ratingCount: ratingCount),
                   ],
                 );
               },
@@ -210,6 +215,47 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 40),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RatingSummary extends StatelessWidget {
+  final double rating;
+  final int ratingCount;
+
+  const _RatingSummary({required this.rating, required this.ratingCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleRating = rating.clamp(0, 5).toDouble();
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFE0A3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.star_rounded, color: Color(0xFFFFA000), size: 26),
+          const SizedBox(width: 8),
+          Text(
+            '${visibleRating.toStringAsFixed(1)} / 5',
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF5D4A00),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            ratingCount == 1 ? '1 calificación' : '$ratingCount calificaciones',
+            style: const TextStyle(color: Color(0xFF806C1A), fontSize: 12),
+          ),
+        ],
       ),
     );
   }

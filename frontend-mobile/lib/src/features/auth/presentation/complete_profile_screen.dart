@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/notifications/push_notification_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/auth_repository.dart';
 
@@ -54,6 +55,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         lastName: _last.text.trim(),
         phone: _phone.text.trim(),
       );
+      await PushNotificationService.instance.registerCurrentDevice();
       // Éxito: cierra el modal de espera y da la bienvenida (solo aplica
       // aquí porque CompleteProfileScreen solo existe para perfiles nuevos;
       // los que ya tenían perfil llegan directo al Welcome sin modal).

@@ -222,6 +222,12 @@
       },
       "required": ["paymentId", "status", "amount", "method"]
     },
+    "vehicleUsed": {
+      "type": ["string", "null"],
+      "enum": ["car", "motorcycle", null],
+      "title": "Vehículo utilizado",
+      "description": "Vehículo activo del trabajador al momento de completar el servicio."
+    },
     "route": {
       "type": ["object", "null"],
       "title": "Ruta calculada",

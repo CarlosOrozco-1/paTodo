@@ -58,11 +58,11 @@ Flujo core (happy path):
 - La API autentica cada request con `Authorization: Bearer <idToken>`
   (verificado con el Admin SDK). `/` (health) es la única ruta sin token.
 - **Google Sign-In (web):** issues reales y soluciones en
-  `docs/auth-google.md` (origin/client_id `377828600122-…`, CORS en Render,
+  `docs/autenticacion/auth-google.md` (origin/client_id `377828600122-…`, CORS en Render,
   400 en `/createUser`), y pendientes para el equipo web (modal "Completa tu
   perfil" con teléfono + rol `both`).
 - **Llamadas de voz (contrato en Firestore, API pendiente):** decisión técnica en
-  `docs/llamadas-voz.md`. Se descartó Twilio: el v1 es **WebRTC P2P** con relay
+  `docs/voz/llamadas-voz.md`. Se descartó Twilio: el v1 es **WebRTC P2P** con relay
   TURN de respaldo, entre cliente y trabajador del mismo trabajo, sin llamadas a
   números de teléfono. La señalización va en **Firestore** (`calls/{callId}`
   escrito solo por la API, `calls/{callId}/signals` escrito por los dos
@@ -97,7 +97,7 @@ Flujo core (happy path):
 | GET | `/admin/jobs` | Admin (todos los trabajos; `status?`) |
 | GET | `/admin/activityLog` | Admin (log de acciones; `limit?`) |
 
-Contrato detallado en `spec/openapi.yaml` y `docs/api-conexion.md`. Formato de
+Contrato detallado en `spec/openapi.yaml` y `docs/api/api-conexion.md`. Formato de
 error uniforme: `{ error: string, code: string }` con status HTTP real (400/401/
 403/404/409/412/429/502/503).
 
@@ -121,7 +121,7 @@ Colecciones: `users`, `vehicles`, `skills`, `categories`, `jobs`, `offers`,
 - Geopoints con campo `geohash` (geofire-common) para búsquedas por proximidad.
 - UUIDs/IDs de catálogo estables = slug (ej. `categoryId: "mecanica"`).
 
-Schemas completos: `spec/schemas/*.json`. Reglas: `docs/reglas-firebase.md` +
+Schemas completos: `spec/schemas/*.json`. Reglas: `docs/firebase/reglas-firebase.md` +
 `firestore.rules`. Índices: `firestore.indexes.json`.
 
 ## 6. Estados y división "quién escribe qué"
@@ -134,14 +134,14 @@ Schemas completos: `spec/schemas/*.json`. Reglas: `docs/reglas-firebase.md` +
   (trabajador), `messages` (participante), perfil propio, etc. — autorizadas por
   `firestore.rules`.
 - Solo la API: `reviews`, `notifications`, `conversations`, roles/stats.
-- Detalle: `docs/api-conexion.md` §4.
+- Detalle: `docs/api/api-conexion.md` §4.
 
 ## 7. Despliegue (estado actual)
 
 | Servicio | Sitio | Estado |
 |---|---|---|
 | API REST | `https://patodo.onrender.com` | ✔ desplegado (plan gratuito; cold start 20-50s) |
-| Frontend web | `https://pa-todo.web.app` | ✔ desplegado (procedimiento en `docs/web-actualizacion.md`) |
+| Frontend web | `https://pa-todo.web.app` | ✔ desplegado (procedimiento en `docs/deploy/web-actualizacion.md`) |
 | Reglas e índices Firestore | `firebase deploy --only firestore:rules,firestore:indexes` | ✔ desplegados |
 | App móvil | Play/App Store | pendiente |
 
@@ -173,14 +173,14 @@ Pendientes para el equipo web (ya reportados):
 
 | Doc | Contenido |
 |---|---|
-| `docs/arquitectura.md` | Arquitectura, modelo de acceso, endpoints, autorización, despliegue |
-| `docs/auth-google.md` | Problemas de login Google + soluciones + pendientes web |
-| `docs/api-conexion.md` | URLs por entorno, quién escribe qué, contratos, ruta/búsqueda |
-| `docs/reglas-firebase.md` | Reglas de seguridad por colección |
+| `docs/arquitectura/arquitectura.md` | Arquitectura, modelo de acceso, endpoints, autorización, despliegue |
+| `docs/autenticacion/auth-google.md` | Problemas de login Google + soluciones + pendientes web |
+| `docs/api/api-conexion.md` | URLs por entorno, quién escribe qué, contratos, ruta/búsqueda |
+| `docs/firebase/reglas-firebase.md` | Reglas de seguridad por colección |
 | `docs/fases-de-desarrollo/plan-desarrollo.md` | Fases, cronograma, criterios de aceptación (MVP) |
 | `docs/diagramas/*.md` | Diagramas de casos de uso y módulos |
-| `docs/web-actualizacion.md` | Ciclo de publicación de la web (build + deploy) |
-| `docs/ejecucion.md` / `docs/api-emulador.md` | Levantar servicios localmente y pruebas |
-| `docs/admin.md` | Rol admin: crear primer admin, promover/revocar, suspender, verificar, catálogo, log activity |
-| `docs/segunda-maquina.md` | Checklist para levantar el repo completo en una máquina nueva |
+| `docs/deploy/web-actualizacion.md` | Ciclo de publicación de la web (build + deploy) |
+| `docs/deploy/ejecucion.md` / `docs/api/api-emulador.md` | Levantar servicios localmente y pruebas |
+| `docs/admin/admin.md` | Rol admin: crear primer admin, promover/revocar, suspender, verificar, catálogo, log activity |
+| `docs/deploy/segunda-maquina.md` | Checklist para levantar el repo completo en una máquina nueva |
 | `spec/openapi.yaml` + `spec/schemas/` | Contratos de API y modelos (fuente de verdad) |

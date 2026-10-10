@@ -14,6 +14,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/category_theme.dart';
 import '../../../core/utils/category_utils.dart';
 import '../../../shared/widgets/user_avatar.dart';
+import '../../notifications/presentation/notifications_screen.dart';
 import '../../services/data/firebase_service.dart';
 import '../../tracking/presentation/screens/live_tracking_screen.dart';
 
@@ -106,11 +107,14 @@ class _HomeScreenState extends State<HomeScreen> {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+      final currentUid = FirebaseAuth.instance.currentUser?.uid;
       final pendingJobs = await _service.fetchPendingJobs();
       final nearby =
           pendingJobs
               .where(
                 (job) =>
+                    // Solo trabajos de otros para postularme, nunca mis propios trabajos:
+                    (currentUid == null || job.clientId != currentUid) &&
                     Geolocator.distanceBetween(
                           position.latitude,
                           position.longitude,
@@ -152,6 +156,63 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Widget _buildTabButton({
+    required int index,
+    required IconData icon,
+    required String label,
+  }) {
+    final isSelected = _bothTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _bothTab = index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow:
+                isSelected
+                    ? [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                    : null,
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 15,
+                  color:
+                      isSelected ? AppTheme.primaryGreen : Colors.grey[600],
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.w600,
+                    color:
+                        isSelected ? AppTheme.primaryGreen : Colors.grey[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -164,25 +225,31 @@ class _HomeScreenState extends State<HomeScreen> {
                 : (email.isNotEmpty ? email.split('@').first : 'Usuario'));
 
     final isClient = _role == 'client';
-    final showTabs = _role == 'both' || _role == 'worker';
+    final isWorker = _role == 'worker';
+    final isBoth = _role == 'both';
+    final showTabs = isBoth || isWorker;
 
     String sectionTitle;
     if (isClient) {
-      sectionTitle = 'Mis Trabajos';
-    } else if (showTabs) {
-      sectionTitle = _bothTab == 0 ? 'Trabajos Cercanos' : 'Más Publicaciones';
+      sectionTitle = 'Mis Publicaciones';
+    } else if (isBoth) {
+      sectionTitle = switch (_bothTab) {
+        0 => 'Trabajos Cercanos',
+        1 => 'Para Postularme',
+        2 => 'Mis Publicaciones',
+        _ => 'Trabajos Cercanos',
+      };
+    } else if (isWorker) {
+      sectionTitle = _bothTab == 0 ? 'Trabajos Cercanos' : 'Para Postularme';
     } else {
       sectionTitle = 'Trabajos Cercanos';
     }
 
     return RefreshIndicator(
       color: AppTheme.primaryGreen,
-      onRefresh:
-          _role == 'client'
-              ? _loadRoleAndData
-              : () async {
-                await _loadRoleAndData();
-              },
+      onRefresh: () async {
+        await _loadRoleAndData();
+      },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
@@ -217,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (!_loading)
                         GestureDetector(
                           onTap: () {
-                            if (_role == 'client') {
+                            if (isClient || (isBoth && _bothTab == 2)) {
                               _loadRoleAndData();
                             } else {
                               _loadNearby();
@@ -255,7 +322,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
 
-                  // Permitir alternar entre explorar trabajos cercanos o más publicaciones lejanas
+                  // Selector de pestañas según el rol
                   if (showTabs) ...[
                     const SizedBox(height: 14),
                     Container(
@@ -265,122 +332,36 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() => _bothTab = 0),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 9,
-                                ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      _bothTab == 0
-                                          ? Colors.white
-                                          : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(10),
-                                  boxShadow:
-                                      _bothTab == 0
-                                          ? [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(
-                                                0.06,
-                                              ),
-                                              blurRadius: 4,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ]
-                                          : null,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.explore_outlined,
-                                      size: 16,
-                                      color:
-                                          _bothTab == 0
-                                              ? AppTheme.primaryGreen
-                                              : Colors.grey[600],
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Trabajos Cercanos',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight:
-                                            _bothTab == 0
-                                                ? FontWeight.bold
-                                                : FontWeight.w500,
-                                        color:
-                                            _bothTab == 0
-                                                ? AppTheme.primaryGreen
-                                                : Colors.grey[700],
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                        children: isBoth
+                            ? [
+                              _buildTabButton(
+                                index: 0,
+                                icon: Icons.explore_outlined,
+                                label: 'Cercanos',
                               ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() => _bothTab = 1),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 9,
-                                ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      _bothTab == 1
-                                          ? Colors.white
-                                          : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(10),
-                                  boxShadow:
-                                      _bothTab == 1
-                                          ? [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(
-                                                0.06,
-                                              ),
-                                              blurRadius: 4,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ]
-                                          : null,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.travel_explore,
-                                      size: 16,
-                                      color:
-                                          _bothTab == 1
-                                              ? AppTheme.primaryGreen
-                                              : Colors.grey[600],
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Más Publicaciones',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight:
-                                            _bothTab == 1
-                                                ? FontWeight.bold
-                                                : FontWeight.w500,
-                                        color:
-                                            _bothTab == 1
-                                                ? AppTheme.primaryGreen
-                                                : Colors.grey[700],
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              _buildTabButton(
+                                index: 1,
+                                icon: Icons.travel_explore,
+                                label: 'Postularme',
                               ),
-                            ),
-                          ),
-                        ],
+                              _buildTabButton(
+                                index: 2,
+                                icon: Icons.assignment_outlined,
+                                label: 'Mis Publicados',
+                              ),
+                            ]
+                            : [
+                              _buildTabButton(
+                                index: 0,
+                                icon: Icons.explore_outlined,
+                                label: 'Trabajos Cercanos',
+                              ),
+                              _buildTabButton(
+                                index: 1,
+                                icon: Icons.travel_explore,
+                                label: 'Para Postularme',
+                              ),
+                            ],
                       ),
                     ),
                   ],
@@ -393,7 +374,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     _ErrorState(message: _error!, onRetry: _loadRoleAndData)
                   else if (isClient)
                     const _ClientJobsList()
-                  else if (showTabs)
+                  else if (isBoth)
+                    switch (_bothTab) {
+                      0 => _NearbyList(items: _nearby),
+                      1 => _MoreJobsList(userLocation: _userLocation),
+                      2 => const _ClientJobsList(),
+                      _ => _NearbyList(items: _nearby),
+                    }
+                  else if (isWorker)
                     _bothTab == 0
                         ? _NearbyList(items: _nearby)
                         : _MoreJobsList(userLocation: _userLocation)
@@ -505,25 +493,31 @@ class _HeroBanner extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 8,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const NotificationBell(),
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 8,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: UserAvatar(
-                      photoUrl: profileImageUrl,
-                      name: displayName,
-                      email: email,
-                      radius: 26,
-                      backgroundColor: Colors.white24,
-                      textColor: Colors.white,
-                    ),
+                        child: UserAvatar(
+                          photoUrl: profileImageUrl,
+                          name: displayName,
+                          email: email,
+                          radius: 26,
+                          backgroundColor: Colors.white24,
+                          textColor: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -788,7 +782,7 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ─────────────────────────── Lista Cliente ───────────────────────────
+// ─────────────────────────── Lista Cliente / Mis Publicaciones ───────────────────────────
 
 class _ClientJobsList extends StatelessWidget {
   const _ClientJobsList();
@@ -808,7 +802,7 @@ class _ClientJobsList extends StatelessWidget {
           return const _LoadingShimmer();
         if (snap.hasError)
           return const Center(
-            child: Text('No se pudieron cargar tus trabajos.'),
+            child: Text('No se pudieron cargar tus publicaciones.'),
           );
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {
@@ -818,9 +812,22 @@ class _ClientJobsList extends StatelessWidget {
             subtitle: 'Toca el botón + para publicar tu primer trabajo.',
           );
         }
+        // Ordenar en memoria por fecha de creación (los más recientes primero)
+        final sortedDocs = List<QueryDocumentSnapshot>.from(docs);
+        sortedDocs.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>? ?? {};
+          final bData = b.data() as Map<String, dynamic>? ?? {};
+          final aDate = aData['createdAt'];
+          final bDate = bData['createdAt'];
+          if (aDate is Timestamp && bDate is Timestamp) {
+            return bDate.compareTo(aDate);
+          }
+          return 0;
+        });
+
         return Column(
           children:
-              docs.map((doc) {
+              sortedDocs.map((doc) {
                 final d = doc.data() as Map<String, dynamic>;
                 return ModernJobCard(jobData: d, jobId: doc.id);
               }).toList(),
@@ -843,7 +850,7 @@ class _NearbyList extends StatelessWidget {
         icon: Icons.location_searching,
         title: 'Sin trabajos cercanos',
         subtitle:
-            'No encontramos trabajos en tu área.\nDesliza para actualizar.',
+            'No encontramos publicaciones cercanas para postularte.\nDesliza para actualizar.',
       );
     }
     return Column(
@@ -868,6 +875,7 @@ class _MoreJobsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const distanceCalc = Distance();
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
 
     return StreamBuilder<QuerySnapshot>(
       stream:
@@ -881,21 +889,29 @@ class _MoreJobsList extends StatelessWidget {
         }
         if (snap.hasError) {
           return const Center(
-            child: Text('No se pudieron cargar más publicaciones.'),
+            child: Text('No se pudieron cargar las publicaciones.'),
           );
         }
 
         final docs = snap.data?.docs ?? [];
-        if (docs.isEmpty) {
+        // Filtrar para excluir mis propias publicaciones de la lista para postularme
+        final availableDocs = docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          if (data == null) return false;
+          final clientId = data['clientId'] as String?;
+          return currentUid == null || clientId != currentUid;
+        }).toList();
+
+        if (availableDocs.isEmpty) {
           return const _EmptyState(
             icon: Icons.public_off_outlined,
-            title: 'Sin publicaciones disponibles',
-            subtitle: 'Cuando haya nuevos trabajos, aparecerán aquí.',
+            title: 'Sin publicaciones para postularte',
+            subtitle: 'Cuando otros clientes publiquen trabajos, aparecerán aquí.',
           );
         }
 
         final jobs =
-            docs.map((doc) {
+            availableDocs.map((doc) {
               final data = Map<String, dynamic>.from(
                 doc.data() as Map<String, dynamic>,
               );
@@ -1017,6 +1033,9 @@ class ModernJobCard extends StatelessWidget {
       }
     }
     final clientName = jobData['clientName']?.toString();
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final jobClientId = (jobData['clientId'] ?? jobData['uid'])?.toString();
+    final isOwner = currentUid != null && jobClientId != null && currentUid == jobClientId;
 
     final catIcon = jobCategoryIcon(categoryId);
     final catColor = jobCategoryColor(categoryId);
@@ -1047,8 +1066,10 @@ class ModernJobCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: Colors.grey.withValues(alpha: 0.15),
-          width: 1,
+          color: isOwner
+              ? AppTheme.primaryGreen.withOpacity(0.35)
+              : Colors.grey.withValues(alpha: 0.15),
+          width: isOwner ? 1.5 : 1,
         ),
         boxShadow: [
           BoxShadow(
@@ -1085,7 +1106,7 @@ class ModernJobCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                // ── Fila Superior: Categoría + Estado ──
+                // ── Fila Superior: Categoría + Estado / Tu Publicación ──
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1115,35 +1136,77 @@ class ModernJobCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    // Badge de Estado
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: statusColor.withValues(alpha: 0.25),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(statusIcon, size: 12, color: statusColor),
-                          const SizedBox(width: 4),
-                          Text(
-                            statusLabel,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: statusColor,
+                    // Badges (Tu publicación + Estado)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isOwner) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            margin: const EdgeInsets.only(right: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5E9),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFF81C784),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(
+                                  Icons.person_pin_circle_rounded,
+                                  size: 13,
+                                  color: Color(0xFF2E7D32),
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Tu publicación',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF2E7D32),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
-                      ),
+                        // Badge de Estado
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: statusColor.withValues(alpha: 0.25),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(statusIcon, size: 12, color: statusColor),
+                              const SizedBox(width: 4),
+                              Text(
+                                statusLabel,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

@@ -57,7 +57,7 @@ print(json.dumps({"fields":{
   "details":{"mapValue":{"fields":{
     "title":{"stringValue":"Cambio de llanta zona 10"},
     "description":{"stringValue":"Llanta ponchada"},
-    "categoryId":{"stringValue":"cat-mecanica"},
+    "categoryId":{"stringValue":"mecanica"},
     "skillIds":{"arrayValue":{"values":[{"stringValue":"sk-llantas"}]}}}}},
   "location":{"mapValue":{"fields":{
     "geopoint":{"mapValue":{"fields":{

@@ -14,6 +14,8 @@
     "create-admin": "npm run build && node dist/scripts/createAdmin.js",
     "typecheck": "tsc --noEmit",
     "test:voice": "npm run build && firebase emulators:exec --config ../firebase.test.json --only firestore,auth --project demo-pa-todo \"node test/calls.e2e.js\"",
+    "test:messages": "npm run build && firebase emulators:exec --config ../firebase.test.json --only firestore,auth --project demo-pa-todo \"node test/messages.e2e.js\"",
+    "test:offers": "npm run build && firebase emulators:exec --config ../firebase.test.json --only firestore,auth --project demo-pa-todo \"node test/offers.e2e.js\"",
     "verify:turn": "node scripts/verifyTurn.js"
   },
   "keywords": [],

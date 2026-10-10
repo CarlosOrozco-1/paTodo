@@ -10,7 +10,7 @@ export const callsRouter = Router();
 
 /**
  * Llamadas de voz por WebRTC entre el cliente y el trabajador de un mismo
- * trabajo. Decisión técnica y alcance en docs/llamadas-voz.md.
+ * trabajo. Decisión técnica y alcance en docs/voz/llamadas-voz.md.
  *
  * Reparto de escrituras (ver firestore.rules, match /calls):
  * - `calls/{callId}` lo escribe SOLO esta API. Las reglas lo prohíben a los
@@ -147,8 +147,24 @@ async function displayNameOf(userId: string): Promise<string> {
   if (!userDoc.exists) return "Tu contacto";
 
   const data = userDoc.data() ?? {};
-  const first = typeof data.firstName === "string" ? data.firstName.trim() : "";
-  const last = typeof data.lastName === "string" ? data.lastName.trim() : "";
+  // El contrato actual guarda datos personales en `profile`; se conserva la
+  // lectura plana por compatibilidad con perfiles creados antes de ese cambio.
+  const profile =
+    typeof data.profile === "object" && data.profile !== null
+      ? (data.profile as Record<string, unknown>)
+      : {};
+  const first =
+    typeof profile.firstName === "string"
+      ? profile.firstName.trim()
+      : typeof data.firstName === "string"
+      ? data.firstName.trim()
+      : "";
+  const last =
+    typeof profile.lastName === "string"
+      ? profile.lastName.trim()
+      : typeof data.lastName === "string"
+      ? data.lastName.trim()
+      : "";
   const full = `${first} ${last}`.trim();
 
   if (full !== "") return full;
@@ -319,6 +335,7 @@ void sendIncomingCallPush({
       callId: callRef.id,
       jobId: body.jobId,
       callerName,
+      callerRole: uid === clientId ? "Cliente" : "Trabajador",
     }).catch((error: unknown) => {
       console.error(`No se pudo enviar el push de llamada a ${calleeId}:`, error);
     });

@@ -1,19 +1,20 @@
-% =====================================================================
+﻿% =====================================================================
 % DERCAS - PaTodo
 % Documento de Especificaciones, Requerimientos y Criterios de
 % Aceptacion de Software
 % Compilacion: pdflatex main.tex  (dos veces para el indice)
 % =====================================================================
-\documentclass[12pt,a4paper]{article}
+\documentclass[doc,12pt,a4paper]{apa7}
 
 % --- Codificacion e idioma -----------------------------------------
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[spanish,es-nodecimaldot]{babel}
 \usepackage{lmodern}
+\usepackage{newtx}                  % fuente Times (APA 7)
 
-% --- Pagina y margenes ---------------------------------------------
-\usepackage[a4paper,left=3cm,right=2.5cm,top=3cm,bottom=2.5cm]{geometry}
+% --- Pagina y margenes (APA 7: 1 pulgada por lado) ------------------
+\geometry{a4paper, margin=1in}
 
 % --- Paquetes de apoyo ---------------------------------------------
 \usepackage{array}
@@ -25,8 +26,6 @@
 \usepackage{graphicx}
 \usepackage{caption}
 \usepackage{enumitem}
-\usepackage{fancyhdr}
-\usepackage{titlesec}
 \usepackage{xcolor}
 \usepackage{colortbl}
 \usepackage{hyperref}
@@ -67,19 +66,22 @@
   pdfauthor={Equipo de Desarrollo PaTodo}
 }
 
-% --- Encabezado y pie ----------------------------------------------
-\pagestyle{fancy}
-\fancyhf{}
-\setlength{\headheight}{14.6pt}
-\fancyhead[L]{\small DERCAS -- PaTodo}
-\fancyhead[R]{\small \leftmark}
-\fancyfoot[C]{\thepage}
-\renewcommand{\headrulewidth}{0.4pt}
+% --- APA 7: interlineado doble, sangria y alineacion ----------------
+\linespread{1.655}                   % interlineado doble
+\setlength{\parindent}{0.5in}        % sangria de 1.27 cm
+\raggedright                         % texto alineado a la izquierda
+\raggedbottom
+\setcounter{secnumdepth}{3}          % numeracion 1 / 1.1 / 1.1.1
 
-% --- Títulos de sección --------------------------------------------
-\titleformat{\section}{\normalfont\Large\bfseries}{\thesection}{0.6em}{}
-\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
-\titleformat{\subsubsection}{\normalfont\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
+% Espaciado (APA 7) alrededor de los titulos (aprox. una linea en blanco)
+\makeatletter
+\b@level@one@skip=24pt plus 6pt minus 3pt
+\e@level@one@skip=12pt plus 4pt minus 2pt
+\b@level@two@skip=24pt plus 6pt minus 3pt
+\e@level@two@skip=12pt plus 4pt minus 2pt
+\b@level@three@skip=24pt plus 6pt minus 3pt
+\e@level@three@skip=12pt plus 4pt minus 2pt
+\makeatother
 
 % --- Listas ---------------------------------------------------------
 \setlist[itemize]{leftmargin=*,itemsep=2pt,topsep=3pt}
@@ -91,46 +93,47 @@
 \setlength{\tabcolsep}{5pt}
 \newenvironment{casos}{\small}{\normalsize}
 
-\captionsetup[figure]{labelformat=empty}
-\captionsetup{font=small}
+% Figuras APA 7: rotulo en negrita y titulo en cursiva, debajo
+\captionsetup[figure]{labelfont=bf,textfont=it,labelsep=newline}
 
 % --- Página de título ----------------------------------------------
 \begin{document}
 
-\begin{titlepage}
-\centering
-\vspace*{1.5cm}
+% =====================================================================
+% Portada (APA 7)
+% =====================================================================
+\title{Sistema de gestión de servicios bajo demanda (PaTodo)\par
+Documento de Especificaciones, Requerimientos y Criterios de Aceptación de Software (DERCAS)}
+\shorttitle{DERCAS -- PaTodo}
+\author{Equipo de Desarrollo de Sistemas --- PaTodo}
+\authorsaffiliations{Departamento de Desarrollo de Sistemas}
 
-{\Large\bfseries SISTEMA DE GESTIÓN DE SERVICIOS BAJO DEMANDA\\[0.3em] PaTodo\par}
+\maketitle
+\thispagestyle{otherpage}
 
-\vspace{1.2cm}
-
-{\large Documento de Especificaciones, Requerimientos y Criterios de\\
-Aceptación de Software --- DERCAS\par}
-
-\vspace{0.8cm}
-
-{\normalsize Departamento de Desarrollo de Sistemas\par}
-\vspace{0.3cm}
-{\normalsize PaTodo --- Servicios bajo demanda\par}
-
-\vfill
-
-\begin{tabular}{|P{4.2cm}|L{9.5cm}|}
-\hline
-\textbf{Proyecto} & PaTodo: plataforma que conecta clientes con trabajadores cercanos para la contratación de servicios generales, del hogar y de emergencias. \\ \hline
-\textbf{Versión del documento} & 1.0 \\ \hline
-\textbf{Fecha} & Octubre de 2026 \\ \hline
-\textbf{Estado} & En producción (API REST, frontend web y reglas de seguridad desplegadas) \\ \hline
-\textbf{Elaborado por} & Equipo de Desarrollo de Sistemas --- PaTodo \\ \hline
-\textbf{Fuente de verdad} & \texttt{spec/openapi.yaml} y \texttt{spec/schemas/} (Especificación OpenAPI 3 y JSON Schemas) \\ \hline
+% Información documental (control de versiones de la DERCAS)
+\vspace*{2\baselineskip}
+\noindent
+\begin{tabular}{@{}P{4.2cm} L{9.5cm}@{}}
+\toprule
+\textbf{Proyecto} & PaTodo: plataforma que conecta clientes con trabajadores cercanos para la contratación de servicios generales, del hogar y de emergencias. \\
+\midrule
+\textbf{Versión del documento} & 1.0 \\
+\midrule
+\textbf{Fecha} & Octubre de 2026 \\
+\midrule
+\textbf{Estado} & En producción (API REST, frontend web y reglas de seguridad desplegadas) \\
+\midrule
+\textbf{Elaborado por} & Equipo de Desarrollo de Sistemas --- PaTodo \\
+\midrule
+\textbf{Fuente de verdad} & \texttt{spec/openapi.yaml} y \texttt{spec/schemas/} (Especificación OpenAPI 3 y JSON Schemas) \\
+\bottomrule
 \end{tabular}
 
-\vfill
-\end{titlepage}
+\newpage
 
 % --- Índice ---------------------------------------------------------
-\tableofcontents
+{\linespread{0.96}\selectfont\tableofcontents}
 \newpage
 
 % =====================================================================
@@ -251,7 +254,7 @@ El desarrollo se apoya, además, en un modelo de desarrollo orientado a especifi
 
 
 
-Cliente (\texttt{client}) & Usuario que contrata servicios. Publica trabajos, revisa las ofertas recibidas, acepta o rechaza ofertas, cancela trabajos no finalizados, conversa con el trabajador asignado, sigue su ubicación, finaliza el trabajo y califica al profesional. \\ \hline
+Cliente (\texttt{client}) & Usuario que contrata servicios. Publica trabajos, revisa las ofertas recibidas, acepta la oferta que mejor le convenga, cancela trabajos no finalizados, conversa con el trabajador asignado, sigue su ubicación, finaliza el trabajo y califica al profesional. \\ \hline
 
 Trabajador (\texttt{worker}) & Usuario que ofrece servicios. Consulta los trabajos cercanos a su ubicación mediante búsqueda geográfica, calcula la ruta hacia el trabajo, envía ofertas, gestiona sus propias ofertas (editar o retirar), reporta su ubicación durante el trayecto, finaliza el trabajo y califica al cliente. \\ \hline
 
@@ -282,7 +285,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \textbf{Actores} & Cliente, Trabajador, API REST \\ \hline
 \textbf{Entradas} & Correo electrónico, contraseña, o credenciales de Google; nombre, teléfono y rol seleccionado. \\ \hline
 \textbf{Salidas} & Sesión iniciada con ID token; documento de usuario creado; Custom Claim \texttt{role} asignado. \\ \hline
-\textbf{Especificaciones de funcionamiento} & El registro y el inicio de sesión se resuelven directamente contra Firebase Authentication desde el cliente. La creación del perfil se realiza mediante \texttt{POST /createUser}, que valida que el \texttt{uid} y el correo coincidan con los del token, crea el documento de usuario y asigna el rol como \textit{Custom Claim}. Al finalizar, el cliente debe refrescar su ID token (\texttt{getIdToken(true)}) para que el rol viaje en las peticiones. Los usuarios previos a la assignment del rol se actualizan con la utilidad de sincronización de claims. \\ \hline
+\textbf{Especificaciones de funcionamiento} & El registro y el inicio de sesión se resuelven directamente contra Firebase Authentication desde el cliente. La creación del perfil se realiza mediante \texttt{POST /createUser}, que valida que el \texttt{uid} y el correo coincidan con los del token, crea el documento de usuario y asigna el rol como \textit{Custom Claim}. Al finalizar, el cliente debe refrescar su ID token (\texttt{getIdToken(true)}) para que el rol viaje en las peticiones. Los usuarios previos a la asignación del rol se actualizan con la utilidad de sincronización de claims. \\ \hline
 \textbf{Restricciones adicionales} & Un usuario no puede publicar trabajos con el rol \texttt{worker} ni enviar ofertas con el rol \texttt{client}. No puede crearse un segundo perfil para el mismo \texttt{uid}. El teléfono es obligatorio para completar el perfil. \\ \hline
 \end{longtable}
 
@@ -394,7 +397,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \textbf{Actores} & Cliente, Trabajador, API REST \\ \hline
 \textbf{Entradas} & \texttt{jobId} para iniciar; \texttt{callId}, estado final y duración para finalizar. Mensajes de señalización (oferta, respuesta, candidatas de conexión, colgado). \\ \hline
 \textbf{Salidas} & Sesión de llamada creada con identificador, contraparte, servidores de conexión y ruta de señalización; historial de llamadas con estado, duración y tipo de relevo de medios. \\ \hline
-\textbf{Especificaciones de funcionamiento} & La solicitud de sesión se procesa mediante \texttt{POST /createVoiceSession}, que valida que el trabajo exista, se encuentre aceptado o en curso, que el llamante sea el cliente o el trabajador del trabajo y que ninguno esté suspendido. La API registra la llamada en estado \textit{lamiendo} y toma un cerrojo transaccional por trabajo, devolviendo al cliente los servidores de conexión con credenciales de tiempo limitado. La señalización (oferta, respuesta y candidatas de conexión) la escriben los dos participantes en los documentos de la llamada. Al finalizar, \texttt{POST /endVoiceCall} valida que el llamante sea parte de la llamada y que la transición de estado sea válida, escribe el desenlace y elimina la señalización y el cerrojo. \\ \hline
+\textbf{Especificaciones de funcionamiento} & La solicitud de sesión se procesa mediante \texttt{POST /createVoiceSession}, que valida que el trabajo exista, se encuentre aceptado o en curso, que el llamante sea el cliente o el trabajador del trabajo y que ninguno esté suspendido. La API registra la llamada en estado \textit{llamando} y toma un cerrojo transaccional por trabajo, devolviendo al cliente los servidores de conexión con credenciales de tiempo limitado. La señalización (oferta, respuesta y candidatas de conexión) la escriben los dos participantes en los documentos de la llamada. Al finalizar, \texttt{POST /endVoiceCall} valida que el llamante sea parte de la llamada y que la transición de estado sea válida, escribe el desenlace y elimina la señalización y el cerrojo. \\ \hline
 \textbf{Restricciones adicionales} & Solo puede existir una llamada activa por trabajo: un segundo intento concurrente se rechaza con conflicto. No se permiten llamadas a números telefónicos; el audio se establece directamente entre los participantes y \textbf{nunca} se almacena. El audio viaja cifrado. Las llamadas entrantes en segundo plano solo están soportadas en Android; en iOS quedan fuera de la primera versión. Una llamada que no se atiende dentro del tiempo de espera configurado se cierra automáticamente como perdida y libera el cerrojo. \\ \hline
 \end{longtable}
 
@@ -410,6 +413,20 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \textbf{Salidas} & Trabajo en estado \texttt{completed}; reseña registrada; calificación promedio y número de reseñas actualizados en el perfil del evaluado; notificación a la contraparte. \\ \hline
 \textbf{Especificaciones de funcionamiento} & La finalización se ejecuta mediante \texttt{POST /completeJob}, en una transacción que valida que el llamante sea el cliente o el trabajador asignado y que el trabajo esté aceptado. La calificación se registra mediante \texttt{POST /createReview}, que valida que el autor sea participante del trabajo, que el trabajo esté completado y que el autor no haya calificado previamente ese mismo trabajo; escribe la reseña, recalcula la calificación promedio y el conteo del perfil del evaluado y genera la notificación correspondiente. \\ \hline
 \textbf{Restricciones adicionales} & Solo los participantes de un trabajo completado pueden calificar, y una sola vez por trabajo y por persona. Las reseñas son inmutables: no pueden modificarse ni eliminarse. La calificación influye directamente en la reputación del profesional. \\ \hline
+\end{longtable}
+
+% ---------------------------------------------------------------------
+\subsection{Pago simulado del trabajo}
+
+\begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\hline
+\textbf{Nombre} & Pago simulado del trabajo \\ \hline
+\textbf{Descripción} & Cuando el trabajo está aceptado, en ejecución o completado, el cliente registra el pago del servicio mediante un módulo demostrativo que no mueve dinero real. \\ \hline
+\textbf{Actores} & Cliente, API REST \\ \hline
+\textbf{Entradas} & \texttt{jobId} y método de pago (\texttt{demo\_card}, \texttt{demo\_cash} o \texttt{demo\_bank}). \\ \hline
+\textbf{Salidas} & Documento de pago en estado \texttt{pagado} con la marca \texttt{isDemo}, asociado al trabajo; comisión de plataforma y pago neto calculados; notificación al trabajador. \\ \hline
+\textbf{Especificaciones de funcionamiento} & El pago se registra mediante \texttt{POST /createPayment}, que valida que el llamante sea el cliente dueño del trabajo, que exista un trabajador asignado y que el estado del trabajo permita el pago. En una transacción calcula el monto a partir del precio de la oferta aceptada o del precio propuesto, aplica la comisión de plataforma del 10 \% para obtener el pago neto, crea el pago con estado \texttt{pagado} y la marca \texttt{isDemo}, lo asocia al trabajo y notifica al trabajador. \\ \hline
+\textbf{Restricciones adicionales} & El módulo es demostrativo: no procesa tarjetas reales ni transfiere dinero. Solo el cliente dueño del trabajo puede pagarlo, y un trabajo ya pagado rechaza un segundo intento. \\ \hline
 \end{longtable}
 
 % ---------------------------------------------------------------------
@@ -454,6 +471,15 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \includegraphics[width=0.72\textwidth]{figuras/registro-y-autenticacion.png}
     \captionof{figure}{Diagrama de flujo del proceso de registro y autenticación de un usuario.}
     \label{fig:registro}
+\end{figure}
+
+\subsection{Configuración del catálogo de servicios}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-catalogo.png}
+    \captionof{figure}{Diagrama de flujo del proceso de mantenimiento del catálogo de categorías y habilidades. La lectura es pública y la escritura corresponde al administrador.}
+    \label{fig:catalogo}
 \end{figure}
 
 \subsection{Publicación de un trabajo}
@@ -501,6 +527,31 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \label{fig:ejecucion}
 \end{figure}
 
+\subsection{Conversación y coordinación}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-conversacion.png}
+    \captionof{figure}{Diagrama de flujo del proceso de mensajería entre cliente y trabajador dentro de la conversación del trabajo.}
+    \label{fig:conversacion}
+\end{figure}
+
+\subsection{Llamada de voz entre las partes}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-llamada-voz-1.png}
+    \captionof{figure}{Diagrama de flujo de la solicitud y el establecimiento de una llamada de voz.}
+    \label{fig:llamada1}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-llamada-voz-2.png}
+    \captionof{figure}{Diagrama de flujo del cierre de la llamada de voz y la actualización del historial.}
+    \label{fig:llamada2}
+\end{figure}
+
 \subsection{Finalización y calificación}
 
 \begin{figure}[H]
@@ -508,6 +559,33 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \includegraphics[width=0.72\textwidth]{figuras/finalizacion-y-calificacion.png}
     \captionof{figure}{Diagrama de flujo del proceso de finalización del trabajo y calificación de las partes.}
     \label{fig:finalizacion}
+\end{figure}
+
+\subsection{Pago simulado del trabajo}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-pago.png}
+    \captionof{figure}{Diagrama de flujo del registro del pago simulado del trabajo y de las validaciones que lo acompañan.}
+    \label{fig:pago}
+\end{figure}
+
+\subsection{Notificaciones}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-notificaciones.png}
+    \captionof{figure}{Diagrama de flujo de la creación, la entrega y la lectura de una notificación.}
+    \label{fig:notificaciones}
+\end{figure}
+
+\subsection{Administración del sistema}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth, height=0.78\textheight, keepaspectratio]{figuras/flujo-administracion.png}
+    \captionof{figure}{Diagrama de flujo de una operación administrativa y de las verificaciones de autorización que la preceden.}
+    \label{fig:administracion}
 \end{figure}
 
 \subsection{Flujo general del sistema}
@@ -523,8 +601,8 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.62\textwidth]{figuras/ciclo-de-vida-del-trabajo.png}
-    \captionof{figure}{Diagrama del ciclo de vida de un trabajo: pendiente, aceptado, completado o cancelado.}
+    \includegraphics[width=0.72\textwidth, height=0.75\textheight, keepaspectratio]{figuras/ciclo-de-vida-del-trabajo.png}
+    \captionof{figure}{Diagrama del ciclo de vida de un trabajo: pendiente, aceptado, en ejecución, completado o cancelado, y los pasos posteriores de pago y calificación.}
     \label{fig:ciclo}
 \end{figure}
 
@@ -535,58 +613,97 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 
 \subsection{Diagrama de casos de uso del sistema}
 
+El sistema se representa en cuatro diagramas, uno por actor: cliente,
+trabajador, ambos y administrador. Cada caso de uso se dibuja en una sola
+columna para que las líneas de asociación no se crucen sobre los óvalos, y
+los casos compartidos por más de un rol aparecen en el diagrama de cada uno
+de ellos.
+
 \begin{figure}[H]
 \centering
-\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[node distance=2.5cm,font=\small]
-    % Actores (alineados a la izquierda)
-    \node[actor] (cliente) at (0, 7.5) {Cliente};
-    \node[actor] (trabajador) at (0, 3.5) {Trabajador};
-    \node[actor] (ambos) at (0, -1.0) {Ambos};
-    \node[actor] (admin) at (0, -8.0) {Administrador};
+    \node[actor] (cliente) at (0, 0) {Cliente};
 
-    % UCs de Cliente y Trabajador (Centro, x=6.5)
-    \node[usecase] (cu4) at (6.5, 8.5) {UC-04 Publicar trabajo};
-    \node[usecase] (cu6) at (6.5, 7.0) {UC-06 Cancelar trabajo};
-    \node[usecase] (cu7) at (6.5, 5.5) {UC-07 Completar trabajo};
-    \node[usecase] (cu9) at (6.5, 4.0) {UC-09 Aceptar oferta};
-    \node[usecase] (cu12) at (6.5, 2.5) {UC-12 Crear reseña};
-    \node[usecase] (cu15) at (6.5, 1.0) {UC-15 Iniciar llamada};
-    \node[usecase] (cu16) at (6.5, -0.5) {UC-16 Finalizar llamada};
-    \node[usecase] (cu10) at (6.5, -2.0) {UC-10 Calcular ruta prev.};
-    \node[usecase] (cu11) at (6.5, -3.5) {UC-11 Calcular ruta of.};
+    \node[usecase] (cu4) at (7.0, 6.4) {UC-04 Publicar trabajo};
+    \node[usecase] (cu6) at (7.0, 4.8) {UC-06 Cancelar trabajo};
+    \node[usecase] (cu9) at (7.0, 3.2) {UC-09 Aceptar oferta};
+    \node[usecase] (cu7) at (7.0, 1.6) {UC-07 Completar trabajo};
+    \node[usecase] (cu11) at (7.0, 0.0) {UC-11 Calcular ruta oficial};
+    \node[usecase] (cu12) at (7.0, -1.6) {UC-12 Crear reseña};
+    \node[usecase] (cu13) at (7.0, -3.2) {UC-13 Seguimiento y chat};
+    \node[usecase] (cu15) at (7.0, -4.8) {UC-15 Iniciar llamada};
+    \node[usecase] (cu16) at (7.0, -6.4) {UC-16 Finalizar llamada};
 
-    % UCs de Ambos y Admin (Derecha, x=13.0)
-    \node[usecase] (cu1) at (13.0, 7.5) {UC-01 Registro/Login};
-    \node[usecase] (cu2) at (13.0, 6.0) {UC-02 Crear perfil};
-    \node[usecase] (cu3) at (13.0, 4.5) {UC-03 Refrescar token};
-    \node[usecase] (cu5) at (13.0, 3.0) {UC-05 Buscar cercanos};
-    \node[usecase] (cu8) at (13.0, 1.5) {UC-08 Enviar oferta};
-    \node[usecase] (cu13) at (13.0, 0.0) {UC-13 Chat};
-    \node[usecase] (cu14) at (13.0, -1.5) {UC-14 Notificaciones};
-    
-    \node[usecase] (cu17) at (13.0, -4.0) {UC-17 Panel métricas};
-    \node[usecase] (cu18) at (13.0, -5.5) {UC-18 Gestionar usuarios};
-    \node[usecase] (cu19) at (13.0, -7.0) {UC-19 Cambiar rol};
-    \node[usecase] (cu20) at (13.0, -8.5) {UC-20 Promover admin};
-    \node[usecase] (cu21) at (13.0, -10.0) {UC-21 Suspender/activar};
-    \node[usecase] (cu22) at (13.0, -11.5) {UC-22 Verificar prof.};
-    \node[usecase] (cu23) at (13.0, -13.0) {UC-23 Mantener catálogo};
-    \node[usecase] (cu24) at (13.0, -14.5) {UC-24 Auditoría};
+    \node[draw,fit=(cu4)(cu16),inner sep=12pt,label=above:{\textbf{PaTodo}}] (sis1) {};
 
-    % Límite del sistema
-    \node[draw,fit=(cu4)(cu24),inner sep=18pt,label=above:{\textbf{PaTodo}}] (sis) {};
-
-    % Relaciones (Usando out/in para no cruzar tanto)
-    \foreach \a in {cu4,cu6,cu7,cu9,cu12,cu15,cu16} \draw[flowarrow] (cliente.east) to[out=0,in=180] (\a.west);
-    \foreach \a in {cu5,cu8,cu10,cu15,cu16} \draw[flowarrow] (trabajador.east) to[out=0,in=180] (\a.west);
-    \foreach \a in {cu1,cu2,cu3,cu4,cu5,cu8,cu13,cu14} \draw[flowarrow] (ambos.east) to[out=0,in=180] (\a.west);
-    \foreach \a in {cu17,cu18,cu19,cu20,cu21,cu22,cu23,cu24} \draw[flowarrow] (admin.east) to[out=0,in=180] (\a.west);
-\end{tikzpicture}}%
-\captionof{figure}{Diagrama de casos de uso del sistema.}
-\label{fig:casosdeuso}
+    \foreach \a in {cu4,cu6,cu9,cu7,cu11,cu12,cu13,cu15,cu16} \draw[flowarrow] (cliente.east) to[out=0,in=180] (\a.west);
+\end{tikzpicture}
+\captionof{figure}{Diagrama de casos de uso del cliente: publica trabajos, gestiona las ofertas recibidas, da seguimiento, finaliza y califica.}
+\label{fig:casosdeuso-cliente}
 \end{figure}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=2.5cm,font=\small]
+    \node[actor] (trabajador) at (0, 0) {Trabajador};
+
+    \node[usecase] (cu5) at (7.5, 6.4) {UC-05 Buscar cercanos};
+    \node[usecase] (cu8) at (7.5, 4.8) {UC-08 Enviar oferta};
+    \node[usecase] (cu10) at (7.5, 3.2) {UC-10 Calcular ruta previa};
+    \node[usecase] (cu11) at (7.5, 1.6) {UC-11 Calcular ruta oficial};
+    \node[usecase] (cu7) at (7.5, 0.0) {UC-07 Completar trabajo};
+    \node[usecase] (cu12) at (7.5, -1.6) {UC-12 Crear reseña};
+    \node[usecase] (cu13) at (7.5, -3.2) {UC-13 Seguimiento y chat};
+    \node[usecase] (cu15) at (7.5, -4.8) {UC-15 Iniciar llamada};
+    \node[usecase] (cu16) at (7.5, -6.4) {UC-16 Finalizar llamada};
+
+    \node[draw,fit=(cu5)(cu16),inner sep=12pt,label=above:{\textbf{PaTodo}}] (sis2) {};
+
+    \foreach \a in {cu5,cu8,cu10,cu11,cu7,cu12,cu13,cu15,cu16} \draw[flowarrow] (trabajador.east) to[out=0,in=180] (\a.west);
+\end{tikzpicture}
+\captionof{figure}{Diagrama de casos de uso del trabajador: busca trabajos cercanos, oferta, calcula la ruta, reporta avances y finaliza.}
+\label{fig:casosdeuso-trabajador}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=2.5cm,font=\small]
+    \node[actor] (ambos) at (0, 0) {Ambos};
+
+    \node[usecase] (cu1) at (7.5, 2.4) {UC-01 Registro / Inicio de sesión};
+    \node[usecase] (cu2) at (7.5, 0.8) {UC-02 Crear perfil};
+    \node[usecase] (cu3) at (7.5, -0.8) {UC-03 Refrescar token};
+    \node[usecase] (cu14) at (7.5, -2.4) {UC-14 Notificaciones};
+
+    \node[draw,fit=(cu1)(cu14),inner sep=12pt,label=above:{\textbf{PaTodo}}] (sis3) {};
+
+    \foreach \a in {cu1,cu2,cu3,cu14} \draw[flowarrow] (ambos.east) to[out=0,in=180] (\a.west);
+\end{tikzpicture}
+\captionof{figure}{Diagrama de casos de uso de sesión y notificación, comunes a cualquier usuario autenticado, sea cual sea su rol.}
+\label{fig:casosdeuso-sesion}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=2.5cm,font=\small]
+    \node[actor] (admin) at (0, 0) {Administrador};
+
+    \node[usecase] (cu17) at (7.5, 5.6) {UC-17 Panel de métricas};
+    \node[usecase] (cu18) at (7.5, 4.0) {UC-18 Gestionar usuarios};
+    \node[usecase] (cu19) at (7.5, 2.4) {UC-19 Cambiar rol};
+    \node[usecase] (cu20) at (7.5, 0.8) {UC-20 Promover / revocar admin};
+    \node[usecase] (cu21) at (7.5, -0.8) {UC-21 Suspender / activar};
+    \node[usecase] (cu22) at (7.5, -2.4) {UC-22 Verificar profesional};
+    \node[usecase] (cu23) at (7.5, -4.0) {UC-23 Mantener catálogo};
+    \node[usecase] (cu24) at (7.5, -5.6) {UC-24 Registro de auditoría};
+
+    \node[draw,fit=(cu17)(cu24),inner sep=12pt,label=above:{\textbf{PaTodo}}] (sis4) {};
+
+    \foreach \a in {cu17,cu18,cu19,cu20,cu21,cu22,cu23,cu24} \draw[flowarrow] (admin.east) to[out=0,in=180] (\a.west);
+\end{tikzpicture}
+\captionof{figure}{Diagrama de casos de uso de administración del sistema.}
+\label{fig:casosdeuso-admin}
+\end{figure}
 \subsection{Casos de uso del módulo de autenticación}
 
 \subsubsection{Caso de uso ``UC-01: Registrarse / Iniciar sesión''}
@@ -634,6 +751,26 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \textbf{Requerimientos especiales} & El identificador y el correo de la solicitud deben coincidir con los del token; de lo contrario se rechaza la operación. El teléfono es obligatorio. \\ \hline
 \textbf{Salida} & El documento de usuario creado con su rol, y las acciones del rol habilitadas. \\ \hline
 \textbf{Excepciones} & Perfil ya existente: el servicio responde \texttt{409} y la aplicación dirige al usuario a editar su perfil. \\ \hline
+\end{longtable}
+
+\subsubsection{Caso de uso ``UC-03: Refrescar token de identidad''}
+
+\begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\hline
+\textbf{Descripción} & El usuario renueva su token de identidad para que las reglas de seguridad y la API reconozcan su rol y sus privilegios actuales. \\ \hline
+\textbf{Actores primarios} & Cliente, Trabajador, Ambos, Administrador. \\ \hline
+\textbf{Contexto} & Inicio de sesión, creación o edición del perfil, cambio de rol, o después de un rechazo de escritura por permisos. \\ \hline
+\textbf{Condiciones previas} & El usuario debe tener una sesión iniciada. \\ \hline
+\textbf{Flujo básico} &
+\begin{enumerate}
+    \item La aplicación detecta que necesita un token vigente: al abrir la app, tras crear o editar el perfil, tras cambiar de rol, o cuando una escritura es rechazada con un error de permisos.
+    \item La aplicación solicita el refresco forzado del token al proveedor de autenticación.
+    \item El proveedor emite un token nuevo que incluye las declaraciones personalizadas actualizadas (rol y privilegio de administrador).
+    \item La aplicación utiliza el token nuevo en sus operaciones con Firestore y con la API REST.
+\end{enumerate} \\ \hline
+\textbf{Requerimientos especiales} & Las reglas de Firestore leen el rol del token, por lo que un token emitido antes de crear el perfil o de cambiar de rol no refleja los permisos vigentes y las escrituras se rechazan aunque el usuario esté autenticado. El refresco forzado es obligatorio después de esas operaciones. \\ \hline
+\textbf{Salida} & Token de identidad vigente con el rol y los privilegios actualizados. \\ \hline
+\textbf{Excepciones} & Sin conexión: se reintenta. Sesión revocada o expirada que no puede renovarse: la aplicación cierra la sesión y solicita autenticarse de nuevo. \\ \hline
 \end{longtable}
 
 % ---------------------------------------------------------------------
@@ -772,13 +909,13 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \item El servicio crea la conversación privada entre ambas partes en estado activa.
     \item El servicio notifica la asignación al trabajador y notifica al cliente.
 \end{enumerate} \\ \hline
-\textbf{Requerimientos Simultáneos} & La operación es atómica: si la transacción falla, ninguno de los cambios se aplica, evitando trabajos aceptados sin trabajador asignado. \\ \hline
+\textbf{Requerimientos especiales} & La operación es atómica: si la transacción falla, ninguno de los cambios se aplica, evitando trabajos aceptados sin trabajador asignado. \\ \hline
 \textbf{Salida} & Trabajo aceptado con trabajador asignado, conversación creada y notificaciones enviadas. \\ \hline
 \textbf{Excepciones} & El trabajo ya fue aceptado por otro usuario: la operación se rechaza por conflicto. El usuario no es el dueño del trabajo: se rechaza por permisos insuficientes. \\ \hline
 \end{longtable}
 
 % ---------------------------------------------------------------------
-\subsection{Casos de uso del módulo de rutas y seguimiento}
+\subsection{Casos de uso del módulo de rutas}
 
 \subsubsection{Caso de uso ``UC-10: Calcular ruta (vista previa)''}
 
@@ -823,6 +960,35 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \textbf{Excepciones} & El trabajo no está aceptado o el usuario no participa: se rechaza la operación. Falta de ubicación del trabajador: se rechaza indicando que debe actualizar su ubicación. \\ \hline
 \end{longtable}
 
+\subsection{Casos de uso del módulo de finalización}
+
+\subsubsection{Caso de uso ``UC-12: Crear reseña''}
+
+\begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\hline
+\textbf{Descripción} & Tras completar el trabajo, el cliente y el trabajador califican mutuamente el servicio prestado. \\ \hline
+\textbf{Actores primarios} & Cliente, Trabajador. \\ \hline
+\textbf{Contexto} & Detalle de un trabajo completado. \\ \hline
+\textbf{Condiciones previas} & El trabajo debe estar completado y el usuario debe haber participado en él sin haber publicado ya una reseña. \\ \hline
+\textbf{Flujo básico} &
+\begin{enumerate}
+    \item El usuario abre el detalle de un trabajo completado y selecciona la opción de calificar.
+    \item El usuario asigna una puntuación de una a cinco estrellas.
+    \item Opcionalmente, el usuario escribe un comentario.
+    \item La aplicación envía la calificación al servicio REST.
+    \item El servicio verifica la participación, el estado del trabajo y que no exista ya una reseña del mismo autor para ese trabajo.
+    \item El servicio registra la reseña, recalcula la calificación promedio y el número de reseñas del perfil del evaluado.
+    \item El servicio notifica la nueva reseña a la contraparte.
+\end{enumerate} \\ \hline
+\textbf{Requerimientos especiales} & La puntuación va de 1 a 5. Las reseñas son inmutables: una vez registradas no pueden modificarse ni eliminarse. \\ \hline
+\textbf{Salida} & Reseña registrada, calificación promedio del perfil actualizada y notificación a la contraparte. \\ \hline
+\textbf{Excepciones} & El usuario no participó en el trabajo, el trabajo no está completado o ya lo ha calificado previamente: se rechaza la operación indicando el motivo. \\ \hline
+\end{longtable}
+
+% ---------------------------------------------------------------------
+% ---------------------------------------------------------------------
+\subsection{Casos de uso del módulo de seguimiento y chat}
+
 \subsubsection{Caso de uso ``UC-13: Seguimiento en tiempo real y chat''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
@@ -846,32 +1012,33 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \end{longtable}
 
 % ---------------------------------------------------------------------
-\subsection{Casos de uso del módulo de finalización}
 
-\subsubsection{Caso de uso ``UC-12: Crear reseña''}
+\subsection{Casos de uso del módulo de notificaciones}
+
+\subsubsection{Caso de uso ``UC-14: Recibir y consultar notificaciones''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
 \hline
-\textbf{Descripción} & Tras completar el trabajo, el cliente y el trabajador califican mutuamente el servicio prestado. \\ \hline
+\textbf{Descripción} & El sistema avisa al usuario, mediante una notificación push y una entrada en su bandeja, sobre los eventos de los trabajos, ofertas, mensajes, reseñas, pagos y llamadas de voz en los que participa. \\ \hline
 \textbf{Actores primarios} & Cliente, Trabajador. \\ \hline
-\textbf{Contexto} & Detalle de un trabajo completado. \\ \hline
-\textbf{Condiciones previas} & El trabajo debe estar completado y el usuario debe haber participado en él sin haber publicado ya una reseña. \\ \hline
+\textbf{Actores secundarios} & API REST (emisora), Firebase Cloud Messaging (entrega push). \\ \hline
+\textbf{Contexto} & Bandeja de notificaciones; eventos generados por la API durante las operaciones transaccionales. \\ \hline
+\textbf{Condiciones previas} & El usuario debe tener sesión iniciada. Para recibir push es necesario que su perfil tenga al menos un token FCM registrado; sin tokens, el aviso queda únicamente en la bandeja. \\ \hline
 \textbf{Flujo básico} &
 \begin{enumerate}
-    \item El usuario abre el detalle de un trabajo completado y selecciona la opción de calificar.
-    \item El usuario asigna una puntuación de una a cinco estrellas.
-    \item Opcionalmente, el usuario escribe un comentario.
-    \item La aplicación envía la calificación al servicio REST.
-    \item El servicio verifica la participación, el estado del trabajo y que no exista ya una reseña del mismo autor para ese trabajo.
-    \item El servicio registra la reseña, recalcula la calificación promedio y el número de reseñas del perfil del evaluado.
-    \item El servicio notifica la nueva reseña a la contraparte.
+    \item Ocurre un evento para el usuario: nueva oferta en un trabajo publicado, oferta aceptada o rechazada, trabajo iniciado, completado o cancelado, mensaje nuevo, reseña recibida, pago registrado o llamada de voz entrante.
+    \item La API guarda el aviso en la colección \texttt{notifications} y envía el push por FCM a los tokens del usuario; la llamada entrante usa prioridad alta para que el teléfono la atienda de inmediato.
+    \item La aplicación muestra el aviso según su tipo y, en una llamada entrante, presenta la pantalla de llamada con la orientación correspondiente.
+    \item El usuario abre la notificación; la aplicación navega al recurso relacionado (trabajo, oferta, conversación o llamada) y marca el aviso como leído.
+    \item El usuario consulta el historial en su bandeja de notificaciones.
 \end{enumerate} \\ \hline
-\textbf{Requerimientos especiales} & La puntuación va de 1 a 5. Las reseñas son inmutables: una vez registradas no pueden modificarse ni eliminarse. \\ \hline
-\textbf{Salida} & Reseña registrada, calificación promedio del perfil actualizada y notificación a la contraparte. \\ \hline
-\textbf{Excepciones} & El usuario no participó en el trabajo, el trabajo no está completado o ya calificación previamente: se rechaza la operación indicando el motivo. \\ \hline
+\textbf{Requerimientos especiales} & Tipos soportados: \texttt{new\_offer}, \texttt{offer\_accepted}, \texttt{offer\_rejected}, \texttt{new\_message}, \texttt{job\_started}, \texttt{job\_completed}, \texttt{job\_cancelled}, \texttt{new\_review}, \texttt{payment\_received} y \texttt{voice\_call\_incoming}. La notificación es un efecto secundario de la transacción: si la entrega falla, el estado del trabajo o de la oferta ya quedó guardado y solo se registra el error. El push de llamada entrante se envía con prioridad alta y un TTL corto. \\ \hline
+\textbf{Salida} & Aviso visible en la bandeja y push entregado; el evento relacionado queda registrado en Firestore. \\ \hline
+\textbf{Excepciones} & El usuario no tiene tokens FCM: solo se guarda el aviso en la bandeja. Tokens inválidos o dados de baja: la API los elimina del perfil automáticamente. El dispositivo apagado o sin red: FCM reintenta la entrega según su política. \\ \hline
 \end{longtable}
 
 % ---------------------------------------------------------------------
+
 \subsection{Casos de uso del módulo de comunicación por voz}
 
 \subsubsection{Caso de uso ``UC-15: Iniciar llamada de voz''}
@@ -1081,6 +1248,7 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 
 \begin{figure}[H]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[x=1cm,y=0.85cm,font=\small]
     % Participantes
     \foreach \x/\name/\id in {0/Cliente/a,4.5/SDK\ cliente/b,9.0/Reglas\ de\ seguridad/c,13.5/Cloud\ Firestore/d}
@@ -1095,7 +1263,7 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \draw[-{Latex}] (9.0,-3.5) -- node[above,align=center,font=\scriptsize]{valida rol, suspensión y propiedad} (13.5,-3.5);
     \draw[dashed,-{Latex}] (13.5,-4.5) -- node[above,font=\scriptsize]{trabajo creado} (0,-4.5);
     \node[draw,rounded corners,align=center,font=\scriptsize,fill=red!8,text width=7cm] (err) at (6.75,-5.2) {Si falta el rol, la cuenta está suspendida o el identificador no coincide, las reglas rechazan la escritura.};
-\end{tikzpicture}
+\end{tikzpicture}}%
 \captionof{figure}{Secuencia de publicación de un trabajo con validación en las reglas de seguridad.}
 \label{fig:seq-publicacion}
 \end{figure}
@@ -1104,6 +1272,7 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 
 \begin{figure}[H]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[x=1cm,y=0.8cm,font=\small]
     \foreach \x/\name/\id in {0/Cliente/a,4.5/API\ REST/b,9.0/Cloud\ Firestore/c,13.5/Notificación\ push/d}
         \node[draw,rounded corners,fill=gray!12,minimum width=2.1cm,minimum height=0.8cm,align=center] (p\id) at (\x,0) {\name};
@@ -1118,7 +1287,7 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \draw[-{Latex}] (9.0,-5.5) -- node[above,font=\scriptsize]{confirma transacción} (4.5,-5.5);
     \draw[-{Latex}] (4.5,-6.5) -- node[above,font=\scriptsize]{envía aviso} (13.5,-6.5);
     \draw[-{Latex}] (4.5,-7.2) -- node[above,font=\scriptsize]{trabajo aceptado} (0,-7.2);
-\end{tikzpicture}
+\end{tikzpicture}}%
 \captionof{figure}{Secuencia de aceptación de oferta y asignación del trabajador.}
 \label{fig:seq-aceptacion}
 \end{figure}
@@ -1127,6 +1296,7 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 
 \begin{figure}[H]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[x=1cm,y=0.8cm,font=\small]
     \foreach \x/\name/\id in {0/Participante/a,4.5/API\ REST/b,9.0/Cloud\ Firestore/c,13.5/Perfil\ evaluado/d}
         \node[draw,rounded corners,fill=gray!12,minimum width=2.2cm,minimum height=0.8cm,align=center] (p\id) at (\x,0) {\name};
@@ -1140,7 +1310,7 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \draw[-{Latex}] (0,-3.5) -- node[above,font=\scriptsize]{califica (puntuación y reseña)} (4.5,-3.5);
     \draw[-{Latex}] (4.5,-4.5) -- node[above,font=\scriptsize]{valida y persiste} (9.0,-4.5);
     \draw[-{Latex}] (4.5,-5.5) -- node[above,font=\scriptsize]{recalcula promedio} (13.5,-5.5);
-\end{tikzpicture}
+\end{tikzpicture}}%
 \captionof{figure}{Secuencia de finalización del trabajo y creación de la reseña.}
 \label{fig:seq-finalizacion}
 \end{figure}
@@ -1149,6 +1319,7 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 
 \begin{figure}[H]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[x=1cm,y=0.8cm,font=\small]
     \foreach \x/\name/\id in {0/Trabajador/a,4.5/API\ REST/b,9.0/Búsqueda\ geo/c,13.5/Cloud\ Firestore/d}
         \node[draw,rounded corners,fill=gray!12,minimum width=2.2cm,minimum height=0.8cm,align=center] (p\id) at (\x,0) {\name};
@@ -1163,7 +1334,7 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \draw[-{Latex}] (13.5,-4.5) -- node[above,font=\scriptsize]{candidatos del área} (9.0,-4.5);
     \draw[-{Latex}] (9.0,-5.5) -- node[above,font=\scriptsize]{filtra por radio} (4.5,-5.5);
     \draw[-{Latex}] (4.5,-6.5) -- node[above,font=\scriptsize]{listado ordenado} (0,-6.5);
-\end{tikzpicture}
+\end{tikzpicture}}%
 \captionof{figure}{Secuencia de la búsqueda de trabajos cercanos por proximidad geográfica.}
 \label{fig:seq-busqueda}
 \end{figure}
@@ -1178,21 +1349,20 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[node distance=2.2cm, on grid, auto]
-    \node[startstop] (inicio) {Creado};
-    \node[process,below=of inicio] (pendiente) {Pendiente};
+    \node[startstop] (pendiente) {Pendiente};
     \node[process,below=of pendiente] (aceptado) {Aceptado};
-    \node[process,below=of aceptado] (ejecucion) {En ejecución};
-    \node[process,below=of ejecucion] (completado) {Completado\\{\scriptsize(final)}};
+    \node[process,below=of aceptado, xshift=-4.0cm] (ejecucion) {En ejecución\\{\scriptsize(prevista)}};
+    \node[process,below=of aceptado] (completado) {Completado\\{\scriptsize(final)}};
     \node[process,right=5.5cm of completado] (cancelado) {Cancelado\\{\scriptsize(final)}};
 
-    \draw[flowarrow] (inicio) -- (pendiente);
     \draw[flowarrow] (pendiente) -- node[right,align=center]{cliente acepta\\una oferta} (aceptado);
-    \draw[flowarrow] (pendiente) -| node[pos=0.75,above]{\scriptsize cancelado} (cancelado);
-    \draw[flowarrow] (aceptado) -- node[right,align=center]{\scriptsize ubicaciones} (ejecucion);
-    \draw[flowarrow] (ejecucion) -- (completado);
-    \draw[flowarrow] (aceptado) -- node[right,align=center]{\scriptsize cancelado} (cancelado);
+    \draw[flowarrow] (pendiente) -| node[pos=0.75,above]{\scriptsize cancelación} (cancelado);
+    \draw[flowarrow,dashed] (aceptado) -- node[left,align=center]{\scriptsize se inicia\\la ejecución} (ejecucion);
+    \draw[flowarrow] (ejecucion) -- node[below,align=center,font=\scriptsize]{finaliza} (completado);
+    \draw[flowarrow] (aceptado) -- node[right,align=center]{\scriptsize finaliza} (completado);
+    \draw[flowarrow] (aceptado) -- node[right,align=center]{\scriptsize cancela} (cancelado);
 \end{tikzpicture}
-\captionof{figure}{Diagrama de estados de un trabajo. Los estados finales son completado y cancelado.}
+\captionof{figure}{Diagrama de estados de un trabajo. Los estados finales son completado y cancelado. La transición hacia en ejecución está prevista en el esquema de datos, pero la API no la asigna automáticamente: un trabajo aceptado puede completarse directamente.}
 \label{fig:est-trabajo}
 \end{figure}
 
@@ -1221,8 +1391,7 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[node distance=3.8cm, on grid, auto]
-    \node[startstop] (inicio) {Solicitada};
-    \node[process,below=of inicio] (llamando) {Llamando};
+    \node[startstop] (llamando) {Llamando};
     \node[process,below=of llamando] (curso) {En curso};
     \node[process,below=of curso, xshift=-3.5cm] (perdida) {Perdida\\{\scriptsize(agota la espera)}};
     \node[process,below=of curso, xshift=0cm] (rechazada) {Rechazada};
@@ -1230,7 +1399,6 @@ Los diagramas de flujo describen la secuencia de decisiones y actividades de los
     \node[process,below=of curso, xshift=0cm, yshift=-2.5cm] (finalizada) {Finalizada\\{\scriptsize(colgar)}};
     \node[process,right=6.0cm of curso] (cancelada) {Cancelada};
 
-    \draw[flowarrow] (inicio) -- (llamando);
     \draw[flowarrow] (llamando) -- node[right,align=center]{\scriptsize la contraparte\\acepta} (curso);
     \draw[flowarrow] (llamando) -- node[left]{\scriptsize expira la espera} (perdida);
     \draw[flowarrow] (llamando) -- node[above,xshift=0.5cm]{\scriptsize rechaza} (rechazada);
@@ -1253,174 +1421,8 @@ principales y sus relaciones.
 
 \begin{figure}[H]
 \centering
-\resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[font=\scriptsize, node distance=1.0cm and 1.6cm]
-
-    % USUARIO
-    % USUARIOS (Centro-Izquierda)
-    \node[entity] (users) at (-5.5, 0) {
-        \begin{tabular}{|l|}
-        \hline
-        \rowcolor{blue!10} \textbf{USUARIOS} \\ \hline
-        \textit{uid (clave)} \\
-        email \\
-        role \\
-        estado de la cuenta \\
-        verificado \\
-        calificación promedio \\ \hline
-        \end{tabular}
-    };
-
-    % TRABAJO (Centro)
-    \node[entity] (jobs) at (0, 0) {
-        \begin{tabular}{|l|}
-        \hline
-        \rowcolor{green!12} \textbf{TRABAJOS} \\ \hline
-        \textit{id (clave)} \\
-        descripción \\
-        categoría \\
-        habilidades \\
-        ubicación \\
-        destino \\
-        precio propuesto \\
-        estado \\
-        ruta calculada \\ \hline
-        \end{tabular}
-    };
-
-    % OFERTA (Centro-Abajo)
-    \node[entity] (offers) at (0, -4.5) {
-        \begin{tabular}{|l|}
-        \hline
-        \rowcolor{orange!14} \textbf{OFERTAS} \\ \hline
-        \textit{id (clave)} \\
-        precio propuesto \\
-        tiempo estimado \\
-        estado \\
-        mensaje al cliente \\ \hline
-        \end{tabular}
-    };
-
-    % RESEÑA (Centro-Abajo-Abajo)
-    \node[entity] (reviews) at (0, -8.0) {
-        \begin{tabular}{|l|}
-        \hline
-        \rowcolor{purple!10} \textbf{RESEÑAS} \\ \hline
-        \textit{id (clave)} \\
-        puntuación (1--5) \\
-        comentario \\ \hline
-        \end{tabular}
-    };
-
-    % CONVERSACION (Centro-Arriba)
-    \node[entity] (convs) at (0, 4.5) {
-        \begin{tabular}{|l|}
-        \hline
-        \rowcolor{teal!12} \textbf{CONVERSACIONES} \\ \hline
-        \textit{id (clave)} \\
-        estado \\
-        participantes \\ \hline
-        \end{tabular}
-    };
-
-    % MENSAJES (Centro-Arriba-Arriba)
-    \node[entity] (msgs) at (0, 8.0) {
-        \begin{tabular}{|l|}
-        \hline
-        \rowcolor{teal!8} \textbf{MENSAJES} \\ \hline
-        \textit{id (clave)} \\
-        contenido \\
-        tipo \\
-        remitente \\ \hline
-        \end{tabular}
-    };
-
-    % NOTIFICACIONES (Centro-Derecha)
-    \node[entity] (notifs) at (5.5, 0) {
-        \begin{tabular}{|l|}
-        \hline
-        \rowcolor{gray!20} \textbf{NOTIFICACIONES} \\ \hline
-        \textit{id (clave)} \\
-        tipo \\
-        descripción \\
-        fecha de lectura \\ \hline
-        \end{tabular}
-    };
-
-    % CATALOGOS (Izquierda-Arriba)
-    \node[entity] (cats) at (-5.5, 4.5) {
-        \begin{tabular}{|l|}
-        \hline
-        \rowcolor{yellow!18} \textbf{CATEGORÍAS} \\ \hline
-        \textit{código (clave)} \\ \hline
-        \end{tabular}
-    };
-
-    \node[entity] (skills) at (-5.5, 8.0) {
-        \begin{tabular}{|l|}
-        \hline
-        \rowcolor{yellow!14} \textbf{HABILIDADES} \\ \hline
-        \textit{código (clave)} \\
-        nombre \\ \hline
-        \end{tabular}
-    };
-
-    % VEHICULOS (Izquierda-Abajo)
-    \node[entity] (vehis) at (-5.5, -4.5) {
-        \begin{tabular}{|l|}
-        \hline
-        \rowcolor{cyan!10} \textbf{VEHÍCULOS} \\ \hline
-        \textit{id (clave)} \\
-        tipo, marca, placa \\ \hline
-        \end{tabular}
-    };
-
-    % LLAMADAS (Derecha-Arriba)
-    \node[entity] (calls) at (5.5, 4.5) {
-        \begin{tabular}{|l|}
-        \hline
-        \rowcolor{red!10} \textbf{LLAMADAS} \\ \hline
-        \textit{id (clave)} \\
-        estado \\
-        duración \\
-        tipo de relevo \\ \hline
-        \end{tabular}
-    };
-
-    % ACTIVIDAD (Izquierda-Abajo-Abajo)
-    \node[entity] (act) at (-5.5, -8.0) {
-        \begin{tabular}{|l|}
-        \hline
-        \rowcolor{gray!15} \textbf{AUDITORÍA} \\ \hline
-        \textit{id (clave)} \\
-        acción \\ \hline
-        \end{tabular}
-    };
-
-    % Relaciones
-    % Relaciones
-    \draw[thick] (users) -- node[above,font=\scriptsize]{publica} (jobs);
-    \draw[thick] (users) -- node[below,sloped,font=\scriptsize]{envía} (offers);
-    \draw[thick] (jobs) -- node[right,font=\scriptsize]{recibe} (offers);
-    \draw[thick] (jobs) -- node[right,font=\scriptsize]{genera} (convs);
-    \draw[thick] (convs) -- node[right,font=\scriptsize]{contiene} (msgs);
-    \draw[thick] (users) -- node[above,sloped,font=\scriptsize]{escala} (reviews);
-    \draw[thick] (jobs) -- node[left,font=\scriptsize]{origina} (reviews);
-    \draw[thick] (jobs) -- node[above,font=\scriptsize]{origina} (calls);
-    
-    % Curva por debajo para evitar cruzar TRABAJOS
-    \draw[thick] (users.south east) to[out=-25,in=-155] node[below,font=\scriptsize]{recibe} (notifs.south west);
-    
-    \draw[thick] (cats) -- node[above,sloped,font=\scriptsize]{clasifica} (jobs);
-    \draw[thick] (cats) -- node[right,font=\scriptsize]{agrupa} (skills);
-    
-    % Curvas por la izquierda para evitar cruzar CATEGORÍAS y VEHÍCULOS
-    \draw[thick] (users.north west) to[out=135,in=225] node[left,font=\scriptsize]{requiere} (skills.south west);
-    \draw[thick] (users.south west) to[out=225,in=135] node[left,font=\scriptsize]{ejecuta} (act.north west);
-    
-    \draw[thick] (users) -- node[right,font=\scriptsize]{registra} (vehis);
-\end{tikzpicture}}%
-\captionof{figure}{Diagrama entidad-relación de PaTodo (modelo de documentos en la base de datos). Los atributos mostrados son los principales de cada entidad.}
+\includegraphics[width=\textwidth,height=0.92\textheight,keepaspectratio]{figuras/diagrama-er.png}
+\caption{Diagrama entidad-relación de PaTodo (modelo de documentos en Cloud Firestore). Los nombres de las entidades corresponden a las colecciones y los campos a los atributos principales; las relaciones indican referencias por identificador que las reglas de seguridad y la API mantienen consistentes (Firestore no impone claves foráneas). \texttt{messages} es subcolección de \texttt{conversations} y \texttt{tracking} (documento único \texttt{current}) de \texttt{jobs}.}
 \label{fig:er}
 \end{figure}
 
@@ -1619,7 +1621,7 @@ Funcionalidades de tiempo real, mensajería y notificaciones & Completado \\ \hl
 Interfaz web & Completado y publicado \\ \hline
 Interfaz móvil & En desarrollo \\ \hline
 Módulo de administración & Completado \\ \hline
-Comunicación de voz & En desarrollo \\ \hline
+Comunicación de voz & Backend completado y probado; interfaz móvil en desarrollo \\ \hline
 \end{longtable}
 
 % =====================================================================
@@ -1634,7 +1636,7 @@ especificaciones, requerimientos y criterios de aceptación del sistema PaTodo.
 
 \begin{center}
 \renewcommand{\arraystretch}{2.2}
-\begin{tabular}{|P{5.4cm}|P{5.4cm}|P{4.2cm}|}
+\begin{tabular}{|P{5.0cm}|P{5.0cm}|P{4.0cm}|}
 \hline
 \textbf{Nombre y puesto} & \textbf{Firma y sello} & \textbf{Fecha} \\ \hline
 \rule{0pt}{1.4cm} & & \\ \hline
@@ -1669,6 +1671,7 @@ técnica en \texttt{docs/}.}
 \hline
 \endfoot
 
+GET & \texttt{/} & Health check del servicio. \\ \hline
 POST & \texttt{/createUser} & Crea el perfil del usuario autenticado y asigna su rol. \\ \hline
 POST & \texttt{/acceptOffer} & Acepta una oferta: asigna al trabajador y abre la conversación. \\ \hline
 POST & \texttt{/cancelJob} & Cancela un trabajo pendiente o aceptado. \\ \hline
@@ -1704,8 +1707,11 @@ GET & \texttt{/admin/activityLog} & Registro de acciones administrativas. \\ \hl
 \endfoot
 
 Trabajo & \textit{Pendiente} $\rightarrow$ \textit{Aceptado} (al aceptar una oferta);
-\textit{Pendiente} $\rightarrow$ \textit{Cancelado}; \textit{Aceptado} $\rightarrow$ \textit{Completado};
+\textit{Pendiente} $\rightarrow$ \textit{Cancelado}; \textit{Aceptado} $\rightarrow$ \textit{En ejecución} (transición prevista en el esquema, hoy no se asigna automáticamente);
+\textit{Aceptado} $\rightarrow$ \textit{Completado}; \textit{En ejecución} $\rightarrow$ \textit{Completado};
 \textit{Aceptado} $\rightarrow$ \textit{Cancelado}. Los estados \textit{Completado} y \textit{Cancelado} son finales. \\ \hline
+
+Pago & \textit{Pagado} al registrarse el pago simulado del trabajo: único estado previsto, sin transiciones posteriores. \\ \hline
 
 Oferta & \textit{Pendiente} $\rightarrow$ \textit{Aceptada} (al aceptar el cliente esa oferta);
 \textit{Pendiente} $\rightarrow$ \textit{Rechazada} (al aceptar el cliente otra oferta);

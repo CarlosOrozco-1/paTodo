@@ -10,7 +10,7 @@ Las implementadas siguen el flujo SDD (primero `spec/`, luego `api/`).
 
 ## 1. Búsqueda de trabajos cercanos (geo) — PRIORIDAD 1 — ✔ implementado
 > **Estado:** implementado como `GET /jobs/nearby` (ver `spec/openapi.yaml` y
-> `docs/api-conexion.md` §5.2). El texto siguiente es el análisis original.
+> `docs/api/api-conexion.md` §5.2). El texto siguiente es el análisis original.
 
 ### Problema
 El core de PaTodo es "clientes publican trabajos, trabajadores cercanos ven los

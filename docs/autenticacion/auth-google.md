@@ -171,4 +171,4 @@ Estos mensajes NO son errores de la app ni del backend; se ignoran:
    de crear y que el `uid` del Google Sign-In coincide con el documento en
    `users/`.
 4. Recargar la página y reintentar (el bundle puede estar cacheado; usa el
-   `docs/web-actualizacion.md` para verificar la versión desplegada).
+   `docs/deploy/web-actualizacion.md` para verificar la versión desplegada).

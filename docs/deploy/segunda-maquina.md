@@ -77,7 +77,7 @@ con la API corriendo.
 Descargar desde Firebase Console:
 - `google-services.json` → `frontend-mobile/android/app/`
 - `GoogleService-Info.plist` → `frontend-mobile/ios/Runner/`
-   (ver `docs/api-conexion.md` §2 y `docs/firebase-setup.md`).
+   (ver `docs/api/api-conexion.md` §2 y `docs/firebase/firebase-setup.md`).
 
 ## 4. Firebase CLI / credenciales
 
@@ -138,7 +138,7 @@ Esto inicia sesión en Firebase y asocia la carpeta al proyecto `pa-todo`
 
    Tras promocionar a alguien como admin hay que **refrescar su token**
    (`getIdToken(true)`); el claim `role: admin` solo viaja en tokens nuevos.
-   Detalles: `docs/admin.md`.
+   Detalles: `docs/admin/admin.md`.
 
 ## 6. Desplegar (requiere credenciales)
 
@@ -147,7 +147,7 @@ Desde la raíz del repo, después de haber probado en local:
 ```bash
 npx firebase deploy --only firestore:rules          # tras tocar firestore.rules
 npx firebase deploy --only firestore:indexes        # tras tocar firestore.indexes.json
-npx firebase deploy --only hosting                  # web (ver docs/web-actualizacion.md)
+npx firebase deploy --only hosting                  # web (ver docs/deploy/web-actualizacion.md)
 ```
 
 La **API** se despliega sola en **Render** desde el repo (carpeta `api/`); los
@@ -158,7 +158,7 @@ conectada. No hace falta desplegar la API manualmente para trabajar en local.
 
 - Trabajar en `desa`; jamás subir `backup` (es local).
 - Probar integraciones ajenas en ramas temporales `integracion-*` antes de
-  tocar `desa`. Documentación completa: `docs/trabajo-git.md`.
+  tocar `desa`. Documentación completa: `docs/git/trabajo-git.md`.
 
 ## 8. Autodiagnóstico
 
@@ -171,9 +171,9 @@ conectada. No hace falta desplegar la API manualmente para trabajar en local.
 
 ## 9. Referencias
 
-- `docs/api-conexion.md` — URLs, división quién escribe qué, contratos.
-- `docs/ejecucion.md` — levantar servicios localmente.
-- `docs/reglas-firebase.md` — reglas por colección.
-- `docs/admin.md` — rol admin (crear, promover, revocar, probar).
-- `docs/web-actualizacion.md` — publicar la web.
-- `docs/trabajo-git.md` — flujo de ramas y rescate.
+- `docs/api/api-conexion.md` — URLs, división quién escribe qué, contratos.
+- `docs/deploy/ejecucion.md` — levantar servicios localmente.
+- `docs/firebase/reglas-firebase.md` — reglas por colección.
+- `docs/admin/admin.md` — rol admin (crear, promover, revocar, probar).
+- `docs/deploy/web-actualizacion.md` — publicar la web.
+- `docs/git/trabajo-git.md` — flujo de ramas y rescate.

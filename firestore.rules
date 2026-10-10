@@ -403,6 +403,7 @@ service cloud.firestore {
       // Los participantes solo pueden tocar lastMessage/lastReadAt; la identidad,
       // el estado y el snapshot los controla la API.
       allow update: if signedIn()
+                    && resource.data.status == 'active'
                     && request.auth.uid in resource.data.participants
                     && smallEnough()
                     && request.resource.data.diff(resource.data).affectedKeys()
@@ -420,12 +421,18 @@ service cloud.firestore {
         // Solo los participantes pueden crear mensajes, asignándose como senderId.
         allow create: if signedIn()
                       && smallEnough()
-                      && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
+                      && get(
+                        /databases/$(database)/documents/conversations/$(conversationId)
+                      ).data.status == 'active'
+                      && request.auth.uid in get(
+                        /databases/$(database)/documents/conversations/$(conversationId)
+                      ).data.participants
                       && request.resource.data.senderId == request.auth.uid;
 
         // Los mensajes no se editan ni se eliminan.
         allow update, delete: if false;
       }
+
     }
   }
 }

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { createHmac } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "../shared/admin";
 import { getAuthenticatedUser, requireAuth } from "../shared/auth";
@@ -7,6 +8,15 @@ import { distanceKm, geohashBoundsForRadius, MAX_SEARCH_RADIUS_KM } from "../sha
 import { sendNotificationSafely } from "../shared/notifications";
 
 export const jobsRouter = Router();
+
+const arrivalCodeFor = (jobId: string) => {
+  const secret = process.env.ARRIVAL_CODE_SECRET ?? "patodo-arrival-v1";
+  const value = createHmac("sha256", secret).update(`arrival:${jobId}`).digest("hex");
+  return String(parseInt(value.slice(0, 8), 16) % 1000000).padStart(6, "0");
+};
+
+const validVehicleUsed = (value: unknown): "car" | "motorcycle" | null =>
+  value === "car" || value === "motorcycle" ? value : null;
 
 /**
  * GET /jobs/nearby?lat=&lng=&radiusKm=&categoryId=&limit=
@@ -227,6 +237,117 @@ jobsRouter.post("/cancelJob", async (request, response) => {
   }
 });
 
+/** El cliente consulta el código cuando el trabajador se encuentra cerca. */
+jobsRouter.get("/jobs/:jobId/arrivalCode", async (request, response) => {
+  try {
+    const uid = await requireAuth(request);
+    const job = await db.collection("jobs").doc(request.params.jobId).get();
+    if (!job.exists) throw httpError(404, "not-found", "El trabajo no existe.");
+    const data = job.data()!;
+    if (data.clientId !== uid) {
+      throw httpError(403, "permission-denied", "Solo el cliente puede ver el código.");
+    }
+    if (data.status !== "accepted" && data.status !== "in_progress") {
+      throw httpError(412, "failed-precondition", "El trabajo no está activo.");
+    }
+    response.status(200).json({ code: arrivalCodeFor(job.id) });
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+/**
+ * POST /verifyArrivalCode
+ * El trabajador debe estar a 20 m o menos y presentar el código del cliente.
+ */
+jobsRouter.post("/verifyArrivalCode", async (request, response) => {
+  try {
+    const uid = await requireAuth(request);
+    const body = request.body as { jobId?: string; code?: string };
+    const jobId = body.jobId;
+    const code = body.code;
+    if (!jobId || !code) {
+      throw httpError(400, "invalid-argument", "Faltan jobId o código.");
+    }
+
+    const jobRef = db.collection("jobs").doc(jobId);
+    let clientId = "";
+    let jobTitle = "Trabajo";
+
+    await db.runTransaction(async (transaction) => {
+      const jobDoc = await transaction.get(jobRef);
+      if (!jobDoc.exists) throw httpError(404, "not-found", "El trabajo no existe.");
+      const job = jobDoc.data()!;
+      if (job.workerId !== uid) {
+        throw httpError(403, "permission-denied", "Solo el trabajador asignado puede verificar la llegada.");
+      }
+      if (job.status !== "accepted" && job.status !== "in_progress") {
+        throw httpError(412, "failed-precondition", "El trabajo no está activo.");
+      }
+      if (code.trim() !== arrivalCodeFor(jobDoc.id)) {
+        throw httpError(403, "permission-denied", "El código no es correcto.");
+      }
+
+      const workerDoc = await transaction.get(db.collection("users").doc(uid));
+      const jobPoint = job.location?.geopoint;
+      const workerPoint = workerDoc.data()?.location?.geopoint;
+      if (!jobPoint || !workerPoint) {
+        throw httpError(412, "failed-precondition", "No se pudo comprobar la ubicación del trabajador.");
+      }
+      const meters = distanceKm(
+        workerPoint.latitude,
+        workerPoint.longitude,
+        jobPoint.latitude,
+        jobPoint.longitude,
+      ) * 1000;
+      if (meters > 20) {
+        throw httpError(412, "failed-precondition", "Debes estar a 20 metros o menos del servicio.");
+      }
+
+      const conversations = await transaction.get(
+        db
+          .collection("conversations")
+          .where("jobId", "==", jobId)
+          .where("status", "==", "active"),
+      );
+      clientId = job.clientId;
+      jobTitle = job.details?.title ?? "Trabajo";
+      const vehicleUsed =
+        validVehicleUsed(workerDoc.data()?.availability?.activeVehicle) ??
+        validVehicleUsed(job.route?.vehicleUsed);
+      transaction.update(jobRef, {
+        status: "completed",
+        arrivalVerifiedAt: FieldValue.serverTimestamp(),
+        completedAt: FieldValue.serverTimestamp(),
+        vehicleUsed,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      transaction.update(workerDoc.ref, {
+        "stats.completedJobs": FieldValue.increment(1),
+        "availability.isOnline": false,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      conversations.forEach((conversation) => {
+        transaction.update(conversation.ref, {
+          status: "closed",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+    });
+
+    await sendNotificationSafely({
+      userId: clientId,
+      type: "job_completed",
+      title: "Servicio finalizado",
+      body: `El trabajador finalizó "${jobTitle}".`,
+      data: { jobId },
+    });
+    response.status(200).json({ id: jobId, status: "completed" });
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
 /**
  * POST /completeJob
  */
@@ -281,11 +402,16 @@ jobsRouter.post("/completeJob", async (request, response) => {
       const convSnapshot = await transaction.get(convQuery);
 
       const workerRef = db.collection("users").doc(workerId);
+      const workerDoc = await transaction.get(workerRef);
+      const vehicleUsed =
+        validVehicleUsed(workerDoc.data()?.availability?.activeVehicle) ??
+        validVehicleUsed(jobData.vehicleUsed);
 
       // ============ ESCRITURAS ============
       transaction.update(jobRef, {
         status: "completed",
         completedAt: FieldValue.serverTimestamp(),
+        vehicleUsed,
         updatedAt: FieldValue.serverTimestamp(),
       });
       transaction.delete(jobRef.collection("tracking").doc("current"));

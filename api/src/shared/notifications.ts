@@ -3,6 +3,7 @@ import { db, messaging } from "./admin";
 
 export type NotificationType =
   | "new_offer"
+  | "offer_received"
   | "offer_accepted"
   | "offer_rejected"
   | "new_message"
@@ -22,6 +23,8 @@ export interface NotificationPayload {
     jobId?: string;
     offerId?: string;
     conversationId?: string;
+    senderName?: string;
+    messagePreview?: string;
   };
 }
 
@@ -32,17 +35,25 @@ export interface NotificationPayload {
 async function pushToUser(
   userId: string,
   message: {
-    notification: { title: string; body: string };
+    notification?: { title: string; body: string };
     data: Record<string, string>;
     android?: { priority: "high" | "normal"; ttl?: number };
   }
 ): Promise<boolean> {
   const userDoc = await db.collection("users").doc(userId).get();
 
-  if (!userDoc.exists) return false;
+  if (!userDoc.exists) {
+    console.warn(`PUSH_SKIPPED_USER_NOT_FOUND: ${userId}`);
+    return false;
+  }
 
   const fcmTokens: string[] = userDoc.data()?.fcmTokens ?? [];
-  if (fcmTokens.length === 0) return false;
+  if (fcmTokens.length === 0) {
+    // DEV: el aviso ya quedó creado en Firestore; este log permite distinguir
+    // "sin token registrado" de un error real de FCM al depurar Render.
+    console.warn(`PUSH_SKIPPED_NO_DEVICE_TOKEN: ${userId}`);
+    return false;
+  }
 
   const pushResponse = await messaging.sendEachForMulticast({
     tokens: fcmTokens,
@@ -69,7 +80,13 @@ async function pushToUser(
     });
   }
 
-  return true;
+  const delivered = pushResponse.responses.filter((response) => response.success)
+    .length;
+  if (delivered === 0) {
+    console.warn(`PUSH_NOT_DELIVERED: ${userId}`);
+  }
+
+  return delivered > 0;
 }
 
 /**
@@ -99,6 +116,8 @@ export async function createAndSendNotification(
       jobId: payload.data?.jobId ?? "",
       offerId: payload.data?.offerId ?? "",
       conversationId: payload.data?.conversationId ?? "",
+      senderName: payload.data?.senderName ?? "",
+      messagePreview: payload.data?.messagePreview ?? "",
     },
   });
 
@@ -119,13 +138,14 @@ export async function createAndSendNotification(
  * Lo que NO puede hacer la API es abrir la pantalla: eso lo decide el
  * dispositivo. El equipo de desarrollo app debe declarar en AndroidManifest el
  * permiso USE_FULL_SCREEN_INTENT y crear el canal de notificación con
- * IMPORTANCE_HIGH (fase D en docs/llamadas-voz.md).
+ * IMPORTANCE_HIGH (fase D en docs/voz/llamadas-voz.md).
  */
 export async function sendIncomingCallPush(input: {
   userId: string;
   callId: string;
   jobId: string;
   callerName: string;
+  callerRole: "Cliente" | "Trabajador";
 }): Promise<void> {
   const title = "Llamada entrante";
   const body = `${input.callerName} te está llamando.`;
@@ -143,9 +163,12 @@ export async function sendIncomingCallPush(input: {
   });
 
   await pushToUser(input.userId, {
-    notification: { title, body },
     data: {
       type: "voice_call_incoming",
+      title,
+      body,
+      callerName: input.callerName,
+      callerRole: input.callerRole,
       jobId: input.jobId,
       callId: input.callId,
       direction: "incoming",
