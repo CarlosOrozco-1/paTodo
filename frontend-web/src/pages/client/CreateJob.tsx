@@ -50,9 +50,42 @@ export function CreateJob() {
   const [categoryId, setCategoryId] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [address, setAddress] = useState('');
+  
+  // Coordenadas dinámicas basadas en la dirección escrita (por defecto Ciudad de Guatemala)
+  const [coordinates, setCoordinates] = useState<[number, number]>([-90.5069, 14.6349]);
+
   const [price, setPrice] = useState('');
   const [priceType, setPriceType] = useState<'fixed' | 'negotiable'>('fixed');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Efecto para buscar las coordenadas en Mapbox cuando el usuario escribe la dirección
+  useEffect(() => {
+    const resolveCoordinates = async () => {
+      if (!address || address.trim().length < 3) return;
+      const token = import.meta.env.VITE_MAPBOX_TOKEN;
+      if (!token) return;
+
+      try {
+        const query = encodeURIComponent(`${address}, Guatemala`);
+        const res = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${token}&country=gt&limit=1`
+        );
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+          const [lng, lat] = data.features[0].center;
+          setCoordinates([lng, lat]);
+        }
+      } catch {
+        // Fallback silencioso en caso de error de red
+      }
+    };
+
+    const timer = setTimeout(() => {
+      resolveCoordinates();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [address]);
 
   useEffect(() => {
     const load = async () => {
@@ -153,7 +186,7 @@ export function CreateJob() {
       skillIds: selectedSkills,
     },
     location: {
-      coordinates: [-90.5069, 14.6349],
+      coordinates: coordinates, // Envía las coordenadas reales encontradas por el buscador
       address: address.trim(),
     },
     pricing: {
@@ -364,8 +397,8 @@ export function CreateJob() {
                   <JobLocationMap
                     origin={{
                       addressText: address || 'Ciudad de Guatemala',
-                      lat: 14.6349,
-                      lng: -90.5069,
+                      lat: coordinates[1], // Se actualiza dinámicamente con la búsqueda
+                      lng: coordinates[0], // Se actualiza dinámicamente con la búsqueda
                       label: `${address || 'Ubicación aproximada'}, Guatemala`,
                     }}
                     className="h-56 w-full rounded-2xl"

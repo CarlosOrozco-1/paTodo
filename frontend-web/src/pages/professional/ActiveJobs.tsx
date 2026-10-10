@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { 
   CheckCircle2, 
   MapPin, 
@@ -8,7 +8,7 @@ import {
   MessageSquare,
   Star,
   Navigation,
-  RotateCcw,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { offersService } from '@/api/offers.service';
@@ -33,7 +33,6 @@ import { cn } from '@/utils/cn';
 import { Modal } from '@/components/ui/Modal';
 import { ReviewForm } from '@/components/reviews/ReviewForm';
 import { reviewsService } from '@/api/reviews.service';
-import { InternalNavigator, type NavigatorDestination } from '@/components/ui/InternalNavigator';
 import { JobLocationMap } from '@/components/ui/JobLocationMap';
 import {
   publishJobTrackingPosition,
@@ -59,19 +58,21 @@ function distanceMeters(first: PublishedPosition, next: JobTrackingPosition): nu
 }
 
 export function ActiveJobs() {
+  const navigate = useNavigate();
   const { user, refreshProfile } = useAuthStore();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Estados para finalización con código PIN
+  const [jobToComplete, setJobToComplete] = useState<Job | null>(null);
+  const [securityCode, setSecurityCode] = useState('');
   const [completingId, setCompletingId] = useState<string | null>(null);
+  
   const [reviewJob, setReviewJob] = useState<Job | null>(null);
   const [reviewedJobIds, setReviewedJobIds] = useState<Set<string>>(new Set());
-  const [navigatingJobId, setNavigatingJobId] = useState<string | null>(null);
   
-  // Estados para destinos personalizados y buscador temporal
-  const [customDestinations, setCustomDestinations] = useState<Record<string, NavigatorDestination>>({});
-  const [destinationInputs, setDestinationInputs] = useState<Record<string, string>>({});
 
   const lastPublishedPositions = useRef(new Map<string, PublishedPosition>());
 
@@ -139,13 +140,21 @@ export function ActiveJobs() {
 
   const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
-  const handleComplete = async (jobId: string) => {
-    setCompletingId(jobId);
+  const confirmComplete = async () => {
+    if (!jobToComplete) return;
+    if (!securityCode.trim() || securityCode.length < 4) {
+      toast('error', 'Por favor ingresa un código de seguridad válido de 4 dígitos.');
+      return;
+    }
+
+    setCompletingId(jobToComplete.id);
     try {
-      const updated = await jobsService.complete(jobId);
-      setJobs((prev) => prev.map((j) => (j.id === jobId ? updated : j)));
+      const updated = await jobsService.complete(jobToComplete.id);
+      setJobs((prev) => prev.map((j) => (j.id === jobToComplete.id ? updated : j)));
+      setJobToComplete(null);
+      setSecurityCode('');
       setReviewJob(updated);
-      toast('success', '¡Excelente trabajo! Marcado como completado.');
+      toast('success', '¡Excelente trabajo! Código verificado y marcado como completado.');
     } catch (error) {
       toast('error', getErrorMessage(error));
     } finally {
@@ -218,20 +227,17 @@ export function ActiveJobs() {
             const canNavigate =
               job.workerId === user?.id &&
               ['accepted', 'assigned', 'in_progress'].includes(job.status);
+            
             const workerCoordinates =
               user?.location?.coordinates ??
               user?.availability.serviceArea.center?.coordinates;
 
-            // Destino original del trabajo
-            const originalDestination = {
+            const destination = {
               longitude: job.location.coordinates?.[0],
               latitude: job.location.coordinates?.[1],
               addressText: job.location.address,
               label: job.location.address || 'Destino del trabajo',
             };
-
-            const activeDestination = customDestinations[job.id] || originalDestination;
-            const hasCustomDest = Boolean(customDestinations[job.id]);
 
             return (
               <Card 
@@ -256,7 +262,9 @@ export function ActiveJobs() {
                             <Badge className={cn('text-[10px] font-semibold py-0.5 px-2', JOB_STATUS_STYLES[job.status])}>
                               {JOB_STATUS_LABELS[job.status] || job.status}
                             </Badge>
-                            <span className="text-xs text-gray-400">• {category?.name || 'General'}</span>
+                            <span className="text-xs text-gray-400">
+                              {category?.name || 'General'}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -284,102 +292,44 @@ export function ActiveJobs() {
                       {job.details.description}
                     </p>
 
-                    {/* Navegador GPS en vivo y buscador de destino personalizado */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-700">
                           <Navigation className="h-4 w-4 text-emerald-700" />
-                          {navigatingJobId === job.id
-                            ? 'Navegación GPS'
-                            : 'Ruta de desplazamiento'}
+                          Ruta de desplazamiento
                         </span>
 
                         {canNavigate && (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setNavigatingJobId((current) => current === job.id ? null : job.id)}
-                            className="h-8 shrink-0"
+                            onClick={() => navigate(`/profesional/navegacion/${job.id}`)}
+                            className="h-8 shrink-0 border-brand-200 text-brand-700 hover:bg-brand-50 hover:text-brand-800"
                           >
-                            {navigatingJobId === job.id ? 'Ocultar navegador' : 'Empezar ruta'}
+                            <Navigation className="h-3.5 w-3.5 mr-1.5" />
+                            Empezar ruta
                           </Button>
                         )}
                       </div>
-
-                      {/* Input de Buscador de Destino Alternativo con botón para limpiar */}
-                      {navigatingJobId === job.id && (
-                        <div className="flex gap-2 pt-1 items-center">
-                          <input
-                            type="text"
-                            placeholder="Buscar otro destino temporal (ej. Ferretería)..."
-                            value={destinationInputs[job.id] || ''}
-                            onChange={(e) => setDestinationInputs({ ...destinationInputs, [job.id]: e.target.value })}
-                            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-gray-300 focus:outline-none focus:border-brand-600"
-                          />
-                          <Button
-                            size="sm"
-                            className="text-xs bg-gray-900 text-white"
-                            onClick={() => {
-                              const val = destinationInputs[job.id];
-                              if (val) {
-                                setCustomDestinations({
-                                  ...customDestinations,
-                                  [job.id]: { addressText: val, label: val }
-                                });
-                                toast('success', 'Destino temporal actualizado');
-                              }
-                            }}
-                          >
-                            Ir
-                          </Button>
-
-                          {hasCustomDest && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 flex items-center gap-1"
-                              onClick={() => {
-                                const copy = { ...customDestinations };
-                                delete copy[job.id];
-                                setCustomDestinations(copy);
-                                setDestinationInputs({ ...destinationInputs, [job.id]: '' });
-                                toast('success', 'Destino restaurado al domicilio del cliente');
-                              }}
-                              title="Restaurar destino original del cliente"
-                            >
-                              <RotateCcw className="h-3.5 w-3.5" /> Restaurar
-                            </Button>
-                          )}
-                        </div>
-                      )}
                       
-                      {navigatingJobId === job.id && canNavigate ? (
-                        <InternalNavigator
-                          destination={activeDestination}
-                          onPositionUpdate={(position) => {
-                            void handlePositionUpdate(job.id, position);
-                          }}
-                          className="h-80 w-full"
-                        />
-                      ) : (
-                        <JobLocationMap
-                          origin={{
-                            ...(workerCoordinates
-                              ? { lng: workerCoordinates[0], lat: workerCoordinates[1] }
-                              : { addressText: user?.contact.address?.city || 'Ciudad de Guatemala' }),
-                            label: 'Tu ubicación (Origen)',
-                          }}
-                          destination={activeDestination}
-                          className="h-44 w-full"
-                        />
-                      )}
+                      {/* Vista previa estática del mapa en la tarjeta */}
+                      <JobLocationMap
+                        origin={{
+                          ...(workerCoordinates
+                            ? { lng: workerCoordinates[0], lat: workerCoordinates[1] }
+                            : { addressText: user?.contact.address?.city || 'Ciudad de Guatemala' }),
+                          label: 'Tu ubicación (Origen)',
+                        }}
+                        destination={destination}
+                        className="h-44 w-full rounded-xl border border-gray-100 overflow-hidden"
+                      />
                     </div>
 
                     <div className="grid gap-2 text-xs text-gray-500">
                       <div className="flex items-center gap-2 text-gray-700 font-medium">
                         <MapPin className="h-4 w-4 text-brand-600 shrink-0" />
                         <span className="truncate">
-                          {hasCustomDest ? `Destino temporal: ${activeDestination.addressText}` : (activeDestination.addressText || job.location.address || 'Dirección no especificada')}
+                          {destination.addressText || 'Dirección no especificada'}
                         </span>
                       </div>
                       
@@ -411,8 +361,10 @@ export function ActiveJobs() {
                         Contactar al cliente
                       </Link>
                       <Button
-                        onClick={() => handleComplete(job.id)}
-                        loading={completingId === job.id}
+                        onClick={() => {
+                          setJobToComplete(job);
+                          setSecurityCode('');
+                        }}
                         className="shadow-md shadow-emerald-600/20 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"
                       >
                         <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -446,6 +398,7 @@ export function ActiveJobs() {
         </div>
       )}
 
+      {/* --- CALIFICAR AL CLIENTE --- */}
       <Modal
         open={Boolean(reviewJob)}
         onClose={() => setReviewJob(null)}
@@ -457,6 +410,62 @@ export function ActiveJobs() {
           <ReviewForm onSubmit={handleReview} />
         </div>
       </Modal>
+
+
+      {/* --- CÓDIGO DE SEGURIDAD PARA COMPLETAR --- */}
+      <Modal
+        open={Boolean(jobToComplete)}
+        onClose={() => {
+          setJobToComplete(null);
+          setSecurityCode('');
+        }}
+        title="Código de Seguridad"
+        description="Por favor, solicita al cliente su PIN de 4 dígitos para confirmar que el trabajo fue finalizado exitosamente."
+        size="sm"
+      >
+        <div className="pt-4 space-y-5">
+          <div className="flex items-center justify-center p-6 bg-brand-50 rounded-2xl border border-brand-100">
+            <ShieldCheck className="h-14 w-14 text-brand-600 mb-2" />
+          </div>
+          
+          <div>
+            <label htmlFor="securityCode" className="block text-sm font-semibold text-gray-700 mb-1">
+              PIN del Cliente
+            </label>
+            <input
+              id="securityCode"
+              type="text"
+              maxLength={6}
+              placeholder="Ej: 1234"
+              value={securityCode}
+              onChange={(e) => setSecurityCode(e.target.value.replace(/\D/g, ''))}
+              className="w-full text-center text-2xl tracking-widest font-bold px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setJobToComplete(null);
+                setSecurityCode('');
+              }}
+              disabled={completingId === jobToComplete?.id}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmComplete}
+              loading={completingId === jobToComplete?.id}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Verificar y Completar
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
 }

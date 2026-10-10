@@ -34,10 +34,10 @@ type OfferTab = 'all' | 'pending' | 'accepted' | 'finalized';
 type SortBy = 'recent' | 'price_asc' | 'price_desc';
 
 const OFFER_TAB_LABELS: Record<OfferTab, string> = {
-  all: 'Todas',
+  all: 'Todos',
   pending: 'Pendientes',
-  accepted: 'Aceptadas',
-  finalized: 'Finalizadas',
+  accepted: 'Aceptados',
+  finalized: 'Completados',
 };
 
 export function MyOffers() {
@@ -82,12 +82,18 @@ export function MyOffers() {
   );
   const jobMap = useMemo(() => new Map(jobs.map((j) => [j.id, j])), [jobs]);
 
+  // --- CÁLCULO CORREGIDO DE TARJETAS Y PESTAÑAS ---
   const pendingCount = offers.filter(
-    (o) => o.status === 'pending' || o.status === 'countered',
+    (o) => o.status === 'pending' || o.status === 'countered'
   ).length;
-  const acceptedCount = offers.filter((o) => o.status === 'accepted').length;
+  
+  const acceptedCount = offers.filter(
+    (o) => o.status === 'accepted' && jobMap.get(o.jobId)?.status !== 'completed'
+  ).length;
+  
   const finalizedCount = offers.filter(
-    (o) => o.status === 'rejected' || o.status === 'withdrawn',
+    (o) => ['rejected', 'withdrawn'].includes(o.status) || 
+           (o.status === 'accepted' && jobMap.get(o.jobId)?.status === 'completed')
   ).length;
 
   const handleWithdraw = async (offerId: string) => {
@@ -102,10 +108,15 @@ export function MyOffers() {
 
   const filteredOffers = useMemo(() => {
     const result = offers.filter((o) => {
-      if (tab === 'pending' && !['pending', 'countered'].includes(o.status)) return false;
-      if (tab === 'accepted' && o.status !== 'accepted') return false;
-      if (tab === 'finalized' && !['rejected', 'withdrawn'].includes(o.status)) return false;
+      // Validamos si el trabajo ya fue completado
+      const isJobCompleted = jobMap.get(o.jobId)?.status === 'completed';
 
+      // --- FILTROS DE PESTAÑAS CORREGIDOS ---
+      if (tab === 'pending' && !['pending', 'countered'].includes(o.status)) return false;
+      if (tab === 'accepted' && (o.status !== 'accepted' || isJobCompleted)) return false;
+      if (tab === 'finalized' && !(['rejected', 'withdrawn'].includes(o.status) || (o.status === 'accepted' && isJobCompleted))) return false;
+
+      // Filtro de búsqueda por texto
       if (search) {
         const job = jobMap.get(o.jobId);
         const haystack = [
@@ -145,15 +156,6 @@ export function MyOffers() {
       <PageHeader
         title="Mis Ofertas"
         subtitle="Sigue en tiempo real el estado de tus propuestas enviadas a clientes"
-        breadcrumbs={[{ label: 'Mi Ofertas' }]}
-        action={
-          <Link to="/profesional/trabajos-disponibles">
-            <Button className="rounded-xl bg-brand-600 text-white shadow-md shadow-brand-600/25 hover:bg-brand-700">
-              <Compass className="mr-2 h-4 w-4" />
-              Explorar trabajos
-            </Button>
-          </Link>
-        }
       />
 
       {/* Tarjetas de Resumen Superior */}
@@ -336,7 +338,19 @@ export function MyOffers() {
                 {filteredOffers.map((offer) => {
                   const job = jobMap.get(offer.jobId);
                   const category = job ? categoryMap.get(job.details.categoryId) : undefined;
-                  const statusLabel = offerStatusLabel(offer.status);
+                  
+                  // Validación para saber si el trabajo terminó
+                  const isJobCompleted = job?.status === 'completed';
+
+                  // Estilos por defecto
+                  let statusLabel = offerStatusLabel(offer.status);
+                  let badgeClasses = OFFER_STATUS_STYLES[offer.status];
+
+                  // Si fue aceptada pero el trabajo ya se completó, cambiamos el texto y color
+                  if (offer.status === 'accepted' && isJobCompleted) {
+                    statusLabel = 'Completado';
+                    badgeClasses = 'bg-gray-100 text-gray-700 border border-gray-200';
+                  }
 
                   return (
                     <tr key={offer.id} className="group transition-colors hover:bg-brand-50/30">
@@ -378,7 +392,7 @@ export function MyOffers() {
                         <span
                           className={cn(
                             'inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold',
-                            OFFER_STATUS_STYLES[offer.status],
+                            badgeClasses
                           )}
                         >
                           {statusLabel}
@@ -398,7 +412,9 @@ export function MyOffers() {
                               Ver detalle
                             </Link>
                           )}
-                          {offer.status === 'accepted' && (
+                          
+                          {/* Solo se muestra el chat si fue aceptada Y el trabajo NO ha terminado */}
+                          {offer.status === 'accepted' && !isJobCompleted && (
                             <Link
                               to={`/mensajes?jobId=${offer.jobId}`}
                               className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold text-emerald-600 transition-colors hover:bg-emerald-50"
@@ -407,6 +423,7 @@ export function MyOffers() {
                               Chatear con el cliente
                             </Link>
                           )}
+
                           {offer.status === 'pending' && (
                             <button
                               type="button"

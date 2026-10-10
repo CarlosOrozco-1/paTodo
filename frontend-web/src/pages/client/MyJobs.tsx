@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import {
   Briefcase,
-  PlusCircle,
   CheckCircle2,
   Clock,
   HandCoins,
@@ -36,7 +35,7 @@ type Tab = (typeof tabs)[number];
 
 const tabLabels: Record<Tab, string> = {
   all: 'Todos',
-  published: 'Publicados',
+  published: 'En revisión', // Cambié el texto para que coincida con CLIENT_STATUS_LABELS
   offers: 'Recibiendo ofertas',
   contracted: 'Contratados',
   completed: 'Completados',
@@ -90,7 +89,7 @@ export function MyJobs() {
 
   const filtered = useMemo(() => {
     const result = jobs.filter((job) => {
-      if (tab === 'published' && job.status !== 'pending') return false;
+      if (tab === 'published' && job.status !== 'pending') return false; // Nota: 'published' aquí significa "En revisión" según tus pestañas
       if (tab === 'offers' && job.status !== 'published') return false;
       if (tab === 'contracted' && !['assigned', 'in_progress'].includes(job.status)) return false;
       if (tab === 'completed' && job.status !== 'completed') return false;
@@ -155,9 +154,10 @@ export function MyJobs() {
   }, [pageItems]);
 
   const activeJobs = jobs.filter(
-    (j) => ['pending', 'published', 'assigned'].includes(j.status),
+    (j) => ['pending', 'published', 'assigned', 'in_progress'].includes(j.status),
   ).length;
   const pendingJobs = jobs.filter((j) => j.status === 'pending').length;
+  // Con ofertas: Calculamos basándonos en si el trabajo está en estado 'published' (recibiendo ofertas)
   const withOffersJobs = jobs.filter((j) => j.status === 'published').length;
   const completedJobs = jobs.filter((j) => j.status === 'completed').length;
 
@@ -182,15 +182,6 @@ export function MyJobs() {
       <PageHeader
         title="Mis trabajos"
         subtitle="Gestiona y da seguimiento a todas tus solicitudes de servicio"
-        breadcrumbs={[{ label: 'Mis Trabajos' }]}
-        action={
-          <Link to="/cliente/crear-trabajo">
-            <Button className="rounded-xl bg-brand-600 text-white shadow-md shadow-brand-600/25 hover:bg-brand-700">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Publicar un trabajo
-            </Button>
-          </Link>
-        }
       />
 
       {/* Métricas Superiores */}
@@ -232,8 +223,15 @@ export function MyJobs() {
       {/* Contenido */}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
-          {/* Pestañas + Búsqueda + Orden */}
-          <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          
+          {/* 
+            SOLUCIÓN 2: Diseño de los filtros corregido. 
+            Usamos flex-wrap para que si no caben, salten a la siguiente línea. 
+            Y separamos claramente la zona de pestañas de la zona de búsqueda.
+          */}
+          <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm flex flex-col gap-4">
+            
+            {/* Fila superior: Pestañas */}
             <div className="flex flex-wrap items-center gap-2">
               {tabs.map((t) => (
                 <button
@@ -259,24 +257,25 @@ export function MyJobs() {
               ))}
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Fila inferior: Select de ordenamiento y Buscador */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
               <select
                 value={sortBy}
                 onChange={changeSort}
-                className="rounded-xl border border-gray-200 bg-gray-50/70 px-2.5 py-2 text-xs font-bold text-gray-600 outline-none focus:border-brand-300 cursor-pointer"
+                className="w-full sm:w-auto rounded-xl border border-gray-200 bg-gray-50/70 px-3 py-2.5 text-xs font-bold text-gray-600 outline-none focus:border-brand-300 cursor-pointer"
               >
                 <option value="recent">Más recientes</option>
                 <option value="price_asc">Menor presupuesto</option>
                 <option value="price_desc">Mayor presupuesto</option>
               </select>
-              <div className="relative flex-1 xl:w-48">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+              <div className="relative w-full flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   value={search}
                   onChange={changeSearch}
                   placeholder="Buscar solicitudes..."
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/70 py-2 pl-9 pr-3 text-xs outline-none transition-colors placeholder:text-gray-400 focus:border-brand-300 focus:bg-white"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/70 py-2.5 pl-9 pr-3 text-xs outline-none transition-colors placeholder:text-gray-400 focus:border-brand-300 focus:bg-white"
                 />
               </div>
             </div>

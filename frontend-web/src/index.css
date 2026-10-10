@@ -91,3 +91,13 @@ body {
   background-color: #f3faf7;
   color: #111827;
 }
+
+/* Ocultar el logotipo de Mapbox */
+.mapboxgl-ctrl-logo {
+  display: none !important;
+}
+
+/* Ocultar los enlaces de atribución (© Mapbox, © OpenStreetMap, etc.) */
+.mapboxgl-ctrl-attrib {
+  display: none !important;
+}

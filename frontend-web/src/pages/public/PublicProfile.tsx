@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
+import { useNavigate } from 'react-router';
 import {
   ArrowLeft,
   Briefcase,
@@ -40,7 +41,7 @@ export function PublicProfile() {
   // reiniciar el estado dentro del efecto.
   const [result, setResult] = useState<{ id: string; user: User | null } | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
-
+  const navigate = useNavigate();
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -114,11 +115,13 @@ export function PublicProfile() {
         <p className="mt-1 text-sm text-gray-500">
           Es posible que el usuario ya no exista o haya desactivado su cuenta.
         </p>
-        <Link to="/mensajes" className="mt-6 inline-block">
-          <Button variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Volver a mensajes
-          </Button>
-        </Link>
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-6 inline-flex items-center text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Regresar
+        </button>
       </div>
     );
   }
@@ -129,13 +132,13 @@ export function PublicProfile() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link
-          to="/mensajes"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 transition-colors hover:text-brand-600"
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-6 inline-flex items-center text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Volver
-        </Link>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Regresar
+        </button>
 
         <div className="flex flex-wrap gap-2">
           {isSelf ? (

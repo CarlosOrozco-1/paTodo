@@ -51,7 +51,7 @@ export function StatsCard({
                 </span>
               )}
             </div>
-            <p className="mt-1 text-3xl font-black text-gray-900 tracking-tight">{value}</p>
+            <div className="mt-1 text-3xl font-black text-gray-900 tracking-tight">{value}</div>
             {trend && (
               <p
                 className={cn(

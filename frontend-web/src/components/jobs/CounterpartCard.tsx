@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { Briefcase, MessageSquare, Star } from 'lucide-react';
+import { Briefcase, Star } from 'lucide-react';
 import { usersService } from '@/api/users.service';
 import { Avatar } from '@/components/ui/Avatar';
 import { Spinner } from '@/components/ui/Spinner';
@@ -57,7 +57,10 @@ export function CounterpartCard({
 
   if (loading) {
     return (
-      <div className={cn('rounded-2xl border border-gray-100 bg-white p-4', className)}>
+      <div
+        className={cn('rounded-2xl border border-gray-100 bg-white p-4', className)}
+        data-job-id={jobId}
+      >
         <Spinner size="sm" label="Cargando contacto..." />
       </div>
     );
@@ -66,12 +69,12 @@ export function CounterpartCard({
   if (!user) return null;
 
   const name = fullName(user.profile);
-  const chatLink = jobId
-    ? `/mensajes?jobId=${jobId}`
-    : `/mensajes?userId=${user.id}`;
 
   return (
-    <div className={cn('rounded-2xl border border-gray-100 bg-white p-4 shadow-sm', className)}>
+    <div
+      className={cn('rounded-2xl border border-gray-100 bg-white p-4 shadow-sm', className)}
+      data-job-id={jobId}
+    >
       <p className="text-xs font-bold uppercase tracking-wider text-gray-400">{title}</p>
 
       <Link
@@ -105,13 +108,7 @@ export function CounterpartCard({
         >
           Ver perfil y reseñas
         </Link>
-        <Link
-          to={chatLink}
-          className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 text-xs font-medium text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-md"
-        >
-          <MessageSquare className="h-3.5 w-3.5" />
-          Chatear
-        </Link>
+   
       </div>
     </div>
   );

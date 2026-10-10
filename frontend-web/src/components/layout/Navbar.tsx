@@ -79,16 +79,6 @@ export function Navbar() {
           >
             <Menu className="h-5 w-5" />
           </button>
-
-          {/* El logo en el Navbar solo se mostrará en dispositivos móviles (lg:hidden) cuando la barra lateral se oculta */}
-          <Link to={dashboardRoute} className="flex items-center gap-2 lg:hidden">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-600 text-base font-black text-white shadow-md shadow-brand-600/20">
-              P
-            </div>
-            <span className="text-lg font-extrabold tracking-tight text-gray-900">
-              PaTodo
-            </span>
-          </Link>
         </div>
 
         {/*Acciones globales y Perfil */}

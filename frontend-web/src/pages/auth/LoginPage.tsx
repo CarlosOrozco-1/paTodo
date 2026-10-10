@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { FlaskConical, LockKeyhole, Mail, ArrowRight, ArrowLeft, CheckCircle2, Sparkles } from 'lucide-react';
+import { FlaskConical, LockKeyhole, Mail, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/uiStore';
@@ -8,6 +8,7 @@ import { getErrorMessage } from '@/api/axiosClient';
 import { isDemoMode } from '@/api/demo';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Logo } from '@/components/logo/logo';
 import { homeRouteFor } from '@/utils/roles';
 import type { UserRole } from '@/types/user.types';
 
@@ -154,10 +155,10 @@ export function LoginPage() {
 
   return (
     <div className="w-full">
-      {/* Encabezado del Formulario */}
+      {/* Encabezado del Formulario con Logo para móvil */}
       <div className="mb-6 text-center sm:text-left">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-500 via-brand-600 to-teal-400 text-white shadow-lg shadow-emerald-600/30 border border-emerald-400/40 lg:hidden mb-4 mx-auto sm:mx-0">
-          <Sparkles className="h-6 w-6 text-white" />
+        <div className="lg:hidden flex justify-center sm:justify-start mb-6">
+          <Logo variant="default" imgClassName="h-14" />
         </div>
         <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Bienvenido de nuevo</h1>
         <p className="mt-1.5 text-xs font-medium text-gray-500">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { Navigation, Volume2, VolumeX, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import type { JobTrackingPosition } from '@/api/firebase/jobTracking';
 
@@ -16,12 +16,19 @@ export type NavigatorDestination = {
 type InternalNavigatorProps = {
   destination?: NavigatorDestination;
   onPositionUpdate?: (position: JobTrackingPosition) => void;
+  onInstructionChange?: (instruction: string) => void;
+  // NUEVO: Pasamos el tiempo y distancia exactos de la ruta verde hacia las tarjetas
+  onRouteCalculated?: (distanceMeters: number, durationSeconds: number) => void;
+  voiceEnabled?: boolean;
   className?: string;
 };
 
 export function InternalNavigator({
   destination,
   onPositionUpdate,
+  onInstructionChange,
+  onRouteCalculated,
+  voiceEnabled = true,
   className,
 }: InternalNavigatorProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -29,10 +36,6 @@ export function InternalNavigator({
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const destinationMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [currentInstruction, setCurrentInstruction] = useState('Calculando ruta GPS en vivo...');
-  const [distanceText, setDistanceText] = useState('--');
-  const [durationText, setDurationText] = useState('--');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const lastSpokenInstruction = useRef<string>('');
@@ -40,13 +43,16 @@ export function InternalNavigator({
   const lastUserCoords = useRef<[number, number] | null>(null);
   const hasArrived = useRef<boolean>(false);
 
+  const destAddress = destination?.addressText;
+  const destLat = destination?.latitude;
+  const destLng = destination?.longitude;
+
   useEffect(() => {
     voiceEnabledRef.current = voiceEnabled;
   }, [voiceEnabled]);
 
   const speak = (text: string) => {
     if (!voiceEnabledRef.current || !('speechSynthesis' in window)) return;
-    // Si la instrucción es idéntica, no se repite en bucle (evita spam si estás detenido)
     if (lastSpokenInstruction.current === text) return;
     lastSpokenInstruction.current = text;
     window.speechSynthesis.cancel();
@@ -70,10 +76,10 @@ export function InternalNavigator({
     });
     map.current = currentMap;
 
-    const resolveDestCoords = async (dest?: NavigatorDestination): Promise<[number, number] | null> => {
-      if (dest?.addressText && dest.addressText.trim().length > 0) {
+    const resolveDestCoords = async (): Promise<[number, number] | null> => {
+      if (destAddress && destAddress.trim().length > 0) {
         try {
-          const query = encodeURIComponent(`${dest.addressText}, Guatemala`);
+          const query = encodeURIComponent(`${destAddress}, Guatemala`);
           const res = await fetch(
             `https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${mapboxgl.accessToken}&country=gt&limit=1`
           );
@@ -82,14 +88,12 @@ export function InternalNavigator({
             return data.features[0].center as [number, number];
           }
         } catch {
-          // Fallback
+          // Fallback silencioso
         }
       }
-
-      if (dest?.longitude !== undefined && dest?.latitude !== undefined && dest.longitude !== 0 && dest.latitude !== 0) {
-        return [dest.longitude, dest.latitude];
+      if (destLng !== undefined && destLat !== undefined && destLng !== 0 && destLat !== 0) {
+        return [destLng, destLat];
       }
-
       return [-90.5069, 14.6349];
     };
 
@@ -104,15 +108,16 @@ export function InternalNavigator({
           const route = data.routes[0];
           const distanceMeters = route.distance;
           
-          setDistanceText((distanceMeters / 1000).toFixed(1) + ' km');
-          setDurationText(Math.ceil(route.duration / 60) + ' min');
-
-          // Comportamiento Waze al llegar (< 30 metros del destino)
+          // NUEVO: Enviar la distancia y duración 100% exactas de la ruta pintada
+          if (onRouteCalculated) {
+            onRouteCalculated(distanceMeters, route.duration);
+          }
+          
           if (distanceMeters < 30) {
             if (!hasArrived.current) {
               hasArrived.current = true;
               const arrivalMsg = 'Has llegado a tu destino.';
-              setCurrentInstruction(arrivalMsg);
+              if (onInstructionChange) onInstructionChange(arrivalMsg);
               speak(arrivalMsg);
             }
             return;
@@ -122,8 +127,8 @@ export function InternalNavigator({
 
           if (route.legs?.[0]?.steps?.[0]) {
             const instruction = route.legs[0].steps[0].maneuver.instruction;
-            setCurrentInstruction(instruction);
-            speak(instruction); // Habla de forma progresiva según cambie la instrucción de Mapbox
+            if (onInstructionChange) onInstructionChange(instruction);
+            speak(instruction); 
           }
 
           if (map.current.getSource('route-nav')) {
@@ -156,7 +161,7 @@ export function InternalNavigator({
     };
 
     const initNavigator = async () => {
-      const destCoords = await resolveDestCoords(destination);
+      const destCoords = await resolveDestCoords();
       if (!mounted || !destCoords) return;
 
       if (!destinationMarkerRef.current) {
@@ -195,11 +200,10 @@ export function InternalNavigator({
             currentMap.easeTo({ center: userCoords, duration: 1000, pitch: 50 });
             await fetchRoute(userCoords, destCoords);
           },
-          (err) => {
+          () => {
             setErrorMsg('Buscando señal GPS...');
-            console.warn(err);
           },
-          { enableHighAccuracy: false, maximumAge: 30000, timeout: 20000 }
+          { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
         );
       }
     };
@@ -214,41 +218,16 @@ export function InternalNavigator({
       markerRef.current = null;
       destinationMarkerRef.current = null;
     };
-  }, [destination?.addressText, destination?.latitude, destination?.longitude]);
+  }, [destAddress, destLat, destLng]);
 
   return (
     <div className={cn('relative overflow-hidden rounded-2xl border border-emerald-200 shadow-md bg-white', className)}>
-      <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between rounded-xl bg-gray-900/90 backdrop-blur-md px-4 py-2.5 text-white shadow-lg">
-        <div className="flex items-center gap-3 min-w-0">
-          <Navigation className="h-5 w-5 text-emerald-400 shrink-0 animate-pulse" />
-          <div className="min-w-0">
-            <p className="text-xs font-semibold truncate text-emerald-300">{currentInstruction}</p>
-            <p className="text-[10px] text-gray-300 truncate">Destino: {destination?.label || destination?.addressText || 'Ubicación'}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 shrink-0 pl-2">
-          <div className="text-right">
-            <span className="text-xs font-bold text-emerald-400">{distanceText}</span>
-            <span className="block text-[10px] text-gray-300">{durationText}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setVoiceEnabled(!voiceEnabled)}
-            className="rounded-lg bg-white/10 p-1.5 hover:bg-white/20 transition-colors"
-            title={voiceEnabled ? 'Desactivar voz' : 'Activar voz'}
-          >
-            {voiceEnabled ? <Volume2 className="h-4 w-4 text-emerald-400" /> : <VolumeX className="h-4 w-4 text-gray-400" />}
-          </button>
-        </div>
-      </div>
-
       {errorMsg && (
-        <div className="absolute bottom-3 left-3 right-3 z-10 flex items-center gap-2 rounded-lg bg-amber-500/90 p-2 text-xs text-white">
-          <AlertCircle className="h-4 w-4 shrink-0" />
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-lg bg-amber-500/90 px-4 py-2 text-sm font-semibold text-white shadow-lg">
+          <AlertCircle className="h-5 w-5 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
-
       <div ref={mapContainer} className="h-full w-full min-h-[320px]" />
     </div>
   );

@@ -3,9 +3,11 @@ import { useSearchParams } from 'react-router';
 import { useAuthStore } from '@/stores/authStore';
 import { conversationsService, messagesService } from '@/api/messages.service';
 import { usersService } from '@/api/users.service';
+import { jobsService } from '@/api/jobs.service';
 import type { Conversation } from '@/types/message.types';
 import type { Message } from '@/types/message.types';
 import type { User } from '@/types/user.types';
+import type { Job } from '@/types/job.types';
 import { ConversationList } from '@/components/messages/ConversationList';
 import { ChatWindow } from '@/components/messages/ChatWindow';
 import { toast } from '@/stores/uiStore';
@@ -17,13 +19,12 @@ export function Messages() {
   const jobIdParam = searchParams.get('jobId');
   const conversationIdParam = searchParams.get('conversationId');
   const userIdParam = searchParams.get('userId');
+  
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  // Se guarda el ID activo, no el objeto: la suscripción de conversaciones
-  // emite un objeto nuevo en cada cambio y usar su identidad como dependencia
-  // re-suscribía los mensajes sin parar (y disparaba markAsRead en bucle).
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [userMap, setUserMap] = useState<Record<string, User>>({});
+  const [jobMap, setJobMap] = useState<Record<string, Job>>({});
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const markedReadRef = useRef<string | null>(null);
@@ -37,19 +38,34 @@ export function Messages() {
     if (!user) return;
     let cancelled = false;
 
-    const loadProfiles = async (convs: Conversation[]) => {
-      const ids = new Set<string>();
-      convs.forEach((c) => c.participantIds.forEach((p) => ids.add(p)));
-      ids.add(user.id);
-      const results = await Promise.allSettled(
-        [...ids].map((id) => usersService.getById(id)),
-      );
-      if (cancelled) return;
-      const map: Record<string, User> = {};
-      results.forEach((result) => {
-        if (result.status === 'fulfilled') map[result.value.id] = result.value;
+    const loadProfilesAndJobs = async (convs: Conversation[]) => {
+      const userIds = new Set<string>();
+      const jobIds = new Set<string>();
+
+      convs.forEach((c) => {
+        c.participantIds.forEach((p) => userIds.add(p));
+        if (c.jobId) jobIds.add(c.jobId);
       });
-      setUserMap(map);
+      userIds.add(user.id);
+
+      const [userResults, jobResults] = await Promise.all([
+        Promise.allSettled([...userIds].map((id) => usersService.getById(id))),
+        Promise.allSettled([...jobIds].map((id) => jobsService.getById(id)))
+      ]);
+
+      if (cancelled) return;
+
+      const uMap: Record<string, User> = {};
+      userResults.forEach((result) => {
+        if (result.status === 'fulfilled') uMap[result.value.id] = result.value;
+      });
+      setUserMap(uMap);
+
+      const jMap: Record<string, Job> = {};
+      jobResults.forEach((result) => {
+        if (result.status === 'fulfilled') jMap[result.value.id] = result.value;
+      });
+      setJobMap(jMap);
     };
 
     const unsubscribe = conversationsService.subscribe({
@@ -58,19 +74,16 @@ export function Messages() {
         setConversations(convs);
         setLoading(false);
 
-        // Deep-link: prioriza la conversación indicada por la URL sobre la
-        // primera de la lista, para que "Chatear con el profesional" abra
-        // exactamente ese chat y no el más reciente. `userId` sirve cuando
-        // todavía no existe conversación entre las dos partes.
         const targeted =
           convs.find((c) => conversationIdParam && c.id === conversationIdParam) ??
           convs.find((c) => jobIdParam && c.jobId === jobIdParam) ??
           convs.find((c) => userIdParam && c.participantIds.includes(userIdParam));
+        
         setActiveConversationId((current) =>
-          targeted ? targeted.id : current ?? convs[0]?.id ?? null,
+          targeted ? targeted.id : current ?? null
         );
 
-        void loadProfiles(convs);
+        void loadProfilesAndJobs(convs);
       },
       onError: (error) => {
         if (cancelled) return;
@@ -99,8 +112,7 @@ export function Messages() {
       onData: (msgs) => {
         if (cancelled) return;
         setMessages(msgs);
-        // El contador se corrige en local para que el badge caiga al abrir,
-        // sin esperar el rebote de la escritura de lectura.
+        
         setConversations((prev) =>
           prev.map((c) =>
             c.id === conversationId
@@ -109,10 +121,6 @@ export function Messages() {
           ),
         );
 
-        // Marca como leída una sola vez por conversación. Antes se llamaba en
-        // cada emisión: escribir en el documento de conversación disparaba
-        // otra vez el listener de la lista, que re-suscribía los mensajes y
-        // provocaba un bucle de escrituras que ahogaba el tráfico real.
         const lastIncoming = [...msgs].reverse().find((m) => m.senderId !== myId);
         if (
           lastIncoming &&
@@ -141,6 +149,11 @@ export function Messages() {
     setSearchParams({ conversationId: conversation.id }, { replace: true });
   };
 
+  const handleCloseChat = () => {
+    setActiveConversationId(null);
+    setSearchParams({}, { replace: true });
+  };
+
   const handleSend = async (content: string) => {
     if (!user || !activeConversationId) return;
     const conversation = conversations.find((c) => c.id === activeConversationId);
@@ -149,8 +162,7 @@ export function Messages() {
     try {
       const otherId = conversation.participantIds.find((id) => id !== user.id);
       if (!otherId) return;
-      // El mensaje aparece por la suscripción de Firestore, no por estado
-      // local: así el remitente y el destinatario ven exactamente lo mismo.
+      
       await messagesService.send({
         jobId: conversation.jobId,
         receiverId: otherId,
@@ -175,11 +187,17 @@ export function Messages() {
 
   const resolveName = (conversation: Conversation, fallbackId: string): string => {
     const fromUser = userMap[fallbackId];
+    const jobId = conversation.jobId;
+    const job = jobId ? jobMap[jobId] : undefined;
+    const jobTitle = job ? job.details.title : 'Chat de trabajo';
+
+    let userName = conversation.participantsSnapshot[fallbackId]?.name || 'Usuario';
     if (fromUser) {
       const full = `${fromUser.profile.firstName} ${fromUser.profile.lastName}`.trim();
-      if (full) return full;
+      if (full) userName = full;
     }
-    return conversation.participantsSnapshot[fallbackId]?.name || 'Usuario';
+    // Sintaxis corregida
+    return `${userName} • ${jobTitle}`;
   };
 
   const resolveAvatar = (conversation: Conversation, fallbackId: string): string =>
@@ -187,32 +205,46 @@ export function Messages() {
     conversation.participantsSnapshot[fallbackId]?.avatarUrl ||
     '';
 
+  const activeJobTitle = activeConversation?.jobId
+    ? jobMap[activeConversation.jobId]?.details?.title || 'Chat de trabajo'
+    : 'Chat de trabajo';
+
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col bg-gray-50">
-      <div className="border-b border-gray-200 bg-white px-4 py-3">
-        <h1 className="text-lg font-bold text-gray-900">Mensajes</h1>
-      </div>
-      <div className="mx-auto flex w-full max-w-7xl flex-1 overflow-hidden">
+    <div className="flex h-[calc(100vh-4rem)] flex-col bg-gray-50/50">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 overflow-hidden sm:py-6 sm:px-4">
+        
         <div
-          className={`w-full border-r border-gray-200 bg-white sm:w-80 ${
-            activeConversation ? 'hidden sm:block' : 'block'
+          className={`w-full bg-white sm:w-[340px] sm:rounded-l-2xl sm:border border-gray-200 sm:shadow-sm ${
+            activeConversation ? 'hidden sm:flex sm:flex-col' : 'flex flex-col'
           }`}
         >
-          {loading ? (
-            <p className="p-6 text-center text-sm text-gray-400">Cargando...</p>
-          ) : (
-            <ConversationList
-              conversations={conversations}
-              activeConversationId={activeConversation?.id}
-              userId={user?.id || ''}
-              resolveName={resolveName}
-              resolveAvatar={resolveAvatar}
-              onSelect={handleSelect}
-            />
-          )}
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white sm:rounded-tl-2xl">
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight">Chats</h1>
+            <span className="bg-brand-50 text-brand-700 text-xs font-bold px-2.5 py-1 rounded-full">
+              {conversations.length}
+            </span>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center h-32">
+                <p className="text-sm font-medium text-gray-400 animate-pulse">Cargando chats...</p>
+              </div>
+            ) : (
+              <ConversationList
+                conversations={conversations}
+                activeConversationId={activeConversation?.id}
+                userId={user?.id || ''}
+                resolveName={resolveName}
+                resolveAvatar={resolveAvatar}
+                onSelect={handleSelect}
+              />
+            )}
+          </div>
         </div>
+
         <div
-          className={`flex-1 ${
+          className={`flex-1 sm:rounded-r-2xl sm:border-y sm:border-r border-gray-200 sm:shadow-sm bg-white overflow-hidden ${
             activeConversation ? 'block' : 'hidden sm:block'
           }`}
         >
@@ -222,11 +254,15 @@ export function Messages() {
             otherUserId={otherUserId || undefined}
             otherUserName={otherUserName || undefined}
             otherUserAvatar={otherUserAvatar || undefined}
+            jobTitle={activeJobTitle}   
             onSend={handleSend}
+            onBack={handleCloseChat}
+            onClose={handleCloseChat}    
             sending={sending}
             empty={!activeConversation}
           />
         </div>
+
       </div>
     </div>
   );
