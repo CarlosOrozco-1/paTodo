@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { 
   CheckCircle2, 
@@ -34,28 +34,6 @@ import { Modal } from '@/components/ui/Modal';
 import { ReviewForm } from '@/components/reviews/ReviewForm';
 import { reviewsService } from '@/api/reviews.service';
 import { JobLocationMap } from '@/components/ui/JobLocationMap';
-import {
-  publishJobTrackingPosition,
-  type JobTrackingPosition,
-} from '@/api/firebase/jobTracking';
-
-interface PublishedPosition {
-  latitude: number;
-  longitude: number;
-  publishedAt: number;
-}
-
-function distanceMeters(first: PublishedPosition, next: JobTrackingPosition): number {
-  const radians = (degrees: number) => (degrees * Math.PI) / 180;
-  const deltaLatitude = radians(next.latitude - first.latitude);
-  const deltaLongitude = radians(next.longitude - first.longitude);
-  const latitude1 = radians(first.latitude);
-  const latitude2 = radians(next.latitude);
-  const haversine =
-    Math.sin(deltaLatitude / 2) ** 2 +
-    Math.cos(latitude1) * Math.cos(latitude2) * Math.sin(deltaLongitude / 2) ** 2;
-  return 6371000 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-}
 
 export function ActiveJobs() {
   const navigate = useNavigate();
@@ -72,28 +50,6 @@ export function ActiveJobs() {
   
   const [reviewJob, setReviewJob] = useState<Job | null>(null);
   const [reviewedJobIds, setReviewedJobIds] = useState<Set<string>>(new Set());
-  
-
-  const lastPublishedPositions = useRef(new Map<string, PublishedPosition>());
-
-  const handlePositionUpdate = useCallback(async (jobId: string, position: JobTrackingPosition) => {
-    const now = Date.now();
-    const previous = lastPublishedPositions.current.get(jobId);
-    if (previous && now - previous.publishedAt < 10000 && distanceMeters(previous, position) < 20) {
-      return;
-    }
-
-    lastPublishedPositions.current.set(jobId, {
-      latitude: position.latitude,
-      longitude: position.longitude,
-      publishedAt: now,
-    });
-    try {
-      await publishJobTrackingPosition(jobId, position);
-    } catch (error) {
-      console.warn('Rastreo en la nube no disponible:', error);
-    }
-  }, []);
 
   useEffect(() => {
     if (!user) return;
