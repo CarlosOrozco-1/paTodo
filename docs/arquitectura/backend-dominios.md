@@ -1,6 +1,6 @@
 # Diagramas de PaTodo
 
-> Stack real: **Firebase gestionado** (Auth, Firestore, FCM, Realtime Database, Storage) + **API REST** Express 5 en `api/` (Render). No hay Cloud Functions ni Spring/MongoDB. La spec es `spec/openapi.yaml`.
+> Stack real: **Firebase gestionado** (Auth, Firestore, FCM, Storage) + **API REST** Express 5 en `api/` (Render). No hay Cloud Functions, Realtime Database ni Spring/MongoDB. La spec es `spec/openapi.yaml`.
 
 Los diagramas usan [Mermaid](https://mermaid.js.org/). Convención: **flecha sólida = llamada**, **punteada = lectura indirecta / listener**.
 
@@ -31,7 +31,7 @@ flowchart TD
     RULES["firestore.rules"]
     AUTH["Firebase Authentication"]
     FS["Cloud Firestore"]
-    RTDB["Realtime Database — historial ubicaciones"]
+    TRACK["jobs/{jobId}/tracking/current — última posición"]
     FCM["Cloud Messaging (FCM)"]
     OSRM["OSRM — cálculo de rutas"]
 
@@ -45,7 +45,8 @@ flowchart TD
     RULES --> FS
     SDK -.->|"listeners tiempo real"| FS
     SDK -->|"registro token / push"| FCM
-    SDK --> RTDB
+    SDK -->|"publica ubicación (worker asignado)"| TRACK
+    TRACK -->|"subcolección de jobs"| FS
 
     API -->|"verifyIdToken"| AUTH
     API -->|"Admin SDK — omite reglas"| FS
@@ -55,7 +56,7 @@ flowchart TD
 
 **Lectura**
 
-- El SDK mantiene sesión, escucha cambios y envía ubicaciones a RTDB.
+- El SDK mantiene sesión, escucha cambios y el trabajador asignado publica su ubicación en `jobs/{jobId}/tracking/current` (Firestore; no se usa Realtime Database).
 - Escrituras directas **siempre pasan por `firestore.rules`** (autorización por `uid` y `role`).
 - La API es el único componente con Admin SDK: verifica el `idToken` y ejecuta transacciones.
 - No hay Cloud Functions; su código quedó en `docs/functions-legacy/`.
