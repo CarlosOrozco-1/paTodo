@@ -61,6 +61,7 @@ class _RecoveryStepperState extends State<RecoveryStepper> {
     try {
       await widget.onRequestCode(email);
       if (mounted) {
+        _code.clear();
         setState(() {
           _step = 2;
           _error = null;
@@ -329,10 +330,10 @@ class _RecoveryStepperState extends State<RecoveryStepper> {
         const SizedBox(height: 16),
         TextField(
           controller: _code,
+          autofocus: true,
           decoration: InputDecoration(
             labelText: 'Código de 6 dígitos',
-            hintText: '123456',
-            prefixIcon: const Icon(Icons.pin_outlined, size: 20),
+            prefixIcon: const Icon(Icons.security_outlined, size: 20),
             filled: true,
             fillColor: const Color(0xFFF7F9F7),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
