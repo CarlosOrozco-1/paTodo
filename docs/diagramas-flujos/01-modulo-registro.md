@@ -1,9 +1,10 @@
 # 01 — Registro, descubrimiento, ejecución, finalización y flujo general
 
-Fuentes Mermaid de las figuras del DERCAS que no tenían módulo previo.
+Diagramas Mermaid de referencia con el stack real (Firebase Auth, Firestore +
+`firestore.rules`, API Express en `api/`, FCM, OSRM). Sirven para validar que las
+figuras del DERCAS no mencionen el stack anterior (Oracle/Atlas): el contenido
+debe coincidir en actores y orden, aunque el estilo de exportación difiera.
 Las figuras de publicación, ofertas y ciclo de vida viven en `02`, `03` y `13`.
-Se exportan a `docs/DERCAS/figuras/*.png` (secuencias en tema claro,
-flowcharts en tema oscuro) y se compila con `pdflatex` ×2.
 
 ## Registro y autenticación → `figuras/registro-y-autenticacion.png`
 
