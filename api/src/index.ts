@@ -12,6 +12,7 @@ import { callsRouter } from "./routes/calls";
 import { messagesRouter } from "./routes/messages";
 import userRouter from "./routes/user";
 import adminRouter from "./routes/admin";
+import { authRouter } from "./routes/auth";
 import { handleError } from "./shared/errors";
 
 const app = express();
@@ -106,6 +107,7 @@ app.use(callsRouter);
 app.use(messagesRouter);
 app.use(userRouter);
 app.use(adminRouter);
+app.use(authRouter);
 
 // Manejo de rutas no encontradas.
 app.use((_req, res) => {

@@ -90,9 +90,65 @@ class AuthRepository {
   Future<UserCredential> signIn(String email, String password) =>
       _auth.signInWithEmailAndPassword(email: email, password: password);
 
-  /// Enlace de recuperación (flujo nativo Firebase, sin códigos).
+  /// Enlace de recuperación nativo (fallback de Firebase).
   Future<void> sendPasswordReset(String email) =>
       _auth.sendPasswordResetEmail(email: email);
+
+  /// Solicita un código de recuperación de 6 dígitos (OTP) enviado por correo vía API.
+  Future<void> requestPasswordResetOtp(String email) async {
+    try {
+      await _api.dio.post(
+        '/auth/requestPasswordReset',
+        data: {'email': email.trim()},
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.data is Map
+          ? (e.response?.data['error'] as String?)
+          : null;
+      throw Exception(msg ?? 'No pudimos enviar el código. Inténtalo de nuevo.');
+    }
+  }
+
+  /// Valida el código de recuperación de 6 dígitos (OTP).
+  Future<void> verifyResetCodeOtp(String email, String code) async {
+    try {
+      await _api.dio.post(
+        '/auth/verifyResetCode',
+        data: {
+          'email': email.trim(),
+          'code': code.trim(),
+        },
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.data is Map
+          ? (e.response?.data['error'] as String?)
+          : null;
+      throw Exception(msg ?? 'Código no válido o expirado.');
+    }
+  }
+
+  /// Restablece la contraseña en Firebase Auth usando el código de 6 dígitos (OTP).
+  Future<void> resetPasswordWithOtp({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      await _api.dio.post(
+        '/auth/resetPassword',
+        data: {
+          'email': email.trim(),
+          'code': code.trim(),
+          'newPassword': newPassword,
+        },
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.data is Map
+          ? (e.response?.data['error'] as String?)
+          : null;
+      throw Exception(msg ?? 'No se pudo restablecer la contraseña.');
+    }
+  }
 
   /// Login con Google. Retorna la credencial.
   /// DEV: el perfil NO se crea aquí; ProfileGate detecta si falta el doc

@@ -55,6 +55,8 @@ tags:
     description: Llamadas de voz entre cliente y trabajador (WebRTC P2P, sin costo por minuto)
   - name: admin
     description: Panel de administración (solo rol `admin`)
+  - name: auth
+    description: Autenticación y recuperación de contraseñas con código OTP
 
 components:
   securitySchemes:
@@ -146,6 +148,137 @@ paths:
                   service:
                     type: string
                     example: patodo-api
+
+  # ===================== AUTENTICACIÓN =====================
+  /auth/requestPasswordReset:
+    post:
+      tags: [auth]
+      summary: Solicitar código de recuperación de contraseña
+      description: |
+        Genera un código OTP de 6 dígitos con expiración de 15 minutos y lo envía
+        por correo electrónico al usuario si existe en Firebase Auth.
+        No revela si el correo está registrado o no por motivos de seguridad.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Correo electrónico de la cuenta a recuperar.
+      responses:
+        '200':
+          description: Solicitud procesada correctamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Si el correo está registrado, enviamos un código de verificación.
+        '400': { $ref: '#/components/responses/InvalidArgument' }
+        '429':
+          description: Límite de solicitudes excedido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/verifyResetCode:
+    post:
+      tags: [auth]
+      summary: Verificar código de recuperación de contraseña
+      description: |
+        Comprueba que el código OTP de 6 dígitos coincida con el generado para el correo,
+        que no haya expirado y que no supere el límite de intentos permitidos.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code]
+              properties:
+                email:
+                  type: string
+                  format: email
+                code:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+                  description: Código numérico de 6 dígitos.
+      responses:
+        '200':
+          description: Código verificado exitosamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Código verificado correctamente.
+        '400': { $ref: '#/components/responses/InvalidArgument' }
+        '429':
+          description: Demasiados intentos fallidos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/resetPassword:
+    post:
+      tags: [auth]
+      summary: Restablecer contraseña con código verificado
+      description: |
+        Valida el código de 6 dígitos y actualiza la contraseña del usuario en Firebase Auth.
+        Al completarse, invalida el código de un solo uso.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code, newPassword]
+              properties:
+                email:
+                  type: string
+                  format: email
+                code:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+                newPassword:
+                  type: string
+                  minLength: 8
+                  description: Nueva contraseña (mínimo 8 caracteres).
+      responses:
+        '200':
+          description: Contraseña actualizada con éxito.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Contraseña actualizada exitosamente.
+        '400': { $ref: '#/components/responses/InvalidArgument' }
+        '429':
+          description: Demasiados intentos fallidos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   # ===================== USUARIOS =====================
   /createUser:

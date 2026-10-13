@@ -434,5 +434,13 @@ service cloud.firestore {
       }
 
     }
+
+    // ===================== passwordResets =====================
+    // Códigos temporales de recuperación de contraseña (OTP).
+    // Gestionados exclusivamente por la API REST mediante Admin SDK.
+    // Ningún cliente puede leer ni escribir en esta colección.
+    match /passwordResets/{resetId} {
+      allow read, write: if false;
+    }
   }
 }

@@ -101,7 +101,15 @@ class _LoginScreenState extends State<LoginScreen> {
   void _openRecovery() {
     showDialog(
       context: context,
-      builder: (_) => RecoveryStepper(onSendLink: _repo.sendPasswordReset),
+      builder: (_) => RecoveryStepper(
+        onRequestCode: _repo.requestPasswordResetOtp,
+        onVerifyCode: _repo.verifyResetCodeOtp,
+        onResetPassword: (email, code, newPassword) => _repo.resetPasswordWithOtp(
+          email: email,
+          code: code,
+          newPassword: newPassword,
+        ),
+      ),
     );
   }
 
