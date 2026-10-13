@@ -232,6 +232,13 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                             details['description'] as String? ??
                             'Sin descripción adicional',
                       ),
+                      // ── Etiquetas de habilidades requeridas ──
+                      if ((details['skillIds'] as List?)?.isNotEmpty == true) ...[
+                        const SizedBox(height: 16),
+                        _SkillTags(
+                          skillIds: List<String>.from(details['skillIds'] as List),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -868,4 +875,114 @@ class _ServiceStatusInfo {
     required this.color,
     required this.icon,
   });
+}
+
+/// Muestra las habilidades requeridas del trabajo como etiquetas (chips).
+/// Resuelve los IDs consultando la colección `skills` en Firestore para
+/// mostrar el nombre legible de cada habilidad.
+class _SkillTags extends StatelessWidget {
+  final List<String> skillIds;
+
+  const _SkillTags({required this.skillIds});
+
+  Future<Map<String, String>> _resolveNames() async {
+    final result = <String, String>{};
+    try {
+      final snap =
+          await FirebaseFirestore.instance.collection('skills').get();
+      final byId = {for (final doc in snap.docs) doc.id: doc.data()};
+      for (final id in skillIds) {
+        final data = byId[id];
+        result[id] = (data?['name'] as String?) ?? id;
+      }
+    } catch (_) {
+      // Fallback: mostrar los IDs tal cual si Firestore falla.
+      for (final id in skillIds) {
+        result[id] = id;
+      }
+    }
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, String>>(
+      future: _resolveNames(),
+      builder: (context, snapshot) {
+        final names = snapshot.data;
+        if (names == null || names.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF2F8F2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.handyman_outlined,
+                    color: AppTheme.primaryGreen,
+                    size: 19,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Habilidades requeridas',
+                  style: TextStyle(
+                    color: AppTheme.textLight,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: names.values.map((name) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.30),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.verified_outlined,
+                        color: AppTheme.primaryGreen,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          color: AppTheme.primaryGreen,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }

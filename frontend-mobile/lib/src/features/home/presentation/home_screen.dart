@@ -1401,6 +1401,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   bool _checkingOwnOfferStatus = true;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
   _ownOfferSubscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  _jobSubscription;
+  Map<String, dynamic>? _liveJobData;
 
   // Rol del usuario actual
   String? _currentUserRole;
@@ -1411,6 +1414,25 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     _loadParticipants();
     _loadOwnOfferStatus();
     _listenForOwnOfferStatus();
+    _listenForJobUpdates();
+  }
+
+  void _listenForJobUpdates() {
+    if (widget.jobId.isEmpty) return;
+    _jobSubscription = FirebaseFirestore.instance
+        .collection('jobs')
+        .doc(widget.jobId)
+        .snapshots()
+        .listen(
+          (doc) {
+            if (doc.exists && mounted) {
+              setState(() => _liveJobData = doc.data());
+            }
+          },
+          onError: (Object error) {
+            debugPrint('JOB_LISTEN_ERROR: $error');
+          },
+        );
   }
 
   Future<void> _loadOwnOfferStatus() async {
@@ -1475,6 +1497,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   @override
   void dispose() {
     _ownOfferSubscription?.cancel();
+    _jobSubscription?.cancel();
     super.dispose();
   }
 
@@ -2060,7 +2083,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final jobData = widget.jobData;
+    final jobData = _liveJobData ?? widget.jobData;
     final details = jobData['details'] as Map<String, dynamic>? ?? {};
     final pricing = jobData['pricing'] as Map<String, dynamic>? ?? {};
     final loc = jobData['location'] as Map<String, dynamic>? ?? {};
@@ -2068,6 +2091,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final title = details['title'] as String? ?? 'Sin título';
     final desc = details['description'] as String? ?? 'Sin descripción';
     final categoryId = normalizeCategoryId(details['categoryId'] ?? 'general');
+    final rawSkillIds = details['skillIds'] ?? jobData['skillIds'];
+    final List<String> skillIds = rawSkillIds is List
+        ? rawSkillIds
+            .map((e) => e.toString())
+            .where((e) => e.trim().isNotEmpty)
+            .toList()
+        : <String>[];
     final price = (pricing['proposedPrice'] ?? 0.0) as num;
     final currency = pricing['currency'] as String? ?? 'Q';
     final status = jobData['status'] as String? ?? 'pending';
@@ -2611,13 +2641,53 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     icon: Icons.description_outlined,
                     iconColor: const Color(0xFF37474F),
                     label: 'DESCRIPCIÓN',
-                    child: Text(
-                      desc,
-                      style: const TextStyle(
-                        color: AppTheme.textDark,
-                        height: 1.6,
-                        fontSize: 14,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          desc,
+                          style: const TextStyle(
+                            color: AppTheme.textDark,
+                            height: 1.6,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if (skillIds.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Divider(height: 1, color: Colors.grey.shade200),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryGreen.withValues(
+                                    alpha: 0.12,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Icon(
+                                  Icons.handyman_outlined,
+                                  size: 13,
+                                  color: AppTheme.primaryGreen,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'HABILIDADES REQUERIDAS',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.grey[500],
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          _JobSkillChips(skillIds: skillIds),
+                        ],
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -3333,6 +3403,91 @@ class _MiniShimmerState extends State<_MiniShimmer>
               ],
             ),
           ),
+    );
+  }
+}
+
+/// Muestra las habilidades requeridas de un trabajo como chips legibles.
+class _JobSkillChips extends StatelessWidget {
+  final List<String> skillIds;
+
+  const _JobSkillChips({required this.skillIds});
+
+  static final Map<String, String> _nameCache = {};
+
+  Future<Map<String, String>> _resolveNames() async {
+    final missing =
+        skillIds.where((id) => !_nameCache.containsKey(id)).toList();
+    if (missing.isNotEmpty) {
+      try {
+        final snap =
+            await FirebaseFirestore.instance.collection('skills').get();
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          final name = (data['name'] as String?) ?? doc.id;
+          _nameCache[doc.id] = name;
+        }
+      } catch (_) {
+        for (final id in missing) {
+          _nameCache.putIfAbsent(id, () => id);
+        }
+      }
+    }
+    return {for (final id in skillIds) id: _nameCache[id] ?? id};
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (skillIds.isEmpty) return const SizedBox.shrink();
+
+    return FutureBuilder<Map<String, String>>(
+      future: _resolveNames(),
+      builder: (context, snapshot) {
+        final names =
+            snapshot.data ?? {for (final id in skillIds) id: _nameCache[id] ?? id};
+
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children:
+              skillIds.map((id) {
+                final name = names[id] ?? id;
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.25),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 13,
+                        color: AppTheme.primaryGreen,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primaryGreen,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+        );
+      },
     );
   }
 }

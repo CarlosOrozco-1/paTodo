@@ -28,10 +28,42 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
   String _directions = '';
   List<String> _categories = [];
 
+  /// Mapa id → nombre legible de cada skill disponible.
+  Map<String, String> _availableSkills = {};
+  /// IDs de skills seleccionados por el usuario.
+  List<String> _selectedSkillIds = [];
+
   @override
   void initState() {
     super.initState();
     _loadCategories();
+  }
+
+  /// Carga las skills activas que pertenecen a la categoría seleccionada.
+  Future<void> _loadSkillsForCategory(String categoryId) async {
+    try {
+      final snap = await FirebaseFirestore.instance.collection('skills').get();
+      final skills = <String, String>{};
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        if (data['isActive'] == false) continue;
+        final categoryIds = List<String>.from(data['categoryIds'] as List? ?? []);
+        if (categoryIds.contains(categoryId)) {
+          skills[doc.id] = (data['name'] as String?) ?? doc.id;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _availableSkills = skills;
+          // Eliminar skills previamente seleccionados que ya no pertenecen a la categoría.
+          _selectedSkillIds = _selectedSkillIds
+              .where((id) => skills.containsKey(id))
+              .toList();
+        });
+      }
+    } catch (_) {
+      // Si falla, dejar el selector vacío; no es campo obligatorio.
+    }
   }
 
   Future<void> _loadCategories() async {
@@ -114,6 +146,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         description: _descController.text,
         price: double.parse(_priceController.text),
         categoryId: _category!,
+        skillIds: _selectedSkillIds,
         location: _location!,
         address: _directions.isEmpty
             ? _address
@@ -234,6 +267,106 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
           ),
         ),
       );
+  }
+
+  Widget _buildSkillSelector() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: _selectedSkillIds.isNotEmpty
+              ? AppTheme.primaryGreen.withValues(alpha: 0.45)
+              : const Color(0xFFE7EBE7),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.handyman_outlined,
+                  color: AppTheme.primaryGreen,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Habilidades requeridas',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Selecciona las que apliquen',
+                      style: TextStyle(
+                        color: AppTheme.textLight,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _availableSkills.entries.map((entry) {
+              final isSelected = _selectedSkillIds.contains(entry.key);
+              return FilterChip(
+                selected: isSelected,
+                label: Text(entry.value),
+                avatar: isSelected
+                    ? const Icon(Icons.check_rounded, size: 16)
+                    : null,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : AppTheme.textDark,
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                ),
+                selectedColor: AppTheme.primaryGreen,
+                backgroundColor: const Color(0xFFF2F8F2),
+                checkmarkColor: Colors.white,
+                showCheckmark: false,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  side: BorderSide(
+                    color: isSelected
+                        ? AppTheme.primaryGreen
+                        : const Color(0xFFD5E0D6),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedSkillIds.add(entry.key);
+                    } else {
+                      _selectedSkillIds.remove(entry.key);
+                    }
+                  });
+                },
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildLocationCard() {
@@ -361,9 +494,17 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                           ),
                         )
                         .toList(),
-                onChanged: (value) => setState(() => _category = value),
+                onChanged: (value) {
+                  setState(() => _category = value);
+                  if (value != null) _loadSkillsForCategory(value);
+                },
               ),
               const SizedBox(height: 15),
+              // ── Selector de habilidades (skills) ──
+              if (_availableSkills.isNotEmpty) ...[
+                _buildSkillSelector(),
+                const SizedBox(height: 15),
+              ],
               TextFormField(
                 controller: _priceController,
                 keyboardType: TextInputType.number,

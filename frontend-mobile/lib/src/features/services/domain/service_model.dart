@@ -11,6 +11,7 @@ class ServiceJob {
   final String title;
   final String description;
   final String categoryId;
+  final List<String> skillIds;
   final String status;
   final double proposedPrice;
   final String currency;
@@ -27,6 +28,7 @@ class ServiceJob {
     required this.title,
     required this.description,
     this.categoryId = 'general',
+    this.skillIds = const [],
     this.status = 'pending',
     required this.proposedPrice,
     this.currency = 'GTQ',
@@ -46,6 +48,7 @@ class ServiceJob {
         'title': title,
         'description': description,
         'categoryId': categoryId,
+        if (skillIds.isNotEmpty) 'skillIds': skillIds,
       },
       'status': status,
       'pricing': {
@@ -73,6 +76,7 @@ class ServiceJob {
       title: map['details']?['title'] ?? '',
       description: map['details']?['description'] ?? '',
       categoryId: map['details']?['categoryId'] ?? 'general',
+      skillIds: List<String>.from(map['details']?['skillIds'] as List? ?? []),
       status: map['status'] ?? 'pending',
       proposedPrice: (pricing['proposedPrice'] ?? 0.0).toDouble(),
       currency: pricing['currency'] ?? 'GTQ',

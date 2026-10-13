@@ -21,6 +21,7 @@ class FirebaseService {
     required String categoryId,
     required GeoPoint location,
     required String address,
+    List<String> skillIds = const [],
     String currency = 'GTQ',
   }) async {
     final user = _auth.currentUser;
@@ -31,6 +32,7 @@ class FirebaseService {
       title: title,
       description: description,
       categoryId: categoryId,
+      skillIds: skillIds,
       proposedPrice: price,
       currency: currency,
       location: location,
