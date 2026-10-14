@@ -116,13 +116,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     // Solo trabajos de otros para postularme, nunca mis propios trabajos:
                     (currentUid == null || job.clientId != currentUid) &&
                     Geolocator.distanceBetween(
-                          position.latitude,
-                          position.longitude,
-                          job.location.latitude,
-                          job.location.longitude,
-                        ) /
-                        1000 <=
-                    _nearbyRadiusKm,
+                              position.latitude,
+                              position.longitude,
+                              job.location.latitude,
+                              job.location.longitude,
+                            ) /
+                            1000 <=
+                        _nearbyRadiusKm,
               )
               .map((job) {
                 final data = Map<String, dynamic>.from(job.toMap());
@@ -191,16 +191,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 Icon(
                   icon,
                   size: 15,
-                  color:
-                      isSelected ? AppTheme.primaryGreen : Colors.grey[600],
+                  color: isSelected ? AppTheme.primaryGreen : Colors.grey[600],
                 ),
                 const SizedBox(width: 5),
                 Text(
                   label,
                   style: TextStyle(
                     fontSize: 12.5,
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.w600,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                     color:
                         isSelected ? AppTheme.primaryGreen : Colors.grey[700],
                   ),
@@ -332,36 +330,37 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
-                        children: isBoth
-                            ? [
-                              _buildTabButton(
-                                index: 0,
-                                icon: Icons.explore_outlined,
-                                label: 'Cercanos',
-                              ),
-                              _buildTabButton(
-                                index: 1,
-                                icon: Icons.travel_explore,
-                                label: 'Postularme',
-                              ),
-                              _buildTabButton(
-                                index: 2,
-                                icon: Icons.assignment_outlined,
-                                label: 'Mis Publicados',
-                              ),
-                            ]
-                            : [
-                              _buildTabButton(
-                                index: 0,
-                                icon: Icons.explore_outlined,
-                                label: 'Trabajos Cercanos',
-                              ),
-                              _buildTabButton(
-                                index: 1,
-                                icon: Icons.travel_explore,
-                                label: 'Para Postularme',
-                              ),
-                            ],
+                        children:
+                            isBoth
+                                ? [
+                                  _buildTabButton(
+                                    index: 0,
+                                    icon: Icons.explore_outlined,
+                                    label: 'Cercanos',
+                                  ),
+                                  _buildTabButton(
+                                    index: 1,
+                                    icon: Icons.travel_explore,
+                                    label: 'Postularme',
+                                  ),
+                                  _buildTabButton(
+                                    index: 2,
+                                    icon: Icons.assignment_outlined,
+                                    label: 'Mis Publicados',
+                                  ),
+                                ]
+                                : [
+                                  _buildTabButton(
+                                    index: 0,
+                                    icon: Icons.explore_outlined,
+                                    label: 'Trabajos Cercanos',
+                                  ),
+                                  _buildTabButton(
+                                    index: 1,
+                                    icon: Icons.travel_explore,
+                                    label: 'Para Postularme',
+                                  ),
+                                ],
                       ),
                     ),
                   ],
@@ -895,18 +894,20 @@ class _MoreJobsList extends StatelessWidget {
 
         final docs = snap.data?.docs ?? [];
         // Filtrar para excluir mis propias publicaciones de la lista para postularme
-        final availableDocs = docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>?;
-          if (data == null) return false;
-          final clientId = data['clientId'] as String?;
-          return currentUid == null || clientId != currentUid;
-        }).toList();
+        final availableDocs =
+            docs.where((doc) {
+              final data = doc.data() as Map<String, dynamic>?;
+              if (data == null) return false;
+              final clientId = data['clientId'] as String?;
+              return currentUid == null || clientId != currentUid;
+            }).toList();
 
         if (availableDocs.isEmpty) {
           return const _EmptyState(
             icon: Icons.public_off_outlined,
             title: 'Sin publicaciones para postularte',
-            subtitle: 'Cuando otros clientes publiquen trabajos, aparecerán aquí.',
+            subtitle:
+                'Cuando otros clientes publiquen trabajos, aparecerán aquí.',
           );
         }
 
@@ -1035,7 +1036,8 @@ class ModernJobCard extends StatelessWidget {
     final clientName = jobData['clientName']?.toString();
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     final jobClientId = (jobData['clientId'] ?? jobData['uid'])?.toString();
-    final isOwner = currentUid != null && jobClientId != null && currentUid == jobClientId;
+    final isOwner =
+        currentUid != null && jobClientId != null && currentUid == jobClientId;
 
     final catIcon = jobCategoryIcon(categoryId);
     final catColor = jobCategoryColor(categoryId);
@@ -1066,9 +1068,10 @@ class ModernJobCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isOwner
-              ? AppTheme.primaryGreen.withOpacity(0.35)
-              : Colors.grey.withValues(alpha: 0.15),
+          color:
+              isOwner
+                  ? AppTheme.primaryGreen.withOpacity(0.35)
+                  : Colors.grey.withValues(alpha: 0.15),
           width: isOwner ? 1.5 : 1,
         ),
         boxShadow: [
@@ -1401,8 +1404,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   bool _checkingOwnOfferStatus = true;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
   _ownOfferSubscription;
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
-  _jobSubscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _jobSubscription;
   Map<String, dynamic>? _liveJobData;
 
   // Rol del usuario actual
@@ -1706,9 +1708,37 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final priceCtrl = TextEditingController();
     final timeCtrl = TextEditingController();
     var timeUnit = _DetailOfferTimeUnit.minutes;
-    final currency =
-        (widget.jobData['pricing'] as Map<String, dynamic>?)?['currency'] ??
-        'Q';
+    final pricing =
+        widget.jobData['pricing'] as Map<String, dynamic>? ?? const {};
+    final currency = pricing['currency'] ?? 'Q';
+    final proposedAmountRaw =
+        pricing['proposedPrice'] ??
+        widget.jobData['proposedPrice'] ??
+        widget.jobData['price'];
+    final proposedAmount =
+        proposedAmountRaw is num
+            ? proposedAmountRaw.toDouble()
+            : double.tryParse(proposedAmountRaw?.toString() ?? '');
+
+    String? priceComparisonMessage() {
+      final offer = double.tryParse(priceCtrl.text.trim().replaceAll(',', '.'));
+      if (offer == null ||
+          offer <= 0 ||
+          proposedAmount == null ||
+          proposedAmount <= 0) {
+        return null;
+      }
+      if (offer > proposedAmount) {
+        return 'Tu oferta supera en $currency ${(offer - proposedAmount).toStringAsFixed(2)} el monto propuesto por el cliente.';
+      }
+      if (offer < proposedAmount * 0.8) {
+        return 'Tu oferta está más de un 20% por debajo del monto propuesto; verifica que cubra el trabajo.';
+      }
+      if (offer < proposedAmount) {
+        return 'Tu oferta está por debajo del monto propuesto por el cliente.';
+      }
+      return 'Tu oferta coincide con el monto propuesto por el cliente.';
+    }
 
     String formattedEstimatedTime() {
       final amount = int.tryParse(timeCtrl.text.trim());
@@ -1793,6 +1823,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                         // Precio propuesto
                         TextField(
                           controller: priceCtrl,
+                          onChanged: (_) => setSheetState(() {}),
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
@@ -1814,6 +1845,42 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                             ),
                           ),
                         ),
+                        if (priceComparisonMessage() case final message?) ...[
+                          const SizedBox(height: 9),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(11),
+                            decoration: BoxDecoration(
+                              color:
+                                  message.contains('supera')
+                                      ? const Color(0xFFFFF4E5)
+                                      : const Color(0xFFEAF8EB),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  message.contains('supera')
+                                      ? Icons.warning_amber_rounded
+                                      : Icons.info_outline_rounded,
+                                  size: 18,
+                                  color:
+                                      message.contains('supera')
+                                          ? Colors.deepOrange
+                                          : AppTheme.primaryGreen,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    message,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 14),
                         Container(
                           width: double.infinity,
@@ -2092,12 +2159,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final desc = details['description'] as String? ?? 'Sin descripción';
     final categoryId = normalizeCategoryId(details['categoryId'] ?? 'general');
     final rawSkillIds = details['skillIds'] ?? jobData['skillIds'];
-    final List<String> skillIds = rawSkillIds is List
-        ? rawSkillIds
-            .map((e) => e.toString())
-            .where((e) => e.trim().isNotEmpty)
-            .toList()
-        : <String>[];
+    final List<String> skillIds =
+        rawSkillIds is List
+            ? rawSkillIds
+                .map((e) => e.toString())
+                .where((e) => e.trim().isNotEmpty)
+                .toList()
+            : <String>[];
     final price = (pricing['proposedPrice'] ?? 0.0) as num;
     final currency = pricing['currency'] as String? ?? 'Q';
     final status = jobData['status'] as String? ?? 'pending';
@@ -3444,7 +3512,8 @@ class _JobSkillChips extends StatelessWidget {
       future: _resolveNames(),
       builder: (context, snapshot) {
         final names =
-            snapshot.data ?? {for (final id in skillIds) id: _nameCache[id] ?? id};
+            snapshot.data ??
+            {for (final id in skillIds) id: _nameCache[id] ?? id};
 
         return Wrap(
           spacing: 8,

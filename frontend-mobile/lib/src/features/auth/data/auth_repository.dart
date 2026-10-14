@@ -42,7 +42,10 @@ class AuthRepository {
     required String lastName,
     required String phone,
   }) async {
-    final cred = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+    final cred = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
     debugPrint('SIGNUP_AUTH_OK: ${cred.user!.uid}');
     final user = cred.user!;
     // DEV: imprime la URL real para distinguir 10.0.2.2 (emulador) vs Render.
@@ -50,13 +53,17 @@ class AuthRepository {
     final token = await user.getIdToken();
 
     try {
-      final res = await _api.dio.post('/createUser', data: {
-        'uid': user.uid,
-        'email': email,
-        'role': role,
-        'profile': {'firstName': firstName, 'lastName': lastName},
-        'contact': {'phone': normalizeGtPhone(phone)},
-      }, options: orgOptions(token));
+      final res = await _api.dio.post(
+        '/createUser',
+        data: {
+          'uid': user.uid,
+          'email': email,
+          'role': role,
+          'profile': {'firstName': firstName, 'lastName': lastName},
+          'contact': {'phone': normalizeGtPhone(phone)},
+        },
+        options: orgOptions(token),
+      );
       debugPrint('SIGNUP_API_OK: ${res.statusCode}');
     } catch (e) {
       // DEV: si la API falla, la cuenta queda huérfana en Auth (explica el
@@ -87,12 +94,13 @@ class AuthRepository {
       debugPrint('VERIFY_EMAIL_SKIP: $e');
     }
   }
+
   Future<UserCredential> signIn(String email, String password) =>
       _auth.signInWithEmailAndPassword(email: email, password: password);
 
-  /// Enlace de recuperación nativo (fallback de Firebase).
+  /// Envía el correo nativo de restablecimiento de Firebase Auth.
   Future<void> sendPasswordReset(String email) =>
-      _auth.sendPasswordResetEmail(email: email);
+      _auth.sendPasswordResetEmail(email: email.trim());
 
   /// Solicita un código de recuperación de 6 dígitos (OTP) enviado por correo vía API.
   Future<void> requestPasswordResetOtp(String email) async {
@@ -102,10 +110,13 @@ class AuthRepository {
         data: {'email': email.trim()},
       );
     } on DioException catch (e) {
-      final msg = e.response?.data is Map
-          ? (e.response?.data['error'] as String?)
-          : null;
-      throw Exception(msg ?? 'No pudimos enviar el código. Inténtalo de nuevo.');
+      final msg =
+          e.response?.data is Map
+              ? (e.response?.data['error'] as String?)
+              : null;
+      throw Exception(
+        msg ?? 'No pudimos enviar el código. Inténtalo de nuevo.',
+      );
     }
   }
 
@@ -114,15 +125,13 @@ class AuthRepository {
     try {
       await _api.dio.post(
         '/auth/verifyResetCode',
-        data: {
-          'email': email.trim(),
-          'code': code.trim(),
-        },
+        data: {'email': email.trim(), 'code': code.trim()},
       );
     } on DioException catch (e) {
-      final msg = e.response?.data is Map
-          ? (e.response?.data['error'] as String?)
-          : null;
+      final msg =
+          e.response?.data is Map
+              ? (e.response?.data['error'] as String?)
+              : null;
       throw Exception(msg ?? 'Código no válido o expirado.');
     }
   }
@@ -143,9 +152,10 @@ class AuthRepository {
         },
       );
     } on DioException catch (e) {
-      final msg = e.response?.data is Map
-          ? (e.response?.data['error'] as String?)
-          : null;
+      final msg =
+          e.response?.data is Map
+              ? (e.response?.data['error'] as String?)
+              : null;
       throw Exception(msg ?? 'No se pudo restablecer la contraseña.');
     }
   }
@@ -188,13 +198,17 @@ class AuthRepository {
     final user = _auth.currentUser!;
     debugPrint('REGISTER_BASEURL: ${_api.dio.options.baseUrl}');
     final token = await user.getIdToken();
-    final res = await _api.dio.post('/createUser', data: {
-      'uid': user.uid,
-      'email': user.email,
-      'role': role,
-      'profile': {'firstName': firstName, 'lastName': lastName},
-      'contact': {'phone': normalizeGtPhone(phone)},
-    }, options: orgOptions(token));
+    final res = await _api.dio.post(
+      '/createUser',
+      data: {
+        'uid': user.uid,
+        'email': user.email,
+        'role': role,
+        'profile': {'firstName': firstName, 'lastName': lastName},
+        'contact': {'phone': normalizeGtPhone(phone)},
+      },
+      options: orgOptions(token),
+    );
     debugPrint('SIGNUP_API_OK: ${res.statusCode}');
     await user.getIdToken(true);
   }
@@ -203,6 +217,7 @@ class AuthRepository {
 
   Stream<User?> authStateChanges() => _auth.authStateChanges();
 
-  static Options orgOptions(String? token) =>
-      Options(headers: token != null ? {'Authorization': 'Bearer $token'} : null);
+  static Options orgOptions(String? token) => Options(
+    headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+  );
 }
