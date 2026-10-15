@@ -111,6 +111,8 @@ class _ServiceCard extends StatelessWidget {
     final title = details['title'] as String? ?? 'Servicio';
     final price =
         pricing['proposedPrice'] as num? ?? pricing['budget'] as num? ?? 0;
+    final paymentMethod =
+        (pricing['paymentMethod'] ?? job['paymentMethod'] ?? 'cash').toString();
     final isClient = job['clientId'] == userId;
     final otherName = isClient ? 'Trabajador asignado' : 'Cliente';
     final otherRole = isClient ? 'Trabajador' : 'Cliente';
@@ -208,9 +210,54 @@ class _ServiceCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 15),
-              Text(
-                'Presupuesto: GTQ ${price.toStringAsFixed(2)}',
-                style: const TextStyle(color: AppTheme.textLight),
+              Row(
+                children: [
+                  Text(
+                    'Presupuesto: GTQ ${price.toStringAsFixed(2)}',
+                    style: const TextStyle(color: AppTheme.textLight),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: paymentMethod == 'card'
+                          ? const Color(0xFFE3F2FD)
+                          : const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: paymentMethod == 'card'
+                            ? const Color(0xFF90CAF9)
+                            : const Color(0xFFA5D6A7),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          paymentMethod == 'card'
+                              ? Icons.credit_card_rounded
+                              : Icons.payments_rounded,
+                          size: 12,
+                          color: paymentMethod == 'card'
+                              ? const Color(0xFF1565C0)
+                              : const Color(0xFF2E7D32),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          paymentMethod == 'card' ? 'Tarjeta' : 'Efectivo',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: paymentMethod == 'card'
+                                ? const Color(0xFF1565C0)
+                                : const Color(0xFF2E7D32),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 14),
               const Divider(height: 1),

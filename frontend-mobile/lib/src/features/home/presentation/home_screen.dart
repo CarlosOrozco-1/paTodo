@@ -1018,6 +1018,8 @@ class ModernJobCard extends StatelessWidget {
 
     final currency =
         (pricing['currency'] ?? jobData['currency'] ?? 'Q').toString();
+    final paymentMethod =
+        (pricing['paymentMethod'] ?? jobData['paymentMethod'] ?? 'cash').toString();
     final address =
         (location['address'] ?? jobData['address'] ?? '').toString();
 
@@ -1110,108 +1112,115 @@ class ModernJobCard extends StatelessWidget {
                   ),
                 ),
                 // ── Fila Superior: Categoría + Estado / Tu Publicación ──
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Chip de Categoría
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: catColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(catIcon, size: 14, color: catColor),
-                          const SizedBox(width: 6),
-                          Text(
-                            catName,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: catColor,
+                SizedBox(
+                  width: double.infinity,
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      // Chip de Categoría
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: catColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(catIcon, size: 13, color: catColor),
+                            const SizedBox(width: 5),
+                            Text(
+                              catName,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: catColor,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    // Badges (Tu publicación + Estado)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isOwner) ...[
+                      // Badges (Tu publicación + Estado)
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (isOwner) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 3.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F5E9),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFF81C784),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(
+                                    Icons.person_pin_circle_rounded,
+                                    size: 12,
+                                    color: Color(0xFF2E7D32),
+                                  ),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'Tu publicación',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          // Badge de Estado
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 4,
                             ),
-                            margin: const EdgeInsets.only(right: 6),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE8F5E9),
+                              color: statusColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: const Color(0xFF81C784),
+                                color: statusColor.withValues(alpha: 0.25),
                                 width: 1,
                               ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(
-                                  Icons.person_pin_circle_rounded,
-                                  size: 13,
-                                  color: Color(0xFF2E7D32),
-                                ),
-                                SizedBox(width: 4),
+                              children: [
+                                Icon(statusIcon, size: 11, color: statusColor),
+                                const SizedBox(width: 4),
                                 Text(
-                                  'Tu publicación',
+                                  statusLabel,
                                   style: TextStyle(
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.w800,
-                                    color: Color(0xFF2E7D32),
+                                    color: statusColor,
                                   ),
                                 ),
                               ],
                             ),
                           ),
                         ],
-                        // Badge de Estado
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: statusColor.withValues(alpha: 0.25),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(statusIcon, size: 12, color: statusColor),
-                              const SizedBox(width: 4),
-                              Text(
-                                statusLabel,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color: statusColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 14),
 
@@ -1324,43 +1333,93 @@ class ModernJobCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
 
-                    // Etiqueta de Precio / Presupuesto
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(
-                              0xFF1B5E20,
-                            ).withValues(alpha: 0.25),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                    // Etiqueta de Precio / Presupuesto + Método de pago
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
                           ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '$currency ${price.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: -0.3,
+                          decoration: BoxDecoration(
+                            color: paymentMethod == 'card'
+                                ? const Color(0xFFE3F2FD)
+                                : const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: paymentMethod == 'card'
+                                  ? const Color(0xFF90CAF9)
+                                  : const Color(0xFFA5D6A7),
+                              width: 1,
                             ),
                           ),
-                        ],
-                      ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                paymentMethod == 'card'
+                                    ? Icons.credit_card_rounded
+                                    : Icons.payments_rounded,
+                                size: 12,
+                                color: paymentMethod == 'card'
+                                    ? const Color(0xFF1565C0)
+                                    : const Color(0xFF2E7D32),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                paymentMethod == 'card' ? 'Tarjeta' : 'Efectivo',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: paymentMethod == 'card'
+                                      ? const Color(0xFF1565C0)
+                                      : const Color(0xFF2E7D32),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF1B5E20,
+                                ).withValues(alpha: 0.25),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$currency ${price.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -2168,6 +2227,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             : <String>[];
     final price = (pricing['proposedPrice'] ?? 0.0) as num;
     final currency = pricing['currency'] as String? ?? 'Q';
+    final paymentMethod =
+        (pricing['paymentMethod'] ?? jobData['paymentMethod'] ?? 'cash').toString();
     final status = jobData['status'] as String? ?? 'pending';
     final address = loc['address'] as String?;
     final clientId = jobData['clientId'] as String?;
@@ -2455,103 +2516,192 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                         ),
                         Padding(
                           padding: const EdgeInsets.all(20),
-                          child: Row(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Precio
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Presupuesto',
-                                      style: TextStyle(
-                                        color: Colors.grey[500],
-                                        fontSize: 11,
-                                        letterSpacing: 0.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      '$currency ${price.toStringAsFixed(2)}',
-                                      style: TextStyle(
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.w900,
-                                        color: AppTheme.primaryGreen,
-                                        letterSpacing: -1,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    // Chip de categoría
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: catColor.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            catIcon,
-                                            size: 13,
-                                            color: catColor,
-                                          ),
-                                          const SizedBox(width: 5),
-                                          Text(
-                                            categoryDisplayName(categoryId),
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color: catColor,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // Estado
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withOpacity(0.08),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: statusColor.withOpacity(0.25),
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
+                                  // Precio
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Icon(
-                                          statusIcon,
-                                          size: 14,
-                                          color: statusColor,
-                                        ),
-                                        const SizedBox(width: 5),
                                         Text(
-                                          statusLabel,
+                                          'Presupuesto',
                                           style: TextStyle(
-                                            color: statusColor,
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 12,
+                                            color: Colors.grey[500],
+                                            fontSize: 11,
+                                            letterSpacing: 0.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          '$currency ${price.toStringAsFixed(2)}',
+                                          style: TextStyle(
+                                            fontSize: 32,
+                                            fontWeight: FontWeight.w900,
+                                            color: AppTheme.primaryGreen,
+                                            letterSpacing: -1,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        // Chip de categoría
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: catColor.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                catIcon,
+                                                size: 13,
+                                                color: catColor,
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Text(
+                                                categoryDisplayName(categoryId),
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: catColor,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  // Estado
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(
+                                            color: statusColor.withOpacity(0.25),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              statusIcon,
+                                              size: 14,
+                                              color: statusColor,
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              statusLabel,
+                                              style: TextStyle(
+                                                color: statusColor,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Divider(height: 1, color: Colors.grey.shade100),
+                              const SizedBox(height: 14),
+                              // ── Fila de Método de pago ──
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: paymentMethod == 'card'
+                                          ? const Color(0xFFE3F2FD)
+                                          : const Color(0xFFE8F5E9),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      paymentMethod == 'card'
+                                          ? Icons.credit_card_rounded
+                                          : Icons.payments_rounded,
+                                      size: 18,
+                                      color: paymentMethod == 'card'
+                                          ? const Color(0xFF1565C0)
+                                          : const Color(0xFF2E7D32),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'MÉTODO DE PAGO',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.grey[500],
+                                            letterSpacing: 0.8,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          paymentMethod == 'card'
+                                              ? 'Pago con Tarjeta (simulado)'
+                                              : 'Pago en Efectivo',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w800,
+                                            color: paymentMethod == 'card'
+                                                ? const Color(0xFF1565C0)
+                                                : const Color(0xFF2E7D32),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: paymentMethod == 'card'
+                                          ? const Color(0xFFE3F2FD)
+                                          : const Color(0xFFE8F5E9),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: paymentMethod == 'card'
+                                            ? const Color(0xFF90CAF9)
+                                            : const Color(0xFFA5D6A7),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      paymentMethod == 'card' ? 'Tarjeta' : 'Efectivo',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: paymentMethod == 'card'
+                                            ? const Color(0xFF1565C0)
+                                            : const Color(0xFF2E7D32),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -2933,7 +3083,7 @@ class _OffersForJobState extends State<_OffersForJob> {
         SnackBar(
           content: Text(
             accept
-                ? 'Propuesta aceptada. El seguimiento ya estÃ¡ activo.'
+                ? 'Propuesta aceptada. El seguimiento ya está activo.'
                 : 'Propuesta rechazada.',
           ),
           backgroundColor: accept ? AppTheme.primaryGreen : Colors.blueGrey,
@@ -2947,7 +3097,7 @@ class _OffersForJobState extends State<_OffersForJob> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'No pudimos procesar la propuesta. IntÃ©ntalo de nuevo.',
+            'No pudimos procesar la propuesta. Inténtalo de nuevo.',
           ),
           backgroundColor: Colors.redAccent,
         ),
@@ -3007,7 +3157,7 @@ class _OffersForJobState extends State<_OffersForJob> {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Elige a la persona que realizarÃ¡ tu trabajo.',
+                'Elige a la persona que realizará tu trabajo.',
                 style: TextStyle(color: AppTheme.textLight, fontSize: 13),
               ),
               const SizedBox(height: 14),

@@ -23,6 +23,7 @@ class FirebaseService {
     required String address,
     List<String> skillIds = const [],
     String currency = 'GTQ',
+    String paymentMethod = 'cash',
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('Usuario no autenticado');
@@ -35,6 +36,7 @@ class FirebaseService {
       skillIds: skillIds,
       proposedPrice: price,
       currency: currency,
+      paymentMethod: paymentMethod,
       location: location,
       geohash: GeoHashUtil.encode(location.latitude, location.longitude),
       address: address,

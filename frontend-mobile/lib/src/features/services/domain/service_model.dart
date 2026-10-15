@@ -15,6 +15,7 @@ class ServiceJob {
   final String status;
   final double proposedPrice;
   final String currency;
+  final String paymentMethod;
   final GeoPoint location;
   final String geohash;
   final String address;
@@ -32,6 +33,7 @@ class ServiceJob {
     this.status = 'pending',
     required this.proposedPrice,
     this.currency = 'GTQ',
+    this.paymentMethod = 'cash',
     this.location = const GeoPoint(14.6349, -90.5069),
     this.geohash = '',
     this.address = '',
@@ -55,7 +57,9 @@ class ServiceJob {
         'proposedPrice': proposedPrice,
         'currency': currency,
         'priceType': 'negotiable',
+        'paymentMethod': paymentMethod,
       },
+      'paymentMethod': paymentMethod,
       'location': {
         'geopoint': location,
         'geohash': geohash,
@@ -80,6 +84,7 @@ class ServiceJob {
       status: map['status'] ?? 'pending',
       proposedPrice: (pricing['proposedPrice'] ?? 0.0).toDouble(),
       currency: pricing['currency'] ?? 'GTQ',
+      paymentMethod: (pricing['paymentMethod'] ?? map['paymentMethod'] ?? 'cash').toString(),
       location: loc['geopoint'] as GeoPoint? ?? const GeoPoint(14.6349, -90.5069),
       geohash: loc['geohash'] ?? '',
       address: loc['address'] ?? '',

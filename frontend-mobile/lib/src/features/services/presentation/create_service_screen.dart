@@ -22,6 +22,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
   final _service = FirebaseService();
 
   String? _category;
+  String _paymentMethod = 'cash';
   bool _isLoading = false;
   GeoPoint? _location;
   String _address = '';
@@ -151,6 +152,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         address: _directions.isEmpty
             ? _address
             : '$_address · Indicaciones: $_directions',
+        paymentMethod: _paymentMethod,
       );
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
@@ -439,6 +441,104 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
     );
   }
 
+  Widget _buildPaymentMethodSelector() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE7EBE7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.payments_outlined, size: 18, color: AppTheme.primaryGreen),
+              SizedBox(width: 8),
+              Text(
+                'Método de pago (simulado)',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildPaymentOption(
+                  id: 'cash',
+                  label: 'Efectivo',
+                  icon: Icons.payments_rounded,
+                  isSelected: _paymentMethod == 'cash',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildPaymentOption(
+                  id: 'card',
+                  label: 'Tarjeta',
+                  icon: Icons.credit_card_rounded,
+                  isSelected: _paymentMethod == 'card',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentOption({
+    required String id,
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+  }) {
+    final activeColor = id == 'card' ? const Color(0xFF1976D2) : AppTheme.primaryGreen;
+    return Material(
+      color: isSelected ? activeColor.withValues(alpha: 0.12) : const Color(0xFFF7F9F7),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () => setState(() => _paymentMethod = id),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? activeColor : const Color(0xFFE0E5E0),
+              width: isSelected ? 1.8 : 1.0,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isSelected ? activeColor : AppTheme.textLight,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  color: isSelected ? activeColor : AppTheme.textDark,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   InputDecoration _dec(String label, {Widget? suffix}) => InputDecoration(
         labelText: label,
         filled: true,
@@ -511,6 +611,8 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                 decoration: _dec('Presupuesto (Q)'),
                 validator: (v) => double.tryParse(v!) == null ? 'Número inválido' : null,
               ),
+              const SizedBox(height: 15),
+              _buildPaymentMethodSelector(),
               const SizedBox(height: 15),
               _buildLocationCard(),
               const SizedBox(height: 30),

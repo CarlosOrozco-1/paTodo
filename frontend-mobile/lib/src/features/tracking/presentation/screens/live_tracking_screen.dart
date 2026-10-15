@@ -133,7 +133,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
       final geometry = Map<String, dynamic>.from(data['geometry'] as Map);
       final coordinates = geometry['coordinates'] as List? ?? [];
       final route = coordinates.map(_toLatLng).whereType<LatLng>().toList();
-      if (route.length < 2) throw StateError('Ruta vacía');
+      if (route.length < 2) throw StateError('Ruta vacÃ­a');
       if (!mounted) return;
       setState(() {
         _route = route;
@@ -284,8 +284,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
       );
       return isWorkerPreview;
     } catch (error) {
-      // DEV: Si no hay GPS disponible, se intenta la ruta con la última
-      // ubicación guardada para no bloquear a clientes ni ubicaciones previas.
+      // DEV: Si no hay GPS disponible, se intenta la ruta con la Ãºltima
+      // ubicaciÃ³n guardada para no bloquear a clientes ni ubicaciones previas.
       debugPrint('TRACKING_LOCATION_REFRESH_ERROR: $error');
       return false;
     }
@@ -508,7 +508,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                    'Â¡Tu solicitud fue aceptada! Iniciando seguimiento.',
+                    'Ã‚Â¡Tu solicitud fue aceptada! Iniciando seguimiento.',
                   ),
                   backgroundColor: AppTheme.primaryGreen,
                 ),
@@ -526,87 +526,155 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
         );
   }
 
-  void _showTripCompletedDialog(BuildContext codeDialogContext) {
-    Navigator.of(codeDialogContext).pop();
-    _locationSubscription?.cancel();
-    _driverSubscription?.cancel();
-    if (mounted) setState(() => _isCompletedJob = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder:
-            (dialogContext) => Dialog(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 30, 24, 22),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 76,
-                      height: 76,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE7F7E9),
-                        shape: BoxShape.circle,
+  void _showArrivalCodeEntry() {
+    final controller = TextEditingController();
+    final rootNavigator = Navigator.of(context);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        var jobCompleted = false;
+        return StatefulBuilder(
+          builder: (_, setDialogState) {
+            if (jobCompleted) {
+              return Dialog(
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 30, 24, 22),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 76,
+                        height: 76,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE7F7E9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.route_rounded,
+                          color: AppTheme.primaryGreen,
+                          size: 38,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.route_rounded,
-                        color: AppTheme.primaryGreen,
-                        size: 38,
+                      const SizedBox(height: 18),
+                      const Text(
+                        '¡Trayecto finalizado!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textDark,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      '¡Trayecto finalizado!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.textDark,
+                      const SizedBox(height: 8),
+                      const Text(
+                        'El servicio quedó marcado como realizado. Podrás consultar los mensajes anteriores, pero el chat ya no permitirá enviar nuevos.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppTheme.textLight,
+                          height: 1.45,
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'El servicio quedó marcado como realizado. Podrás consultar los mensajes anteriores, pero el chat ya no permitirá enviar nuevos.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppTheme.textLight,
-                        height: 1.45,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: FilledButton(
-                        onPressed: () {
-                          Navigator.of(dialogContext).pop();
-                          Navigator.of(context).pop();
-                        },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppTheme.primaryGreen,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                      const SizedBox(height: 22),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: FilledButton(
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop();
+                            rootNavigator.pop();
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppTheme.primaryGreen,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Text(
+                            'Entendido',
+                            style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
-                        child: const Text(
-                          'Entendido',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+              );
+            }
+            return AlertDialog(
+              title: const Text('Finalizar servicio'),
+              content: TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: const InputDecoration(
+                  labelText: 'Código de 6 dígitos del cliente',
+                  border: OutlineInputBorder(),
                 ),
               ),
-            ),
-      );
-    });
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    try {
+                      await _api.dio.post(
+                        '/verifyArrivalCode',
+                        data: {
+                          'jobId': widget.jobId,
+                          'code': controller.text.trim(),
+                        },
+                      );
+                      if (!dialogContext.mounted) return;
+                      _locationSubscription?.cancel();
+                      _driverSubscription?.cancel();
+                      if (mounted) setState(() => _isCompletedJob = true);
+                      setDialogState(() => jobCompleted = true);
+                    } on DioException catch (error) {
+                      if (error.response?.statusCode == 404 &&
+                          controller.text.trim() == _fallbackArrivalCode &&
+                          _isAtJob) {
+                        try {
+                          await _api.dio.post(
+                            '/completeJob',
+                            data: {'jobId': widget.jobId},
+                          );
+                          if (!dialogContext.mounted) return;
+                          _locationSubscription?.cancel();
+                          _driverSubscription?.cancel();
+                          if (mounted) setState(() => _isCompletedJob = true);
+                          setDialogState(() => jobCompleted = true);
+                          return;
+                        } on DioException {
+                          // cae al error inferior
+                        }
+                      }
+                      final message =
+                          error.response?.data is Map
+                              ? (error.response?.data['error']?.toString() ??
+                                  'No pudimos verificar el código.')
+                              : 'No pudimos verificar el código.';
+                      if (!dialogContext.mounted) return;
+                      ScaffoldMessenger.of(
+                        dialogContext,
+                      ).showSnackBar(SnackBar(content: Text(message)));
+                    }
+                  },
+                  child: const Text('Confirmar y finalizar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).whenComplete(controller.dispose);
   }
 
   Future<void> _loadArrivalCode() async {
@@ -628,73 +696,6 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
     return value.toString().padLeft(6, '0');
   }
 
-  void _showArrivalCodeEntry() {
-    final controller = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: const Text('Finalizar servicio'),
-            content: TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              decoration: const InputDecoration(
-                labelText: 'Código de 6 dígitos del cliente',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  try {
-                    await _api.dio.post(
-                      '/verifyArrivalCode',
-                      data: {
-                        'jobId': widget.jobId,
-                        'code': controller.text.trim(),
-                      },
-                    );
-                    if (!mounted || !dialogContext.mounted) return;
-                    _showTripCompletedDialog(dialogContext);
-                  } on DioException catch (error) {
-                    if (error.response?.statusCode == 404 &&
-                        controller.text.trim() == _fallbackArrivalCode &&
-                        _isAtJob) {
-                      try {
-                        await _api.dio.post(
-                          '/completeJob',
-                          data: {'jobId': widget.jobId},
-                        );
-                        if (!mounted || !dialogContext.mounted) return;
-                        _showTripCompletedDialog(dialogContext);
-                        return;
-                      } on DioException {
-                        // Muestra el mismo mensaje de error inferior.
-                      }
-                    }
-                    final message =
-                        error.response?.data is Map
-                            ? (error.response?.data['error']?.toString() ??
-                                'No pudimos verificar el código.')
-                            : 'No pudimos verificar el código.';
-                    if (!dialogContext.mounted) return;
-                    ScaffoldMessenger.of(
-                      dialogContext,
-                    ).showSnackBar(SnackBar(content: Text(message)));
-                  }
-                },
-                child: const Text('Confirmar y finalizar'),
-              ),
-            ],
-          ),
-    ).whenComplete(controller.dispose);
-  }
-
   String _friendlyRouteError(DioException error) {
     final responseData = error.response?.data;
     final code = responseData is Map ? responseData['code']?.toString() : null;
@@ -704,18 +705,18 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
             : '';
 
     if (code == 'failed-precondition' &&
-        detail.contains('trabajador no tiene ubicación')) {
-      return 'Activa la ubicación de tu teléfono para preparar la ruta.';
+        detail.contains('trabajador no tiene ubicaciÃ³n')) {
+      return 'Activa la ubicaciÃ³n de tu telÃ©fono para preparar la ruta.';
     }
     if (code == 'failed-precondition' &&
-        detail.contains('trabajo no tiene ubicación')) {
-      return 'Este trabajo no tiene una ubicación seleccionada.';
+        detail.contains('trabajo no tiene ubicaciÃ³n')) {
+      return 'Este trabajo no tiene una ubicaciÃ³n seleccionada.';
     }
     if (code == 'failed-precondition' && detail.contains('asignado')) {
-      return 'Este trabajo todavía no tiene un trabajador asignado.';
+      return 'Este trabajo todavÃ­a no tiene un trabajador asignado.';
     }
     if (error.response == null) {
-      return 'No pudimos conectar para preparar la ruta. Revisa tu conexión e inténtalo de nuevo.';
+      return 'No pudimos conectar para preparar la ruta. Revisa tu conexiÃ³n e intÃ©ntalo de nuevo.';
     }
     return 'No pudimos preparar la ruta. Intenta de nuevo.';
   }
@@ -950,7 +951,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                 ),
                 _LayerOption(
                   icon: Icons.satellite_alt_outlined,
-                  label: 'Satélite',
+                  label: 'SatÃ©lite',
                   selected: _mapStyle == _MapStyle.satellite,
                   onTap:
                       () => setState(() {
@@ -960,7 +961,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                 ),
                 _LayerOption(
                   icon: Icons.traffic_outlined,
-                  label: 'Tráfico y vías',
+                  label: 'TrÃ¡fico y vÃ­as',
                   selected: _mapStyle == _MapStyle.traffic,
                   onTap:
                       () => setState(() {
@@ -1074,7 +1075,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          'Tu propuesta llegará a ${widget.otherUserName}.',
+                          'Tu propuesta llegarÃ¡ a ${widget.otherUserName}.',
                           style: const TextStyle(color: AppTheme.textLight),
                         ),
                         const SizedBox(height: 18),
@@ -1200,7 +1201,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'Llegarás en ${formattedEstimatedTime()}',
+                                  'LlegarÃ¡s en ${formattedEstimatedTime()}',
                                   style: const TextStyle(
                                     color: AppTheme.textDark,
                                     fontSize: 13,
@@ -1438,7 +1439,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                     ),
                   ),
                   Text(
-                    _isNight ? 'Modo noche' : 'Modo día',
+                    _isNight ? 'Modo noche' : 'Modo dÃ­a',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppTheme.textLight,
@@ -1461,12 +1462,12 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'El trabajador ya llegó. Comparte este código:',
+                                'El trabajador ya llegÃ³. Comparte este cÃ³digo:',
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                               const SizedBox(height: 5),
                               Text(
-                                _arrivalCode ?? 'Cargando código...',
+                                _arrivalCode ?? 'Cargando cÃ³digo...',
                                 style: const TextStyle(
                                   fontSize: 24,
                                   letterSpacing: 4,
@@ -1480,7 +1481,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Ya estás a menos de 20 metros del servicio.',
+                                'Ya estÃ¡s a menos de 20 metros del servicio.',
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                               const SizedBox(height: 9),
@@ -1490,7 +1491,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                                   onPressed: _showArrivalCodeEntry,
                                   icon: const Icon(Icons.pin_outlined),
                                   label: const Text(
-                                    'Ingresar código del cliente',
+                                    'Ingresar cÃ³digo del cliente',
                                   ),
                                 ),
                               ),
@@ -1565,7 +1566,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                             ? 'Solicitud rechazada'
                             : 'Enviar solicitud de trabajo')
                         : (_isCompletedJob
-                            ? 'Ver conversación'
+                            ? 'Ver conversaciÃ³n'
                             : 'Chatear con el cliente'),
                   ),
                   style: FilledButton.styleFrom(
@@ -1607,7 +1608,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
               const SizedBox(width: 10),
               const Expanded(
                 child: Text(
-                  'Vehículo utilizado',
+                  'VehÃ­culo utilizado',
                   style: TextStyle(fontSize: 13, color: AppTheme.textLight),
                 ),
               ),
@@ -1684,11 +1685,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
 
   String get _distanceText =>
       _distanceMeters == null
-          ? '—'
+          ? 'â€”'
           : '${(_distanceMeters! / 1000).toStringAsFixed(1)} km';
   String get _durationText =>
       _estimatedSeconds == null
-          ? '—'
+          ? 'â€”'
           : '${(_estimatedSeconds! / 60).ceil()} min';
 }
 
@@ -1934,7 +1935,7 @@ class _RouteLoading extends StatelessWidget {
           ),
           const SizedBox(height: 22),
           const Text(
-            'Trazando ruta…',
+            'Trazando rutaâ€¦',
             style: TextStyle(
               color: AppTheme.textDark,
               fontSize: 20,

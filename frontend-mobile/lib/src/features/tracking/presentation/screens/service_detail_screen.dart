@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../chat/presentation/screens/chat_screen.dart';
 import '../../../reviews/presentation/review_worker_button.dart';
@@ -170,6 +172,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         final title = details['title'] as String? ?? 'Servicio';
         final price =
             pricing['proposedPrice'] as num? ?? pricing['budget'] as num? ?? 0;
+        final paymentMethod =
+            (pricing['paymentMethod'] ?? job['paymentMethod'] ?? 'cash').toString();
         final status = (job['status'] ?? 'pending').toString();
         final statusInfo = _serviceStatusInfo(status);
         final clientId = (job['clientId'] ?? '').toString();
@@ -212,9 +216,14 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   _ServiceHero(
                     title: title,
                     price: price,
+                    paymentMethod: paymentMethod,
                     statusInfo: statusInfo,
                   ),
                   const SizedBox(height: 18),
+                  if (isClient && !hasAssignedWorker) ...[
+                    _ServiceOffersSection(jobId: widget.jobId),
+                    const SizedBox(height: 18),
+                  ],
                   _SectionCard(
                     title: 'Información del servicio',
                     icon: Icons.assignment_outlined,
@@ -231,6 +240,16 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         value:
                             details['description'] as String? ??
                             'Sin descripción adicional',
+                      ),
+                      const SizedBox(height: 16),
+                      _DetailRow(
+                        icon: paymentMethod == 'card'
+                            ? Icons.credit_card_rounded
+                            : Icons.payments_outlined,
+                        label: 'Método de pago',
+                        value: paymentMethod == 'card'
+                            ? 'Tarjeta (simulado)'
+                            : 'Efectivo',
                       ),
                       // ── Etiquetas de habilidades requeridas ──
                       if ((details['skillIds'] as List?)?.isNotEmpty == true) ...[
@@ -434,11 +453,13 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 class _ServiceHero extends StatelessWidget {
   final String title;
   final num price;
+  final String paymentMethod;
   final _ServiceStatusInfo statusInfo;
 
   const _ServiceHero({
     required this.title,
     required this.price,
+    this.paymentMethod = 'cash',
     required this.statusInfo,
   });
 
@@ -526,9 +547,34 @@ class _ServiceHero extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              const Text(
-                'Presupuesto',
-                style: TextStyle(color: Color(0xDFFFFFFF), fontSize: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0x33FFFFFF),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0x55FFFFFF)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      paymentMethod == 'card'
+                          ? Icons.credit_card_rounded
+                          : Icons.payments_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      paymentMethod == 'card' ? 'Tarjeta' : 'Efectivo',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -981,6 +1027,228 @@ class _SkillTags extends StatelessWidget {
               }).toList(),
             ),
           ],
+        );
+      },
+    );
+  }
+}
+
+class _ServiceOffersSection extends StatefulWidget {
+  final String jobId;
+
+  const _ServiceOffersSection({required this.jobId});
+
+  @override
+  State<_ServiceOffersSection> createState() => _ServiceOffersSectionState();
+}
+
+class _ServiceOffersSectionState extends State<_ServiceOffersSection> {
+  final _api = ApiClient.create();
+  String? _processingOfferId;
+
+  Future<void> _processOffer(String offerId, bool accept) async {
+    setState(() => _processingOfferId = offerId);
+    try {
+      await _api.dio.post(
+        accept ? '/acceptOffer' : '/rejectOffer',
+        data: {'jobId': widget.jobId, 'offerId': offerId},
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            accept
+                ? 'Propuesta aceptada. El seguimiento ya está activo.'
+                : 'Propuesta rechazada.',
+          ),
+          backgroundColor: accept ? AppTheme.primaryGreen : Colors.blueGrey,
+        ),
+      );
+    } on DioException catch (error) {
+      debugPrint(
+        'OFFER_PROCESS_ERROR: ${error.response?.data ?? error.message}',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No pudimos procesar la propuesta. Inténtalo de nuevo.',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _processingOfferId = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream:
+          FirebaseFirestore.instance
+              .collection('offers')
+              .where('jobId', isEqualTo: widget.jobId)
+              .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError || !snapshot.hasData) {
+          return const SizedBox.shrink();
+        }
+        final offers =
+            snapshot.data!.docs
+                .where((doc) => doc.data()['status'] == 'pending')
+                .toList();
+        if (offers.isEmpty) return const SizedBox.shrink();
+
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEAF8EE),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppTheme.primaryGreen.withOpacity(.28)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.notifications_active_rounded,
+                    color: AppTheme.primaryGreen,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      offers.length == 1
+                          ? 'Nueva propuesta recibida'
+                          : '${offers.length} propuestas recibidas',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: AppTheme.textDark,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Elige a la persona que realizará tu trabajo.',
+                style: TextStyle(color: AppTheme.textLight, fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              ...offers.map((offer) {
+                final data = offer.data();
+                final price = (data['price'] as num?)?.toDouble() ?? 0;
+                final currency = data['currency'] as String? ?? 'GTQ';
+                final note = (data['note'] as String? ?? '').trim();
+                final time = (data['estimatedTime'] as String? ?? '').trim();
+                final busy = _processingOfferId == offer.id;
+                return Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 18,
+                            backgroundColor: Color(0xFFE2F4E7),
+                            child: Icon(
+                              Icons.person_rounded,
+                              color: AppTheme.primaryGreen,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Propuesta de un trabajador',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textDark,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '$currency ${price.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: AppTheme.primaryGreen,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (time.isNotEmpty || note.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        if (time.isNotEmpty)
+                          Text(
+                            'Tiempo estimado: $time',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        if (note.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Text(
+                              note,
+                              style: const TextStyle(
+                                color: AppTheme.textLight,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                      ],
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed:
+                                  busy
+                                      ? null
+                                      : () => _processOffer(offer.id, false),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.redAccent,
+                              ),
+                              child: const Text('Rechazar'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed:
+                                  busy
+                                      ? null
+                                      : () => _processOffer(offer.id, true),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppTheme.primaryGreen,
+                              ),
+                              child:
+                                  busy
+                                      ? const SizedBox(
+                                        height: 18,
+                                        width: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                      : const Text('Aceptar'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
         );
       },
     );
