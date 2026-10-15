@@ -113,13 +113,13 @@ export function CompleteGoogleProfile() {
 
     if (!form.firstName.trim()) {
       next.firstName = 'Requerido';
-    } else if (!nameRegex.test(form.firstName)) {
+    } else if (!nameRegex.test(form.firstName.trim())) {
       next.firstName = 'Solo se permiten letras';
     }
 
     if (!form.lastName.trim()) {
       next.lastName = 'Requerido';
-    } else if (!nameRegex.test(form.lastName)) {
+    } else if (!nameRegex.test(form.lastName.trim())) {
       next.lastName = 'Solo se permiten letras';
     }
 

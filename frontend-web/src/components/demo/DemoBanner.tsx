@@ -48,7 +48,7 @@ function DemoBadge({ onHide }: { onHide: () => void }) {
 
 function RealBadge({ onHide }: { onHide: () => void }) {
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 shadow-lg">
+    <div className="fixed bottom-14 right-4 z-50 flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 shadow-lg">
       <PlugZap className="h-4 w-4 text-emerald-600" />
       <span className="text-xs font-semibold text-emerald-800">Conectado</span>
       <button

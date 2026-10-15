@@ -25,7 +25,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
 import { OfferForm } from '@/components/offers/OfferForm';
 import { CounterpartCard } from '@/components/jobs/CounterpartCard';
-import { JobLocationMap } from '@/components/ui/JobLocationMap'; // IMPORTANTE
+import { JobLocationMap } from '@/components/ui/JobLocationMap'; 
 import { toast } from '@/stores/uiStore';
 import { getErrorMessage } from '@/api/axiosClient';
 import { JOB_STATUS_LABELS, JOB_STATUS_STYLES } from '@/utils/constants';
@@ -111,9 +111,9 @@ export function JobDetailPro() {
       <div className="py-16 text-center">
         <p className="text-lg font-semibold text-gray-700">Trabajo no encontrado</p>
         <p className="mt-1 text-sm text-gray-500">Es posible que la solicitud haya sido eliminada por el cliente.</p>
-        <Link to="/profesional/trabajos-disponibles" className="mt-6 inline-block">
+        <Link to="/profesional/mis-ofertas" className="mt-6 inline-block">
           <Button variant="outline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Volver a trabajos disponibles
+            <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Mis Ofertas
           </Button>
         </Link>
       </div>
@@ -127,11 +127,11 @@ export function JobDetailPro() {
       {/* Botón de Regreso */}
       <div>
         <Link
-          to="/profesional/trabajos-disponibles"
+          to="/profesional/mis-ofertas"
           className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 transition-colors hover:text-brand-600"
         >
           <ArrowLeft className="h-4 w-4" />
-          Volver a trabajos disponibles
+          Volver a Mis Ofertas
         </Link>
       </div>
 

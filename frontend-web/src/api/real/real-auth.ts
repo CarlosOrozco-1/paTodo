@@ -4,6 +4,8 @@ import {
   signInWithCredential,
   signInWithEmailAndPassword,
   signOut,
+  sendPasswordResetEmail,
+  confirmPasswordReset,
 } from 'firebase/auth';
 import type { RegisterRole, User } from '@/types/user.types';
 import type {
@@ -29,6 +31,7 @@ function firebaseAuthMessage(error: unknown): string {
     case 'auth/weak-password':
       return 'La contraseña es demasiado débil';
     case 'auth/user-not-found':
+      return 'Este correo no está registrado';
     case 'auth/invalid-credential':
     case 'auth/wrong-password':
       return 'Correo o contraseña incorrectos';
@@ -194,6 +197,28 @@ export const realAuth = {
   async logout(): Promise<void> {
     await signOut(auth);
     localStorage.removeItem('paTodo_refresh_token');
+  },
+
+  /**
+   * Envía el correo de recuperación de contraseña a través de Firebase Auth.
+   */
+  async forgotPassword(email: string): Promise<void> {
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+    } catch (error) {
+      throw new Error(firebaseAuthMessage(error));
+    }
+  },
+
+  /**
+   * Confirma el cambio de contraseña utilizando el código (oobCode) del correo.
+   */
+  async resetPassword(oobCode: string, newPassword: string): Promise<void> {
+    try {
+      await confirmPasswordReset(auth, oobCode, newPassword);
+    } catch (error) {
+      throw new Error(firebaseAuthMessage(error));
+    }
   },
 };
 

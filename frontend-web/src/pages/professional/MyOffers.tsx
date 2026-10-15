@@ -82,7 +82,7 @@ export function MyOffers() {
   );
   const jobMap = useMemo(() => new Map(jobs.map((j) => [j.id, j])), [jobs]);
 
-  // --- CÁLCULO CORREGIDO DE TARJETAS Y PESTAÑAS ---
+  // ---  TARJETAS Y PESTAÑAS ---
   const pendingCount = offers.filter(
     (o) => o.status === 'pending' || o.status === 'countered'
   ).length;
@@ -111,7 +111,7 @@ export function MyOffers() {
       // Validamos si el trabajo ya fue completado
       const isJobCompleted = jobMap.get(o.jobId)?.status === 'completed';
 
-      // --- FILTROS DE PESTAÑAS CORREGIDOS ---
+      // --- FILTROS DE PESTAÑAS ---
       if (tab === 'pending' && !['pending', 'countered'].includes(o.status)) return false;
       if (tab === 'accepted' && (o.status !== 'accepted' || isJobCompleted)) return false;
       if (tab === 'finalized' && !(['rejected', 'withdrawn'].includes(o.status) || (o.status === 'accepted' && isJobCompleted))) return false;

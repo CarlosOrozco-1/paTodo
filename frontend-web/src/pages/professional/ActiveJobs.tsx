@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { 
   CheckCircle2, 
@@ -8,7 +8,6 @@ import {
   MessageSquare,
   Star,
   Navigation,
-  ShieldCheck,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { offersService } from '@/api/offers.service';
@@ -34,6 +33,28 @@ import { Modal } from '@/components/ui/Modal';
 import { ReviewForm } from '@/components/reviews/ReviewForm';
 import { reviewsService } from '@/api/reviews.service';
 import { JobLocationMap } from '@/components/ui/JobLocationMap';
+import {
+  publishJobTrackingPosition,
+  type JobTrackingPosition,
+} from '@/api/firebase/jobTracking';
+
+interface PublishedPosition {
+  latitude: number;
+  longitude: number;
+  publishedAt: number;
+}
+
+function distanceMeters(first: PublishedPosition, next: JobTrackingPosition): number {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const deltaLatitude = radians(next.latitude - first.latitude);
+  const deltaLongitude = radians(next.longitude - first.longitude);
+  const latitude1 = radians(first.latitude);
+  const latitude2 = radians(next.latitude);
+  const haversine =
+    Math.sin(deltaLatitude / 2) ** 2 +
+    Math.cos(latitude1) * Math.cos(latitude2) * Math.sin(deltaLongitude / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
 
 export function ActiveJobs() {
   const navigate = useNavigate();
@@ -43,31 +64,73 @@ export function ActiveJobs() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Estados para finalización con código PIN
+  // Estados para finalización
   const [jobToComplete, setJobToComplete] = useState<Job | null>(null);
-  const [securityCode, setSecurityCode] = useState('');
   const [completingId, setCompletingId] = useState<string | null>(null);
   
   const [reviewJob, setReviewJob] = useState<Job | null>(null);
   const [reviewedJobIds, setReviewedJobIds] = useState<Set<string>>(new Set());
+  
+  const lastPublishedPositions = useRef(new Map<string, PublishedPosition>());
 
+  const handlePositionUpdate = useCallback(async (jobId: string, position: JobTrackingPosition) => {
+    const now = Date.now();
+    const previous = lastPublishedPositions.current.get(jobId);
+    if (previous && now - previous.publishedAt < 10000 && distanceMeters(previous, position) < 20) {
+      return;
+    }
+
+    lastPublishedPositions.current.set(jobId, {
+      latitude: position.latitude,
+      longitude: position.longitude,
+      publishedAt: now,
+    });
+    try {
+      await publishJobTrackingPosition(jobId, position);
+    } catch (error) {
+      console.warn('Rastreo en la nube no disponible:', error);
+    }
+  }, []);
+
+  // Lógica para saber qué trabajos ya calificó el profesional
   useEffect(() => {
-    if (!user) return;
+    if (!user || jobs.length === 0) return;
+    
     let cancelled = false;
-    const load = async () => {
+    
+    const checkCompletedJobsReviews = async () => {
+      const completedJobs = jobs.filter(j => j.status === 'completed');
+      if (completedJobs.length === 0) return;
+
       try {
-        const mine = await reviewsService.getAllByUser(user.id);
-        if (cancelled) return;
-        setReviewedJobIds(new Set(mine.map((review) => review.jobId)));
-      } catch {
-        if (!cancelled) setReviewedJobIds(new Set());
+        const reviewedIds = new Set<string>();
+        
+        await Promise.all(
+          completedJobs.map(async (job) => {
+            try {
+              const reviews = await reviewsService.getAllByJob(job.id);
+              const hasReviewed = reviews.some(r => r.reviewerId === user.id);
+              if (hasReviewed) reviewedIds.add(job.id);
+            } catch {
+              console.warn(`No se pudieron cargar las reseñas del trabajo ${job.id}`);
+            }
+          })
+        );
+        
+        if (!cancelled) {
+          setReviewedJobIds(prev => new Set([...prev, ...reviewedIds]));
+        }
+      } catch (error) {
+        console.error('Error comprobando reseñas:', error);
       }
     };
-    load();
+
+    checkCompletedJobsReviews();
+
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, jobs]);
 
   useEffect(() => {
     const load = async () => {
@@ -98,19 +161,15 @@ export function ActiveJobs() {
 
   const confirmComplete = async () => {
     if (!jobToComplete) return;
-    if (!securityCode.trim() || securityCode.length < 4) {
-      toast('error', 'Por favor ingresa un código de seguridad válido de 4 dígitos.');
-      return;
-    }
 
     setCompletingId(jobToComplete.id);
     try {
       const updated = await jobsService.complete(jobToComplete.id);
       setJobs((prev) => prev.map((j) => (j.id === jobToComplete.id ? updated : j)));
+      
+      toast('success', 'Trabajo marcado como completado exitosamente.');
       setJobToComplete(null);
-      setSecurityCode('');
-      setReviewJob(updated);
-      toast('success', '¡Excelente trabajo! Código verificado y marcado como completado.');
+      setReviewJob(updated); // Abre automáticamente el modal para calificar
     } catch (error) {
       toast('error', getErrorMessage(error));
     } finally {
@@ -123,6 +182,7 @@ export function ActiveJobs() {
     try {
       await reviewsService.create(reviewJob.id, { ...data, revieweeId: reviewJob.clientId });
       toast('success', 'Gracias por calificar al cliente');
+      // Al agregar el ID aquí, el componente se re-renderiza y el trabajo desaparece mágicamente
       setReviewedJobIds((prev) => new Set(prev).add(reviewJob.id));
       setReviewJob(null);
       await refreshProfile();
@@ -132,34 +192,43 @@ export function ActiveJobs() {
     }
   };
 
-  if (loading) return <Spinner label="Cargando tus trabajos activos..." />;
+  if (loading) return <Spinner label="Cargando tu actividad..." />;
 
-  const inProgressJobs = jobs.filter((j) => j.status === 'in_progress');
+  // --- FILTRO MINIMALISTA ---
+  // Solo mostramos los trabajos que NO están (completados Y calificados)
+  const displayedJobs = jobs.filter((job) => {
+    const isCompletedAndReviewed = job.status === 'completed' && reviewedJobIds.has(job.id);
+    return !isCompletedAndReviewed;
+  });
+
+  const inProgressCount = displayedJobs.filter((j) => j.status === 'in_progress').length;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Trabajos Activos</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Mi Actividad</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Gestiona los servicios en curso que han sido contratados por tus clientes
+            Gestiona los servicios en curso que tienes pendientes
           </p>
         </div>
 
-        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 shadow-xs">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+        {inProgressCount > 0 && (
+          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 shadow-xs">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+            </span>
+            {inProgressCount} {inProgressCount === 1 ? 'trabajo en curso' : 'trabajos en curso'}
           </span>
-          {inProgressJobs.length} {inProgressJobs.length === 1 ? 'trabajo en curso' : 'trabajos en curso'}
-        </span>
+        )}
       </div>
 
-      {jobs.length === 0 ? (
+      {displayedJobs.length === 0 ? (
         <WorkflowEmptyState
           icon={<CheckCircle2 className="h-9 w-9 text-brand-700" />}
-          title="No tienes trabajos activos"
-          description="Cuando un cliente acepte una de tus propuestas, el proyecto aparecerá automáticamente aquí para que lo gestiones."
+          title="No tienes trabajos pendientes"
+          description="Actualmente no tienes servicios en curso ni trabajos pendientes de calificar. Puedes ver tu historial en Mis Ofertas."
           primaryAction={
             <Link to="/profesional/trabajos-disponibles">
               <Button className="rounded-xl bg-brand-600 text-white shadow-md shadow-brand-600/25 hover:bg-brand-700">
@@ -168,14 +237,23 @@ export function ActiveJobs() {
             </Link>
           }
           steps={[
-            { title: 'Explora oportunidades', description: 'Revisa trabajos disponibles en tu zona y categoría.' },
-            { title: 'Envía propuestas atractivas', description: 'Precio justo y tiempo claro aumentan tus posibilidades.' },
-            { title: 'Gestiona tus servicios', description: 'Aquí verás los proyectos aceptados y podrás marcarlos como completados.' },
+            {
+              title: 'Explora oportunidades',
+              description: 'Revisa los trabajos disponibles en tu zona y elige los que mejor encajen con tus habilidades.',
+            },
+            {
+              title: 'Envía una oferta',
+              description: 'Presenta tu propuesta con precio, disponibilidad y la mejor forma de resolver el servicio.',
+            },
+            {
+              title: 'Gestiona tu actividad',
+              description: 'Cuando un trabajo sea aceptado, podrás seguir su progreso y completar tu actividad desde aquí.',
+            },
           ]}
         />
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
-          {jobs.map((job) => {
+          {displayedJobs.map((job) => {
             const category = categoryMap.get(job.details.categoryId);
             const myOffer = offers.find(
               (o) => o.jobId === job.id && (o.status === 'accepted' || o.status === 'countered'),
@@ -305,7 +383,7 @@ export function ActiveJobs() {
                   </CardContent>
                 </div>
 
-                {/* Acciones de Finalización */}
+                {/* Acciones de Finalización o Calificación */}
                 {['accepted', 'assigned', 'in_progress'].includes(job.status) ? (
                   <div className="p-5 pt-0">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3">
@@ -317,10 +395,7 @@ export function ActiveJobs() {
                         Contactar al cliente
                       </Link>
                       <Button
-                        onClick={() => {
-                          setJobToComplete(job);
-                          setSecurityCode('');
-                        }}
+                        onClick={() => setJobToComplete(job)}
                         className="shadow-md shadow-emerald-600/20 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"
                       >
                         <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -328,23 +403,16 @@ export function ActiveJobs() {
                       </Button>
                     </div>
                   </div>
-                ) : job.status === 'completed' ? (
+                ) : job.status === 'completed' && !reviewedJobIds.has(job.id) ? (
                   <div className="p-5 pt-0">
                     <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-3">
-                      {reviewedJobIds.has(job.id) ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
-                          <CheckCircle2 className="h-4 w-4" />
-                          Trabajo completado y calificado
-                        </span>
-                      ) : (
-                        <Button
-                          onClick={() => setReviewJob(job)}
-                          className="bg-brand-600 text-white hover:bg-brand-700 rounded-xl"
-                        >
-                          <Star className="mr-2 h-4 w-4" />
-                          Calificar al cliente
-                        </Button>
-                      )}
+                      <Button
+                        onClick={() => setReviewJob(job)}
+                        className="bg-brand-600 text-white hover:bg-brand-700 rounded-xl animate-pulse"
+                      >
+                        <Star className="mr-2 h-4 w-4" />
+                        Calificar al cliente
+                      </Button>
                     </div>
                   </div>
                 ) : null}
@@ -353,6 +421,39 @@ export function ActiveJobs() {
           })}
         </div>
       )}
+
+      {/* --- CONFIRMACIÓN PARA COMPLETAR EL TRABAJO --- */}
+      <Modal
+        open={Boolean(jobToComplete)}
+        onClose={() => setJobToComplete(null)}
+        title="Finalizar Trabajo"
+        description="¿Confirmas que has terminado de realizar el servicio acordado con el cliente?"
+        size="sm"
+      >
+        <div className="pt-4 space-y-5">
+          <div className="flex items-center justify-center p-6 bg-emerald-50 rounded-2xl border border-emerald-100">
+            <CheckCircle2 className="h-14 w-14 text-emerald-600 mb-2" />
+          </div>
+          
+          <div className="flex justify-end gap-3 pt-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setJobToComplete(null)}
+              disabled={completingId === jobToComplete?.id}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmComplete}
+              loading={completingId === jobToComplete?.id}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Sí, trabajo terminado
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* --- CALIFICAR AL CLIENTE --- */}
       <Modal
@@ -364,61 +465,6 @@ export function ActiveJobs() {
       >
         <div className="pt-2">
           <ReviewForm onSubmit={handleReview} />
-        </div>
-      </Modal>
-
-
-      {/* --- CÓDIGO DE SEGURIDAD PARA COMPLETAR --- */}
-      <Modal
-        open={Boolean(jobToComplete)}
-        onClose={() => {
-          setJobToComplete(null);
-          setSecurityCode('');
-        }}
-        title="Código de Seguridad"
-        description="Por favor, solicita al cliente su PIN de 4 dígitos para confirmar que el trabajo fue finalizado exitosamente."
-        size="sm"
-      >
-        <div className="pt-4 space-y-5">
-          <div className="flex items-center justify-center p-6 bg-brand-50 rounded-2xl border border-brand-100">
-            <ShieldCheck className="h-14 w-14 text-brand-600 mb-2" />
-          </div>
-          
-          <div>
-            <label htmlFor="securityCode" className="block text-sm font-semibold text-gray-700 mb-1">
-              PIN del Cliente
-            </label>
-            <input
-              id="securityCode"
-              type="text"
-              maxLength={6}
-              placeholder="Ej: 1234"
-              value={securityCode}
-              onChange={(e) => setSecurityCode(e.target.value.replace(/\D/g, ''))}
-              className="w-full text-center text-2xl tracking-widest font-bold px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setJobToComplete(null);
-                setSecurityCode('');
-              }}
-              disabled={completingId === jobToComplete?.id}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={confirmComplete}
-              loading={completingId === jobToComplete?.id}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Verificar y Completar
-            </Button>
-          </div>
         </div>
       </Modal>
 

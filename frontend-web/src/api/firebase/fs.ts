@@ -121,6 +121,7 @@ export function jobFromData(data: Any): BackendJob | null {
   const details = (data.details ?? {}) as Any;
   const loc = (data.location ?? {}) as Any;
   const pricing = (data.pricing ?? {}) as Any;
+  const paymentData = (data.payment ?? null) as Any;
   const coords = pointToCoords(loc.geopoint) ?? (loc.coordinates as [number, number] | undefined) ?? null;
   return {
     id: typeof data.id === 'string' ? data.id : '',
@@ -158,9 +159,17 @@ export function jobFromData(data: Any): BackendJob | null {
       currency: typeof pricing.currency === 'string' ? pricing.currency : 'GTQ',
       priceType: typeof pricing.priceType === 'string' ? pricing.priceType : 'fixed',
     },
-  };
-}
+payment: paymentData ? {
+      paymentId: typeof paymentData.paymentId === 'string' ? paymentData.paymentId : '',
+      status: (typeof paymentData.status === 'string' ? paymentData.status : 'paid') as 'paid',
+      amount: typeof paymentData.amount === 'number' ? paymentData.amount : 0,
+      currency: typeof paymentData.currency === 'string' ? paymentData.currency : 'GTQ',
+      method: (typeof paymentData.method === 'string' ? paymentData.method : 'demo_cash') as 'demo_cash' | 'demo_card' | 'demo_bank',
+      isDemo: typeof paymentData.isDemo === 'boolean' ? paymentData.isDemo : true,
+    } : null,
+  } as BackendJob;
 
+  };
 export function jobFromDoc(snapshot: DocumentSnapshot<DocumentData>): BackendJob | null {
   const data = snapshot.data();
   if (!data) return null;

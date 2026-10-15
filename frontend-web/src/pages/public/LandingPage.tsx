@@ -484,11 +484,6 @@ export function LandingPage() {
             © {new Date().getFullYear()} PaTodo. Todos los derechos reservados.
           </p>
 
-          <div className="flex items-center gap-4 text-xs font-medium text-gray-500">
-            <a href="#" className="hover:text-brand-600 transition-colors">Términos</a>
-            <a href="#" className="hover:text-brand-600 transition-colors">Privacidad</a>
-            <a href="#" className="hover:text-brand-600 transition-colors">Soporte</a>
-          </div>
         </div>
       </footer>
     </div>

@@ -9,7 +9,10 @@ import {
   MapPin,
   MessageSquare,
   Star,
-  Tag,
+  Tag, 
+  Banknote, 
+  CreditCard,
+  Building2,
 } from 'lucide-react';
 import { jobsService } from '@/api/jobs.service';
 import { offersService } from '@/api/offers.service';
@@ -42,10 +45,6 @@ import { cn } from '@/utils/cn';
 
 const NO_REVIEWS: Review[] = [];
 
-/**
- * Lee las reseñas de un trabajo sin propagar el error: la lista es un extra de
- * la pantalla, nunca un requisito para ver el trabajo o calificarlo.
- */
 async function fetchJobReviews(jobId: string): Promise<Review[]> {
   try {
     return await reviewsService.getAllByJob(jobId);
@@ -65,6 +64,21 @@ export function JobDetailClient() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewsState, setReviewsState] = useState<{ jobId: string; items: Review[] } | null>(null);
   const [completing, setCompleting] = useState(false);
+
+  // --- ESTADOS PARA LA SIMULACIÓN DEL PAGO ---
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'demo_card' | 'demo_cash' | 'demo_bank'>('demo_card');
+  const [processingPayment, setProcessingPayment] = useState(false);
+  
+  // Estados para los datos de la tarjeta
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+
+  // Estado para la transferencia
+  const [transferReference, setTransferReference] = useState('');
+  // -------------------------------------------
+
   const refreshProfile = useAuthStore((state) => state.refreshProfile);
 
   useEffect(() => {
@@ -93,12 +107,6 @@ export function JobDetailClient() {
     };
   }, [id]);
 
-  /**
-   * Las reseñas se cargan aparte y de forma tolerante. Antes iban en el mismo
-   * `Promise.all` que el trabajo, así que cualquier fallo al leerlas acababa en
-   * `setJob(null)` y la pantalla decía "Trabajo no encontrado" aunque el
-   * trabajo sí existiera. Perder la lista no puede impedir ver ni calificar.
-   */
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -151,14 +159,69 @@ export function JobDetailClient() {
     try {
       const updated = await jobsService.complete(id!);
       setJob(updated);
-      // Se abre el modal en el acto porque es el momento natural para calificar,
-      // pero no es la única oportunidad: si se cierra, el botón sigue disponible
-      // en el panel y en la sección de reseñas.
       setReviewOpen(true);
     } catch (error) {
       toast('error', getErrorMessage(error));
     } finally {
       setCompleting(false);
+    }
+  };
+
+  // --- SIMULAR EL PAGO DESDE EL MODAL ---
+  const handleProcessPayment = async () => {
+    // Validar datos de tarjeta
+    if (paymentMethod === 'demo_card') {
+      const cleanCard = cardNumber.replace(/\s/g, '');
+      if (cleanCard.length < 15 || cleanCard.length > 16) {
+        toast('error', 'El número de tarjeta debe tener 15 o 16 dígitos.');
+        return;
+      }
+      if (cardExpiry.length < 5) {
+        toast('error', 'La fecha de expiración debe ser válida (MM/AA).');
+        return;
+      }
+      if (cardCvv.length < 3 || cardCvv.length > 4) {
+        toast('error', 'El código de seguridad (CVV) debe tener 3 o 4 dígitos.');
+        return;
+      }
+    }
+
+    // Validar transferencia
+    if (paymentMethod === 'demo_bank') {
+      if (transferReference.length < 4) {
+         toast('error', 'Por favor, ingresa un número de boleta válido.');
+         return;
+      }
+    }
+
+    setProcessingPayment(true);
+    try {
+      // Simular tiempo de conexión con el banco
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Guardamos en la orden que se pagó
+      setJob(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          payment: {
+            paymentId: `demo_${Date.now()}`,
+            amount: prev.pricing.proposedPrice,
+            currency: prev.pricing.currency,
+            method: paymentMethod,
+            status: 'paid',
+            isDemo: true
+          }
+        };
+      });
+
+      toast('success', '¡Pago procesado con éxito!');
+      setPaymentOpen(false); 
+      setReviewOpen(true);  
+    } catch (error) {
+      toast('error', 'Error al procesar el pago');
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -192,6 +255,7 @@ export function JobDetailClient() {
   }
 
   const acceptedOffer = offers.find((o) => o.status === 'accepted');
+  const isPaid = job.payment?.status === 'paid';
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -304,29 +368,62 @@ export function JobDetailClient() {
                   <Tag className="h-3 w-3 text-emerald-300" />
                   {job.pricing.priceType === 'fixed' ? 'Precio fijo' : 'Precio negociable'}
                 </span>
+
+                {/* --- MÉTODO DE PAGO  --- */}
+                {(job.status === 'completed' || isPaid) && job.payment && (
+                  <div className="mt-4 rounded-xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur shadow-inner">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-200 mb-1">
+                      Método de pago
+                    </p>
+                    <p className="text-sm font-bold text-white flex justify-center items-center gap-1.5">
+                      {job.payment.method === 'demo_cash' ? (
+                        <><Banknote className="h-4 w-4 text-emerald-300" /> Pago en Efectivo</>
+                      ) : job.payment.method === 'demo_card' ? (
+                        <><CreditCard className="h-4 w-4 text-emerald-300" /> Tarjeta de Crédito</>
+                      ) : (
+                        <><Building2 className="h-4 w-4 text-emerald-300" /> Transferencia</>
+                      )}
+                    </p>
+                  </div>
+                )}
+                {/* ------------------------------ */}
               </div>
 
-              {/* Estado / Finalizar */}
+              {/* Estado / Finalizar / Pagar */}
               <div className="border-t border-white/20 pt-5">
                 {job.status === 'in_progress' ? (
+                  <div className="rounded-2xl border border-white/20 bg-white/10 p-4 text-center backdrop-blur shadow-inner">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400"></span>
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-emerald-100 uppercase tracking-wider">
+                      Trabajo en curso
+                    </p>
+                    <p className="mt-1.5 text-[11px] text-emerald-200/90 leading-tight">
+                      El profesional está realizando el servicio. Podrás pagar y calificarlo en cuanto él marque el trabajo como terminado.
+                    </p>
+                  </div>
+                ) : job.status === 'completed' && !isPaid ? (
                   <Button
-                    onClick={handleComplete}
-                    loading={completing}
+                    onClick={() => setPaymentOpen(true)}
                     fullWidth
                     size="lg"
                     className="rounded-xl bg-white font-bold text-brand-800 shadow-lg hover:bg-emerald-50"
                   >
                     <CheckCircle2 className="mr-2 h-5 w-5" />
-                    Marcar como completado
+                    Pagar y Calificar
                   </Button>
-                ) : job.status === 'completed' && !hasReviewed ? (
+                ) : job.status === 'completed' && isPaid && !hasReviewed ? (
                   <Button
                     onClick={() => setReviewOpen(true)}
                     fullWidth
                     size="lg"
                     className="rounded-xl bg-white font-bold text-brand-800 shadow-lg hover:bg-emerald-50"
                   >
-                    <CheckCircle2 className="mr-2 h-5 w-5" />
+                    <Star className="mr-2 h-5 w-5 fill-brand-800 text-brand-800" />
                     Calificar al profesional
                   </Button>
                 ) : job.status === 'completed' ? (
@@ -436,7 +533,7 @@ export function JobDetailClient() {
         </CardContent>
       </Card>
 
-      {/* Reseñas del trabajo: reachable en cualquier momento, no solo al cerrar */}
+      {/* Reseñas del trabajo */}
       {job.status === 'completed' && job.workerId && (
         <Card className="border border-gray-100 shadow-sm">
           <CardHeader
@@ -484,13 +581,199 @@ export function JobDetailClient() {
               </div>
             ) : (
               <p className="text-sm text-gray-500">
-                Todavía no hay reseñas. Tu calificación ayuda a que otros usuarios
-                confíen en este profesional.
+                Todavía no hay reseñas. Tu calificación ayuda a que otros usuarios confíen en este profesional.
               </p>
             )}
           </CardContent>
         </Card>
       )}
+
+      {/* --- MODAL DE PAGO --- */}
+      <Modal
+        open={paymentOpen}
+        onClose={() => !processingPayment && setPaymentOpen(false)}
+        title="Resumen de Pago"
+        description="Selecciona cómo deseas abonar este servicio."
+        size="md"
+      >
+        <div className="pt-4 space-y-4 max-h-[80vh] overflow-y-auto overflow-x-hidden p-1">
+          <div className="flex flex-col items-center justify-center p-6 bg-brand-50 rounded-2xl border border-brand-100">
+            <p className="text-xs font-bold text-brand-600 uppercase tracking-widest mb-1">Total a Pagar</p>
+            <p className="text-4xl font-black text-brand-800">
+              {job ? formatCurrency(job.pricing.proposedPrice, job.pricing.currency) : 'Q0.00'}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {/* OPCIÓN: TARJETA DE CRÉDITO/DÉBITO */}
+            <button
+              onClick={() => setPaymentMethod('demo_card')}
+              className={cn(
+                "w-full flex items-center justify-between p-3.5 rounded-xl border-2 transition-all",
+                paymentMethod === 'demo_card' ? "border-brand-600 bg-brand-50/50" : "border-gray-100 bg-white hover:border-gray-200"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn("p-2 rounded-lg", paymentMethod === 'demo_card' ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-500")}>
+                  <CreditCard className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-bold text-gray-900">Tarjeta de Crédito / Débito</p>
+                  <p className="text-xs text-gray-500">Paga seguro con Stripe o VisaNet</p>
+                </div>
+              </div>
+              <div className={cn("h-5 w-5 rounded-full border-2 flex items-center justify-center", paymentMethod === 'demo_card' ? "border-brand-600" : "border-gray-300")}>
+                {paymentMethod === 'demo_card' && <div className="h-2.5 w-2.5 rounded-full bg-brand-600" />}
+              </div>
+            </button>
+
+            {/* FORMULARIO DE TARJETA */}
+            {paymentMethod === 'demo_card' && (
+              <div className="px-4 py-3 space-y-4 rounded-xl border border-brand-100 bg-white animate-in slide-in-from-top-2">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Número de Tarjeta</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      maxLength={19}
+                      placeholder="0000 0000 0000 0000"
+                      value={cardNumber}
+                      onChange={(e) => {
+                        // Solo permite números y formatea cada 4 dígitos
+                        const val = e.target.value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim();
+                        setCardNumber(val);
+                      }}
+                      className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                    />
+                    <CreditCard className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  </div>
+                </div>
+                
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Vencimiento</label>
+                    <input
+                      type="text"
+                      maxLength={5}
+                      placeholder="MM/AA"
+                      value={cardExpiry}
+                      onChange={(e) => {
+                        // Solo números y auto-inserta la barra '/'
+                        let val = e.target.value.replace(/\D/g, '');
+                        if (val.length >= 2) val = `${val.slice(0, 2)}/${val.slice(2, 4)}`;
+                        setCardExpiry(val);
+                      }}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">CVV</label>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      placeholder="123"
+                      value={cardCvv}
+                      onChange={(e) => {
+                        // Estrictamente solo números
+                        setCardCvv(e.target.value.replace(/\D/g, ''));
+                      }}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* OPCIÓN: TRANSFERENCIA BANCARIA */}
+            <button
+              onClick={() => setPaymentMethod('demo_bank')}
+              className={cn(
+                "w-full flex items-center justify-between p-3.5 rounded-xl border-2 transition-all",
+                paymentMethod === 'demo_bank' ? "border-brand-600 bg-brand-50/50" : "border-gray-100 bg-white hover:border-gray-200"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn("p-2 rounded-lg", paymentMethod === 'demo_bank' ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-500")}>
+                  <Building2 className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-bold text-gray-900">Transferencia Bancaria</p>
+                  <p className="text-xs text-gray-500">Banca en línea o depósito</p>
+                </div>
+              </div>
+              <div className={cn("h-5 w-5 rounded-full border-2 flex items-center justify-center", paymentMethod === 'demo_bank' ? "border-brand-600" : "border-gray-300")}>
+                {paymentMethod === 'demo_bank' && <div className="h-2.5 w-2.5 rounded-full bg-brand-600" />}
+              </div>
+            </button>
+
+            {/* INSTRUCCIONES Y FORMULARIO DE TRANSFERENCIA DESPLEGABLE */}
+            {paymentMethod === 'demo_bank' && (
+              <div className="px-4 py-3 space-y-4 rounded-xl border border-brand-100 bg-white animate-in slide-in-from-top-2">
+                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                  <p className="text-xs text-gray-600 mb-2">Transfiere el monto total a la siguiente cuenta:</p>
+                  <div className="space-y-1">
+                    <p className="text-sm"><span className="font-semibold text-gray-700">Banco:</span> Banco Industrial</p>
+                    <p className="text-sm"><span className="font-semibold text-gray-700">Tipo:</span> Monetaria</p>
+                    <p className="text-sm"><span className="font-semibold text-gray-700">Cuenta:</span> 123-456789-0</p>
+                    <p className="text-sm"><span className="font-semibold text-gray-700">Nombre:</span> PaTodo S.A.</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    No. de Referencia o Boleta
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={15}
+                    placeholder="Ej: 987654321"
+                    value={transferReference}
+                    onChange={(e) => {
+                       // Validar que solo se ingresen números en la referencia
+                       setTransferReference(e.target.value.replace(/\D/g, ''));
+                    }}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                  />
+                  <p className="mt-1 text-[10px] text-gray-400">Ingresa solo los números de tu comprobante.</p>
+                </div>
+              </div>
+            )}
+
+            {/* OPCIÓN: PAGO EN EFECTIVO */}
+            <button
+              onClick={() => setPaymentMethod('demo_cash')}
+              className={cn(
+                "w-full flex items-center justify-between p-3.5 rounded-xl border-2 transition-all",
+                paymentMethod === 'demo_cash' ? "border-brand-600 bg-brand-50/50" : "border-gray-100 bg-white hover:border-gray-200"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn("p-2 rounded-lg", paymentMethod === 'demo_cash' ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-500")}>
+                  <Banknote className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-bold text-gray-900">Pago en Efectivo</p>
+                  <p className="text-xs text-gray-500">Al profesional en persona</p>
+                </div>
+              </div>
+              <div className={cn("h-5 w-5 rounded-full border-2 flex items-center justify-center", paymentMethod === 'demo_cash' ? "border-brand-600" : "border-gray-300")}>
+                {paymentMethod === 'demo_cash' && <div className="h-2.5 w-2.5 rounded-full bg-brand-600" />}
+              </div>
+            </button>
+          </div>
+
+          <div className="pt-2 border-t border-gray-100">
+            <Button
+              onClick={handleProcessPayment}
+              loading={processingPayment}
+              fullWidth
+              size="lg"
+              className="bg-brand-600 hover:bg-brand-700 text-white rounded-xl shadow-md shadow-brand-600/20"
+            >
+              {processingPayment ? 'Procesando pago...' : 'Confirmar y Pagar'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Modal para Dejar Reseña */}
       <Modal

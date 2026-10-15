@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Rocket,
   Save,
+  X,
 } from 'lucide-react';
 import { categoriesService, skillsService } from '@/api/categories.service';
 import { jobsService } from '@/api/jobs.service';
@@ -50,42 +51,11 @@ export function CreateJob() {
   const [categoryId, setCategoryId] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [address, setAddress] = useState('');
-  
-  // Coordenadas dinámicas basadas en la dirección escrita (por defecto Ciudad de Guatemala)
   const [coordinates, setCoordinates] = useState<[number, number]>([-90.5069, 14.6349]);
 
   const [price, setPrice] = useState('');
   const [priceType, setPriceType] = useState<'fixed' | 'negotiable'>('fixed');
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Efecto para buscar las coordenadas en Mapbox cuando el usuario escribe la dirección
-  useEffect(() => {
-    const resolveCoordinates = async () => {
-      if (!address || address.trim().length < 3) return;
-      const token = import.meta.env.VITE_MAPBOX_TOKEN;
-      if (!token) return;
-
-      try {
-        const query = encodeURIComponent(`${address}, Guatemala`);
-        const res = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${token}&country=gt&limit=1`
-        );
-        const data = await res.json();
-        if (data.features && data.features.length > 0) {
-          const [lng, lat] = data.features[0].center;
-          setCoordinates([lng, lat]);
-        }
-      } catch {
-        // Fallback silencioso en caso de error de red
-      }
-    };
-
-    const timer = setTimeout(() => {
-      resolveCoordinates();
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [address]);
 
   useEffect(() => {
     const load = async () => {
@@ -121,6 +91,31 @@ export function CreateJob() {
     };
     load();
   }, []);
+
+  // BÚSQUEDA AUTOMÁTICA EN EL MAPA AL ESCRIBIR LA DIRECCIÓN
+  useEffect(() => {
+    if (!address || address.trim().length < 3) return;
+    const token = import.meta.env.VITE_MAPBOX_TOKEN;
+    if (!token) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const query = encodeURIComponent(`${address}, Guatemala`);
+        const res = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${token}&country=gt&limit=1`
+        );
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+          const [lng, lat] = data.features[0].center;
+          setCoordinates([lng, lat]);
+        }
+      } catch {
+        // Fallo silencioso de red
+      }
+    }, 600); // Espera 600ms después de que el usuario termine de escribir
+
+    return () => clearTimeout(timer);
+  }, [address]);
 
   const activeCategories = useMemo(
     () => categories.filter((c) => c.isActive),
@@ -186,7 +181,7 @@ export function CreateJob() {
       skillIds: selectedSkills,
     },
     location: {
-      coordinates: coordinates, // Envía las coordenadas reales encontradas por el buscador
+      coordinates: coordinates,
       address: address.trim(),
     },
     pricing: {
@@ -382,26 +377,46 @@ export function CreateJob() {
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-teal-600">Paso 2 de 4</p>
                   <h2 className="mt-0.5 text-lg font-black text-gray-900">¿Dónde se realizará el trabajo?</h2>
                 </div>
-                <Input
-                  label="Dirección de ubicación *"
-                  placeholder="Ej: Zona 10, Ciudad de Guatemala (15 Avenida 10-23)"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  leftIcon={<MapPin className="h-4 w-4 text-brand-600" />}
-                  error={errors.address}
-                />
+                
+                {/* Input de dirección con botón limpiador integrado */}
+                <div className="relative">
+                  <Input
+                    label="Dirección de ubicación *"
+                    placeholder="Ej: Zona 10, Ciudad de Guatemala (15 Avenida 10-23)"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    leftIcon={<MapPin className="h-4 w-4 text-brand-600" />}
+                    error={errors.address}
+                  />
+                  {address && (
+                    <button
+                      type="button"
+                      onClick={() => setAddress('')}
+                      title="Limpiar dirección"
+                      className="absolute right-3 top-[34px] flex h-6 w-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
                 <div className="space-y-2 pt-1">
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">
                     Vista previa de ubicación
                   </label>
                   <JobLocationMap
+                    interactive={true}
                     origin={{
                       addressText: address || 'Ciudad de Guatemala',
-                      lat: coordinates[1], // Se actualiza dinámicamente con la búsqueda
-                      lng: coordinates[0], // Se actualiza dinámicamente con la búsqueda
-                      label: `${address || 'Ubicación aproximada'}, Guatemala`,
+                      lat: coordinates[1],
+                      lng: coordinates[0],
+                      label: `${address || 'Ubicación seleccionada'}, Guatemala`,
                     }}
-                    className="h-56 w-full rounded-2xl"
+                    onLocationSelect={({ lat, lng, addressText }) => {
+                      setCoordinates([lng, lat]);
+                      setAddress(addressText);
+                    }}
+                    className="h-64 w-full rounded-2xl cursor-pointer"
                   />
                 </div>
               </div>

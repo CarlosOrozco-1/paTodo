@@ -76,7 +76,7 @@ export function ReviewForm({ onSubmit, submitting = false }: ReviewFormProps) {
 
       <Textarea
         label="Comentario"
-        placeholder="Cuenta tu experiencia con este profesional..."
+        placeholder="Cuenta tu experiencia..."
         value={comment}
         onChange={(e) => setComment(e.target.value)}
       />

@@ -29,6 +29,15 @@ export interface JobPricing {
   priceType: PriceType;
 }
 
+export interface JobPayment {
+  paymentId: string;
+  status: 'paid';
+  amount: number;
+  currency: string;
+  method: 'demo_card' | 'demo_cash' | 'demo_bank';
+  isDemo: boolean;
+}
+
 export interface Job {
   id: ObjectId;
   clientId: ObjectId;
@@ -44,6 +53,7 @@ export interface Job {
   startedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  payment?: JobPayment | null;
 }
 
 export interface CreateJobDto {

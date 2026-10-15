@@ -225,9 +225,7 @@ export function MyJobs() {
         <div className="lg:col-span-2 space-y-4">
           
           {/* 
-            SOLUCIÓN 2: Diseño de los filtros corregido. 
-            Usamos flex-wrap para que si no caben, salten a la siguiente línea. 
-            Y separamos claramente la zona de pestañas de la zona de búsqueda.
+             Diseño de los filtros.
           */}
           <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm flex flex-col gap-4">
             
@@ -396,7 +394,7 @@ export function MyJobs() {
                                 className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold text-brand-600 transition-colors hover:bg-brand-50"
                               >
                                 <Send className="h-3 w-3" />
-                                Ver propuestas
+                                Ver Detalle 
                               </Link>
                               <button
                                 type="button"

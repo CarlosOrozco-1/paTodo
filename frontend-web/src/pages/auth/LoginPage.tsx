@@ -1,10 +1,11 @@
-import { useState, type FormEvent } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
-import { FlaskConical, LockKeyhole, Mail, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect, type FormEvent } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
+import { FlaskConical, LockKeyhole, Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/uiStore';
 import { getErrorMessage } from '@/api/axiosClient';
+import { realAuth } from '@/api/real/real-auth';
 import { isDemoMode } from '@/api/demo';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -40,7 +41,7 @@ export function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [recoveryStep, setRecoveryStep] = useState<1 | 2 | 3>(1);
+  const [recoveryStep, setRecoveryStep] = useState<1 | 3>(1);
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -50,9 +51,21 @@ export function LoginPage() {
   const { login, loginWithGoogle, isLoading } = authStore;
   const navigate = useNavigate();
   const location = useLocation();
-  const demoEnabled = isDemoMode();
+  const [searchParams] = useSearchParams();
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+  const demoEnabled = isDemoMode();
+
+  useEffect(() => {
+    const mode = searchParams.get('mode');
+    const code = searchParams.get('oobCode');
+
+    if (mode === 'resetPassword' && code) {
+      setShowForgotPassword(true);
+      setRecoveryStep(3);
+      setResetCode(code);
+    }
+  }, [searchParams]);
 
   const redirectUser = (role: string) => {
     const target =
@@ -98,10 +111,9 @@ export function LoginPage() {
         toast('error', 'No se recibieron las credenciales de Google');
         return;
       }
+
       const result = await loginWithGoogle(credentialResponse.credential);
 
-      // Cuenta nueva: el documento se crea al confirmar el formulario, porque
-      // Google no entrega teléfono y /createUser lo exige.
       if (result.needsProfile) {
         sessionStorage.setItem('paTodo_google_draft', JSON.stringify(result.draft));
         navigate('/completar-perfil', { replace: true });
@@ -115,26 +127,27 @@ export function LoginPage() {
     }
   };
 
-  const handleNextStep1 = (e: React.FormEvent) => {
+  // --- Recuperación de Contraseña Modificada con Verificación en Firestore ---
+  const handleSendResetEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recoveryEmail.trim()) {
+    const trimmedEmail = recoveryEmail.trim();
+    if (!trimmedEmail) {
       toast('error', 'Ingresa tu correo electrónico');
       return;
     }
-    toast('success', 'Código de verificación enviado.');
-    setRecoveryStep(2);
-  };
-
-  const handleNextStep2 = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!resetCode.trim()) {
-      toast('error', 'Ingresa el código de verificación');
-      return;
+    
+    try {
+      // Si el correo sí existe, procedemos a enviar el enlace con Firebase Auth
+      await realAuth.forgotPassword(trimmedEmail);
+      toast('success', '¡Listo! Si tienes una cuenta con nosotros, te enviamos un correo para recuperar tu contraseña.');
+      setShowForgotPassword(false);
+      setRecoveryEmail('');
+    } catch (error: any) {
+      toast('error', error.message || 'Error al procesar la solicitud');
     }
-    setRecoveryStep(3);
   };
 
-  const handleFinishReset = (e: React.FormEvent) => {
+  const handleFinishReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword.length < 8) {
       toast('error', 'La contraseña debe tener al menos 8 caracteres');
@@ -144,18 +157,24 @@ export function LoginPage() {
       toast('error', 'Las contraseñas no coinciden');
       return;
     }
-    toast('success', '¡Contraseña actualizada con éxito!');
-    setShowForgotPassword(false);
-    setRecoveryStep(1);
-    setRecoveryEmail('');
-    setResetCode('');
-    setNewPassword('');
-    setConfirmNewPassword('');
+
+    try {
+      await realAuth.resetPassword(resetCode.trim(), newPassword);
+      
+      toast('success', '¡Contraseña actualizada con éxito! Ya puedes iniciar sesión.');
+      setShowForgotPassword(false);
+      setRecoveryStep(1);
+      setResetCode('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      navigate('/login', { replace: true });
+    } catch (error: any) {
+      toast('error', error.message || 'El enlace es inválido o ha expirado.');
+    }
   };
 
   return (
     <div className="w-full">
-      {/* Encabezado del Formulario con Logo para móvil */}
       <div className="mb-6 text-center sm:text-left">
         <div className="lg:hidden flex justify-center sm:justify-start mb-6">
           <Logo variant="default" imgClassName="h-14" />
@@ -218,7 +237,6 @@ export function LoginPage() {
         </div>
       </form>
 
-      {/* Botón de Google OAuth */}
       <div className="flex justify-center pt-3">
         <GoogleLogin
           onSuccess={handleGoogleSuccess}
@@ -274,28 +292,21 @@ export function LoginPage() {
         </p>
       </div>
 
-      {/* Modal Olvidé Contraseña */}
       {showForgotPassword && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-xs p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
             <div className="mb-5">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-bold text-gray-900">Recuperar contraseña</h3>
-                <span className="text-xs font-semibold text-brand-600 bg-brand-50 px-2.5 py-1 rounded-full border border-brand-100">
-                  Paso {recoveryStep} de 3
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                <div className={`h-1.5 rounded-full transition-colors ${recoveryStep >= 1 ? 'bg-brand-600' : 'bg-gray-200'}`} />
-                <div className={`h-1.5 rounded-full transition-colors ${recoveryStep >= 2 ? 'bg-brand-600' : 'bg-gray-200'}`} />
-                <div className={`h-1.5 rounded-full transition-colors ${recoveryStep >= 3 ? 'bg-brand-600' : 'bg-gray-200'}`} />
+                <h3 className="text-base font-bold text-gray-900">
+                  {recoveryStep === 1 ? 'Recuperar contraseña' : 'Nueva contraseña'}
+                </h3>
               </div>
             </div>
 
             {recoveryStep === 1 && (
-              <form onSubmit={handleNextStep1} className="space-y-4">
+              <form onSubmit={handleSendResetEmail} className="space-y-4">
                 <p className="text-xs text-gray-500">
-                  Ingresa tu correo electrónico registrado y te enviaremos un código de seguridad.
+                  Ingresa tu correo electrónico registrado y te enviaremos un enlace de recuperación.
                 </p>
                 <Input
                   label="Correo electrónico"
@@ -310,30 +321,7 @@ export function LoginPage() {
                     Cancelar
                   </Button>
                   <Button type="submit" fullWidth className="bg-brand-600 hover:bg-brand-700 font-bold">
-                    Siguiente <ArrowRight className="ml-1.5 h-4 w-4" />
-                  </Button>
-                </div>
-              </form>
-            )}
-
-            {recoveryStep === 2 && (
-              <form onSubmit={handleNextStep2} className="space-y-4">
-                <p className="text-xs text-gray-500">
-                  Hemos enviado un código de 6 dígitos a <span className="font-bold text-gray-700">{recoveryEmail}</span>.
-                </p>
-                <Input
-                  label="Código de verificación"
-                  type="text"
-                  placeholder="Ej: 123456"
-                  value={resetCode}
-                  onChange={(e) => setResetCode(e.target.value)}
-                />
-                <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="outline" onClick={() => setRecoveryStep(1)}>
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <Button type="submit" fullWidth className="bg-brand-600 hover:bg-brand-700 font-bold">
-                    Verificar código <ArrowRight className="ml-1.5 h-4 w-4" />
+                    Enviar enlace <ArrowRight className="ml-1.5 h-4 w-4" />
                   </Button>
                 </div>
               </form>
@@ -342,7 +330,7 @@ export function LoginPage() {
             {recoveryStep === 3 && (
               <form onSubmit={handleFinishReset} className="space-y-3">
                 <p className="text-xs text-gray-600 flex items-center gap-1.5 text-emerald-700 bg-emerald-50 p-2.5 rounded-xl border border-emerald-100 font-medium">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> Código verificado. Define tu nueva contraseña.
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> Enlace verificado. Define tu nueva contraseña.
                 </p>
                 <Input
                   label="Nueva contraseña"
@@ -361,8 +349,8 @@ export function LoginPage() {
                   leftIcon={<LockKeyhole className="h-4 w-4 text-gray-400" />}
                 />
                 <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="outline" onClick={() => setRecoveryStep(2)}>
-                    <ArrowLeft className="h-4 w-4" />
+                  <Button type="button" variant="outline" fullWidth onClick={() => setShowForgotPassword(false)}>
+                    Cancelar
                   </Button>
                   <Button type="submit" fullWidth className="bg-brand-600 hover:bg-brand-700 font-bold">
                     Actualizar contraseña
