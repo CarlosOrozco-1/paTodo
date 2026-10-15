@@ -1538,7 +1538,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 SnackBar(
                   content: Text(
                     nextStatus == 'accepted'
-                        ? 'Â¡Tu solicitud fue aceptada! Ya puedes iniciar el seguimiento.'
+                        ? '¡Tu solicitud fue aceptada! Ya puedes iniciar el seguimiento.'
                         : 'Tu solicitud fue rechazada.',
                   ),
                   backgroundColor:

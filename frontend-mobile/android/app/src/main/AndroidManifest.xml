@@ -9,7 +9,7 @@
     <!-- Solo para alertas de llamadas entrantes reales entre participantes. -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <application
-        android:label="frontend"
+        android:label="PaTodo"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

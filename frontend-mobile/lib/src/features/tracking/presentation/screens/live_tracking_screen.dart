@@ -133,7 +133,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
       final geometry = Map<String, dynamic>.from(data['geometry'] as Map);
       final coordinates = geometry['coordinates'] as List? ?? [];
       final route = coordinates.map(_toLatLng).whereType<LatLng>().toList();
-      if (route.length < 2) throw StateError('Ruta vacÃ­a');
+      if (route.length < 2) throw StateError('Ruta vacía');
       if (!mounted) return;
       setState(() {
         _route = route;
@@ -284,8 +284,8 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
       );
       return isWorkerPreview;
     } catch (error) {
-      // DEV: Si no hay GPS disponible, se intenta la ruta con la Ãºltima
-      // ubicaciÃ³n guardada para no bloquear a clientes ni ubicaciones previas.
+      // DEV: Si no hay GPS disponible, se intenta la ruta con la última
+      // ubicación guardada para no bloquear a clientes ni ubicaciones previas.
       debugPrint('TRACKING_LOCATION_REFRESH_ERROR: $error');
       return false;
     }
@@ -508,7 +508,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                    'Ã‚Â¡Tu solicitud fue aceptada! Iniciando seguimiento.',
+                    '¡Tu solicitud fue aceptada! Iniciando seguimiento.',
                   ),
                   backgroundColor: AppTheme.primaryGreen,
                 ),
@@ -705,18 +705,18 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
             : '';
 
     if (code == 'failed-precondition' &&
-        detail.contains('trabajador no tiene ubicaciÃ³n')) {
-      return 'Activa la ubicaciÃ³n de tu telÃ©fono para preparar la ruta.';
+        detail.contains('trabajador no tiene ubicación')) {
+      return 'Activa la ubicación de tu teléfono para preparar la ruta.';
     }
     if (code == 'failed-precondition' &&
-        detail.contains('trabajo no tiene ubicaciÃ³n')) {
-      return 'Este trabajo no tiene una ubicaciÃ³n seleccionada.';
+        detail.contains('trabajo no tiene ubicación')) {
+      return 'Este trabajo no tiene una ubicación seleccionada.';
     }
     if (code == 'failed-precondition' && detail.contains('asignado')) {
-      return 'Este trabajo todavÃ­a no tiene un trabajador asignado.';
+      return 'Este trabajo todavía no tiene un trabajador asignado.';
     }
     if (error.response == null) {
-      return 'No pudimos conectar para preparar la ruta. Revisa tu conexiÃ³n e intÃ©ntalo de nuevo.';
+      return 'No pudimos conectar para preparar la ruta. Revisa tu conexión e inténtalo de nuevo.';
     }
     return 'No pudimos preparar la ruta. Intenta de nuevo.';
   }
@@ -951,7 +951,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                 ),
                 _LayerOption(
                   icon: Icons.satellite_alt_outlined,
-                  label: 'SatÃ©lite',
+                  label: 'Satélite',
                   selected: _mapStyle == _MapStyle.satellite,
                   onTap:
                       () => setState(() {
@@ -961,7 +961,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                 ),
                 _LayerOption(
                   icon: Icons.traffic_outlined,
-                  label: 'TrÃ¡fico y vÃ­as',
+                  label: 'Tráfico y vías',
                   selected: _mapStyle == _MapStyle.traffic,
                   onTap:
                       () => setState(() {
@@ -1075,7 +1075,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          'Tu propuesta llegarÃ¡ a ${widget.otherUserName}.',
+                          'Tu propuesta llegará a ${widget.otherUserName}.',
                           style: const TextStyle(color: AppTheme.textLight),
                         ),
                         const SizedBox(height: 18),
@@ -1201,7 +1201,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'LlegarÃ¡s en ${formattedEstimatedTime()}',
+                                  'Llegarás en ${formattedEstimatedTime()}',
                                   style: const TextStyle(
                                     color: AppTheme.textDark,
                                     fontSize: 13,
@@ -1439,7 +1439,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                     ),
                   ),
                   Text(
-                    _isNight ? 'Modo noche' : 'Modo dÃ­a',
+                    _isNight ? 'Modo noche' : 'Modo día',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppTheme.textLight,
@@ -1462,12 +1462,12 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'El trabajador ya llegÃ³. Comparte este cÃ³digo:',
+                                'El trabajador ya llegó. Comparte este código:',
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                               const SizedBox(height: 5),
                               Text(
-                                _arrivalCode ?? 'Cargando cÃ³digo...',
+                                _arrivalCode ?? 'Cargando código...',
                                 style: const TextStyle(
                                   fontSize: 24,
                                   letterSpacing: 4,
@@ -1481,7 +1481,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Ya estÃ¡s a menos de 20 metros del servicio.',
+                                'Ya estás a menos de 20 metros del servicio.',
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                               const SizedBox(height: 9),
@@ -1491,7 +1491,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                                   onPressed: _showArrivalCodeEntry,
                                   icon: const Icon(Icons.pin_outlined),
                                   label: const Text(
-                                    'Ingresar cÃ³digo del cliente',
+                                    'Ingresar código del cliente',
                                   ),
                                 ),
                               ),
@@ -1566,7 +1566,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
                             ? 'Solicitud rechazada'
                             : 'Enviar solicitud de trabajo')
                         : (_isCompletedJob
-                            ? 'Ver conversaciÃ³n'
+                            ? 'Ver conversación'
                             : 'Chatear con el cliente'),
                   ),
                   style: FilledButton.styleFrom(
@@ -1608,7 +1608,7 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
               const SizedBox(width: 10),
               const Expanded(
                 child: Text(
-                  'VehÃ­culo utilizado',
+                  'Vehículo utilizado',
                   style: TextStyle(fontSize: 13, color: AppTheme.textLight),
                 ),
               ),
@@ -1685,11 +1685,11 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen>
 
   String get _distanceText =>
       _distanceMeters == null
-          ? 'â€”'
+          ? '--'
           : '${(_distanceMeters! / 1000).toStringAsFixed(1)} km';
   String get _durationText =>
       _estimatedSeconds == null
-          ? 'â€”'
+          ? '--'
           : '${(_estimatedSeconds! / 60).ceil()} min';
 }
 
@@ -1935,7 +1935,7 @@ class _RouteLoading extends StatelessWidget {
           ),
           const SizedBox(height: 22),
           const Text(
-            'Trazando rutaâ€¦',
+            'Trazando ruta...',
             style: TextStyle(
               color: AppTheme.textDark,
               fontSize: 20,
