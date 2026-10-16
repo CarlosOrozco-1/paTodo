@@ -35,7 +35,7 @@ type Tab = (typeof tabs)[number];
 
 const tabLabels: Record<Tab, string> = {
   all: 'Todos',
-  published: 'En revisión', // Cambié el texto para que coincida con CLIENT_STATUS_LABELS
+  published: 'En revisión',
   offers: 'Recibiendo ofertas',
   contracted: 'Contratados',
   completed: 'Completados',
@@ -89,7 +89,7 @@ export function MyJobs() {
 
   const filtered = useMemo(() => {
     const result = jobs.filter((job) => {
-      if (tab === 'published' && job.status !== 'pending') return false; // Nota: 'published' aquí significa "En revisión" según tus pestañas
+      if (tab === 'published' && job.status !== 'pending') return false; 
       if (tab === 'offers' && job.status !== 'published') return false;
       if (tab === 'contracted' && !['assigned', 'in_progress'].includes(job.status)) return false;
       if (tab === 'completed' && job.status !== 'completed') return false;
@@ -157,7 +157,6 @@ export function MyJobs() {
     (j) => ['pending', 'published', 'assigned', 'in_progress'].includes(j.status),
   ).length;
   const pendingJobs = jobs.filter((j) => j.status === 'pending').length;
-  // Con ofertas: Calculamos basándonos en si el trabajo está en estado 'published' (recibiendo ofertas)
   const withOffersJobs = jobs.filter((j) => j.status === 'published').length;
   const completedJobs = jobs.filter((j) => j.status === 'completed').length;
 
@@ -178,14 +177,14 @@ export function MyJobs() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full overflow-hidden px-2 sm:px-0">
       <PageHeader
         title="Mis trabajos"
         subtitle="Gestiona y da seguimiento a todas tus solicitudes de servicio"
       />
 
       {/* Métricas Superiores */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           label="Solicitudes activas"
           value={activeJobs}
@@ -221,22 +220,19 @@ export function MyJobs() {
       </div>
 
       {/* Contenido */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-4">
+      <div className="grid gap-6 lg:grid-cols-3 min-w-0">
+        <div className="lg:col-span-2 space-y-4 w-full">
           
-          {/* 
-             Diseño de los filtros.
-          */}
-          <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm flex flex-col gap-4">
+          <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm flex flex-col gap-4 w-full">
             
-            {/* Fila superior: Pestañas */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Fila superior: Pestañas con scroll horizontal táctil */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 w-full scrollbar-hide">
               {tabs.map((t) => (
                 <button
                   key={t}
                   onClick={() => changeTab(t)}
                   className={cn(
-                    'flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer',
+                    'flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap shrink-0',
                     tab === t
                       ? 'bg-brand-600 text-white shadow-md shadow-brand-600/20'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
@@ -303,28 +299,19 @@ export function MyJobs() {
               ]}
             />
           ) : (
-            <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-left text-sm">
+            <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm w-full">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full min-w-[500px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50/60">
-                      {[
-                        'Trabajo',
-                        'Categoría',
-                        'Zona / Municipio',
-                        'Fecha publicación',
-                        'Presupuesto',
-                        'Propuestas',
-                        'Estado',
-                        '',
-                      ].map((head) => (
-                        <th
-                          key={head}
-                          className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400"
-                        >
-                          {head}
-                        </th>
-                      ))}
+                      <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Trabajo</th>
+                      <th className="hidden md:table-cell px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Categoría</th>
+                      <th className="hidden lg:table-cell px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Zona</th>
+                      <th className="hidden xl:table-cell px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Fecha</th>
+                      <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Presupuesto</th>
+                      <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Propuestas</th>
+                      <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Estado</th>
+                      <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -335,7 +322,7 @@ export function MyJobs() {
                       return (
                         <tr key={job.id} className="group transition-colors hover:bg-brand-50/30">
                           <td className="px-4 py-3.5">
-                            <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex items-center gap-3 min-w-0 max-w-[150px] sm:max-w-[200px]">
                               <span
                                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white shadow-sm"
                                 style={{ backgroundColor: category?.color || '#0d9488' }}
@@ -347,28 +334,28 @@ export function MyJobs() {
                               </p>
                             </div>
                           </td>
-                          <td className="px-4 py-3.5 text-xs font-semibold text-gray-600">
+                          <td className="hidden md:table-cell px-4 py-3.5 text-xs font-semibold text-gray-600">
                             {category?.name || 'General'}
                           </td>
-                          <td className="px-4 py-3.5 text-xs text-gray-500">
+                          <td className="hidden lg:table-cell px-4 py-3.5 text-xs text-gray-500">
                             <span className="inline-flex items-center gap-1">
                               <MapPin className="h-3 w-3 text-brand-500" />
-                              {guessZone(job.location.address)}
+                              <span className="truncate max-w-[100px]">{guessZone(job.location.address)}</span>
                             </span>
                           </td>
-                          <td className="px-4 py-3.5 text-xs text-gray-500">
-                            <span className="inline-flex items-center gap-1">
+                          <td className="hidden xl:table-cell px-4 py-3.5 text-xs text-gray-500">
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap">
                               <Calendar className="h-3 w-3 text-gray-400" />
                               {formatDate(job.createdAt)}
                             </span>
                           </td>
-                          <td className="px-4 py-3.5 text-sm font-black text-gray-900">
+                          <td className="px-4 py-3.5 text-sm font-black text-gray-900 whitespace-nowrap">
                             {formatCurrency(job.pricing.proposedPrice, job.pricing.currency)}
                           </td>
                           <td className="px-4 py-3.5">
                             <span
                               className={cn(
-                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold',
+                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap',
                                 offersCount > 0
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                                   : 'bg-gray-100 text-gray-500',
@@ -380,7 +367,7 @@ export function MyJobs() {
                           <td className="px-4 py-3.5">
                             <span
                               className={cn(
-                                'inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold',
+                                'inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold whitespace-nowrap',
                                 JOB_STATUS_STYLES[job.status],
                               )}
                             >
@@ -391,10 +378,10 @@ export function MyJobs() {
                             <div className="relative flex items-center justify-end gap-1">
                               <Link
                                 to={`/cliente/trabajo/${job.id}`}
-                                className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold text-brand-600 transition-colors hover:bg-brand-50"
+                                className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold text-brand-600 transition-colors hover:bg-brand-50 whitespace-nowrap"
                               >
                                 <Send className="h-3 w-3" />
-                                Ver Detalle 
+                                <span className="hidden sm:inline">Ver Detalle</span>
                               </Link>
                               <button
                                 type="button"
@@ -433,12 +420,12 @@ export function MyJobs() {
 
               {/* Paginador */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
-                  <p className="text-xs text-gray-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-t border-gray-100 px-4 py-3 gap-3">
+                  <p className="text-xs text-gray-400 text-center sm:text-left">
                     Mostrando {(safePage - 1) * PAGE_SIZE + 1}–
                     {Math.min(safePage * PAGE_SIZE, filtered.length)} de {filtered.length}
                   </p>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center justify-center gap-1">
                     <button
                       type="button"
                       disabled={safePage === 1}
@@ -478,7 +465,7 @@ export function MyJobs() {
         </div>
 
         {/* Panel lateral: consejos */}
-        <div className="space-y-6">
+        <div className="space-y-6 w-full">
           <div className="relative overflow-hidden rounded-3xl border border-brand-100/70 bg-gradient-to-br from-brand-50/60 to-white p-5 shadow-sm">
             <div className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-emerald-100/60 blur-2xl" />
             <div className="flex items-center gap-2">

@@ -17,7 +17,7 @@ type InternalNavigatorProps = {
   destination?: NavigatorDestination;
   onPositionUpdate?: (position: JobTrackingPosition) => void;
   onInstructionChange?: (instruction: string) => void;
-  // NUEVO: Pasamos el tiempo y distancia exactos de la ruta verde hacia las tarjetas
+  //Pasamos el tiempo y distancia exactos de la ruta verde hacia las tarjetas
   onRouteCalculated?: (distanceMeters: number, durationSeconds: number) => void;
   voiceEnabled?: boolean;
   className?: string;
@@ -76,7 +76,13 @@ export function InternalNavigator({
     });
     map.current = currentMap;
 
-    const resolveDestCoords = async (): Promise<[number, number] | null> => {
+   const resolveDestCoords = async (): Promise<[number, number] | null> => {
+      // Coordenadas exactas del pin del cliente
+      if (destLng !== undefined && destLat !== undefined && destLng !== 0 && destLat !== 0) {
+        return [destLng, destLat];
+      }
+
+      // Si no hay coordenadas, buscar por texto
       if (destAddress && destAddress.trim().length > 0) {
         try {
           const query = encodeURIComponent(`${destAddress}, Guatemala`);
@@ -91,9 +97,7 @@ export function InternalNavigator({
           // Fallback silencioso
         }
       }
-      if (destLng !== undefined && destLat !== undefined && destLng !== 0 && destLat !== 0) {
-        return [destLng, destLat];
-      }
+      
       return [-90.5069, 14.6349];
     };
 
@@ -108,7 +112,7 @@ export function InternalNavigator({
           const route = data.routes[0];
           const distanceMeters = route.distance;
           
-          // NUEVO: Enviar la distancia y duración 100% exactas de la ruta pintada
+          //Enviar la distancia y duración 100% exactas de la ruta pintada
           if (onRouteCalculated) {
             onRouteCalculated(distanceMeters, route.duration);
           }

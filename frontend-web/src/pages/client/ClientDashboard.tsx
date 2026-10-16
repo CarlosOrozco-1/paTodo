@@ -147,9 +147,9 @@ export function ClientDashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full overflow-hidden px-2 sm:px-0">
       {/* Banner Superior Limpio */}
-      <div className="relative overflow-hidden rounded-3xl border border-brand-100/70 bg-white p-6 shadow-sm sm:p-8">
+      <div className="relative overflow-hidden rounded-3xl border border-brand-100/70 bg-white p-5 sm:p-8 shadow-sm">
         <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-brand-100/40 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-emerald-100/40 blur-3xl" />
 
@@ -158,7 +158,7 @@ export function ClientDashboard() {
             <p className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-brand-600">
               Panel de Cliente
             </p>
-            <h1 className="mt-1.5 text-3xl font-black tracking-tight text-gray-900">
+            <h1 className="mt-1.5 text-2xl sm:text-3xl font-black tracking-tight text-gray-900">
               ¡Hola, {fullName(user?.profile)}!
             </h1>
             <p className="mt-1 max-w-lg text-sm text-gray-500">
@@ -166,9 +166,9 @@ export function ClientDashboard() {
             </p>
           </div>
 
-          <div className="shrink-0">
-            <Link to="/cliente/crear-trabajo">
-              <Button size="lg" className="rounded-xl bg-brand-600 font-bold text-white shadow-lg shadow-brand-600/25 hover:bg-brand-700">
+          <div className="shrink-0 w-full sm:w-auto">
+            <Link to="/cliente/crear-trabajo" className="block">
+              <Button size="lg" className="w-full sm:w-auto rounded-xl bg-brand-600 font-bold text-white shadow-lg shadow-brand-600/25 hover:bg-brand-700">
                 <PlusCircle className="mr-2 h-5 w-5" />
                 Publicar un trabajo
               </Button>
@@ -178,16 +178,18 @@ export function ClientDashboard() {
 
         {/* Barra de notificación flotante */}
         {waitingForPros > 0 && (
-          <div className="relative mt-5 flex items-center gap-3 rounded-2xl border border-emerald-200/70 bg-emerald-50/70 px-4 py-3">
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-            </span>
-            <p className="text-sm font-semibold text-emerald-800">
-              Tienes {waitingForPros}{' '}
-              {waitingForPros === 1 ? 'solicitud activa recibiendo propuestas' : 'solicitudes activas recibiendo propuestas'}
-            </p>
-            <span className="ml-auto hidden text-xs font-bold text-emerald-700 sm:block">
+          <div className="relative mt-5 flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-emerald-200/70 bg-emerald-50/70 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+              </span>
+              <p className="text-sm font-semibold text-emerald-800">
+                Tienes {waitingForPros}{' '}
+                {waitingForPros === 1 ? 'solicitud activa' : 'solicitudes activas'} recibiendo propuestas
+              </p>
+            </div>
+            <span className="sm:ml-auto text-xs font-bold text-emerald-700">
               {offersReceived} {offersReceived === 1 ? 'propuesta' : 'propuestas'} recibidas
             </span>
           </div>
@@ -195,7 +197,7 @@ export function ClientDashboard() {
       </div>
 
       {/* Tarjetas de Métricas Superiores */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           label="Solicitudes activas"
           value={activeJobs}
@@ -237,21 +239,21 @@ export function ClientDashboard() {
       </div>
 
       {/* Contenido Principal */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3 min-w-0">
         {/* Tabla de solicitudes recientes */}
-        <Card className="lg:col-span-2 border border-gray-100 shadow-sm">
+        <Card className="lg:col-span-2 border border-gray-100 shadow-sm overflow-hidden w-full">
           <CardHeader
             title="Tus últimas solicitudes"
             subtitle="Revisa el estado de tus proyectos y las ofertas recibidas"
             action={
               <Link to="/cliente/mis-trabajos">
-                <Button variant="ghost" size="sm" className="font-semibold text-brand-600">
+                <Button variant="ghost" size="sm" className="font-semibold text-brand-600 hidden sm:flex">
                   Ver todas
                 </Button>
               </Link>
             }
           />
-          <CardContent className="pt-1">
+          <CardContent className="pt-1 p-0 sm:p-6 sm:pt-1">
             {jobs.length === 0 ? (
               <WorkflowEmptyState
                 icon={<Wrench className="h-9 w-9 text-brand-700" />}
@@ -271,27 +273,18 @@ export function ClientDashboard() {
                 ]}
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[820px] text-left text-sm">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full min-w-[500px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-gray-100">
-                      {[
-                        'Solicitud',
-                        'Categoría',
-                        'Ubicación',
-                        'Fecha public.',
-                        'Ofertas',
-                        'Presupuesto',
-                        'Estado',
-                        '',
-                      ].map((head) => (
-                        <th
-                          key={head}
-                          className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400"
-                        >
-                          {head}
-                        </th>
-                      ))}
+                      <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Solicitud</th>
+                      <th className="hidden md:table-cell px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Categoría</th>
+                      <th className="hidden lg:table-cell px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Ubicación</th>
+                      <th className="hidden xl:table-cell px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Fecha public.</th>
+                      <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Ofertas</th>
+                      <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Presupuesto</th>
+                      <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">Estado</th>
+                      <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -309,33 +302,32 @@ export function ClientDashboard() {
                               >
                                 {category?.name?.charAt(0) || 'S'}
                               </span>
-                              <div className="min-w-0">
+                              <div className="min-w-0 max-w-[120px] sm:max-w-[200px]">
                                 <p className="truncate font-bold text-gray-900 group-hover:text-brand-700 transition-colors">
                                   {job.details.title}
                                 </p>
                                 <p className="truncate text-[11px] text-gray-400">
-                                  {job.details.description.slice(0, 48)}
-                                  {job.details.description.length > 48 ? '…' : ''}
+                                  {job.details.description}
                                 </p>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3.5 text-xs font-semibold text-gray-600">
+                          <td className="hidden md:table-cell px-4 py-3.5 text-xs font-semibold text-gray-600">
                             {category?.name || 'General'}
                           </td>
-                          <td className="px-4 py-3.5 text-xs text-gray-500">
+                          <td className="hidden lg:table-cell px-4 py-3.5 text-xs text-gray-500">
                             <span className="inline-flex items-center gap-1">
                               <MapPin className="h-3 w-3 text-brand-500" />
-                              {guessZone(job.location.address)}
+                              <span className="truncate max-w-[100px]">{guessZone(job.location.address)}</span>
                             </span>
                           </td>
-                          <td className="px-4 py-3.5 text-xs text-gray-500">
+                          <td className="hidden xl:table-cell px-4 py-3.5 text-xs text-gray-500">
                             {formatDate(job.createdAt)}
                           </td>
                           <td className="px-4 py-3.5">
                             <span
                               className={cn(
-                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold',
+                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap',
                                 offersCount > 0
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                                   : 'bg-gray-100 text-gray-500',
@@ -344,26 +336,26 @@ export function ClientDashboard() {
                               {offersCount} {offersCount === 1 ? 'oferta' : 'ofertas'}
                             </span>
                           </td>
-                          <td className="px-4 py-3.5 text-sm font-black text-gray-900">
+                          <td className="px-4 py-3.5 text-sm font-black text-gray-900 whitespace-nowrap">
                             {formatCurrency(job.pricing.proposedPrice, job.pricing.currency)}
                           </td>
                           <td className="px-4 py-3.5">
                             <span
                               className={cn(
-                                'inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold',
+                                'inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold whitespace-nowrap',
                                 JOB_STATUS_STYLES[job.status],
                               )}
                             >
                               {CLIENT_STATUS_LABELS[job.status] || job.status}
                             </span>
                           </td>
-                          <td className="px-4 py-3.5">
+                          <td className="px-4 py-3.5 text-right">
                             <Link
                               to={`/cliente/trabajo/${job.id}`}
-                              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold text-brand-600 transition-colors hover:bg-brand-50"
+                              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold text-brand-600 transition-colors hover:bg-brand-50 whitespace-nowrap"
                             >
                               <Send className="h-3 w-3" />
-                              Ver propuestas
+                              <span className="hidden sm:inline">Ver</span>
                             </Link>
                           </td>
                         </tr>
@@ -373,11 +365,19 @@ export function ClientDashboard() {
                 </table>
               </div>
             )}
+            {/* Botón ver todas móvil */}
+            <div className="p-4 sm:hidden border-t border-gray-100">
+               <Link to="/cliente/mis-trabajos">
+                  <Button variant="outline" size="sm" fullWidth className="font-semibold text-brand-600">
+                    Ver todas las solicitudes
+                  </Button>
+               </Link>
+            </div>
           </CardContent>
         </Card>
 
         {/* Panel Lateral Derecho */}
-        <div className="space-y-6">
+        <div className="space-y-6 w-full">
           <Card className="border border-gray-100 shadow-sm">
             <CardHeader
               title={

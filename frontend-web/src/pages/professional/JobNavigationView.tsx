@@ -222,129 +222,145 @@ export function JobNavigationView() {
   return (
     <div className="fixed inset-0 z-[99999] h-screen w-screen flex flex-col bg-gray-950 overflow-hidden">
       
-      {/* BARRA SUPERIOR (Buscador y Volver) */}
-      <div className="absolute top-4 left-4 right-4 z-50 flex flex-col md:flex-row items-center justify-between gap-3 bg-gray-900/95 backdrop-blur-md p-3.5 rounded-2xl shadow-2xl border border-white/10 text-white pointer-events-auto">
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => navigate(-1)}
-            className="bg-white/10 border-white/20 text-white hover:bg-white/20 shrink-0 cursor-pointer"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" /> Volver
-          </Button>
-
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-md">
-              <ArrowUpRight className="h-6 w-6 animate-pulse" />
-            </div>
-            <div className="min-w-0 flex flex-col">
-              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">En ruta hacia el cliente</p>
-              <p className="text-xs font-bold truncate max-w-xs sm:max-w-md">
-                {job.details.title}
-              </p>
-              <p className="text-[10px] text-gray-300 truncate max-w-xs sm:max-w-md" title={activeDestination?.label || activeDestination?.addressText}>
-                {activeDestination?.label || activeDestination?.addressText || 'Ubicación'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <input
-            type="text"
-            placeholder="Buscar parada (ej. Ferretería)..."
-            value={destinationInput}
-            onChange={(e) => setDestinationInput(e.target.value)}
-            className="flex-1 md:w-56 text-xs px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
-          />
-          <Button
-            size="sm"
-            className="bg-brand-600 hover:bg-brand-700 text-white shrink-0 text-xs cursor-pointer"
-            onClick={handleSearchCustomDest}
-          >
-            Ir
-          </Button>
-
-          {hasCustomDest && (
+      {/* =========================================
+          CONTENEDOR SUPERIOR (No se superpone) 
+          pointer-events-none permite tocar el mapa 
+          detrás de los espacios vacíos
+      ============================================= */}
+      <div className="absolute top-0 left-0 right-0 z-50 flex flex-col gap-2 p-2 sm:p-4 pointer-events-none">
+        
+        {/* BARRA SUPERIOR (Buscador y Volver) */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-gray-900/95 backdrop-blur-md p-3 sm:p-3.5 rounded-2xl shadow-2xl border border-white/10 text-white pointer-events-auto">
+          <div className="flex items-center gap-3 min-w-0">
             <Button
               size="sm"
               variant="outline"
-              className="text-emerald-400 border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/50 shrink-0 text-xs cursor-pointer"
-              onClick={handleRestoreOriginal}
-              title="Restaurar destino original"
+              onClick={() => navigate(-1)}
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 shrink-0 cursor-pointer"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
+              <ArrowLeft className="h-4 w-4 sm:mr-1" /> 
+              <span className="hidden sm:inline">Volver</span>
             </Button>
-          )}
+
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-md">
+                <ArrowUpRight className="h-5 w-5 sm:h-6 sm:w-6 animate-pulse" />
+              </div>
+              <div className="min-w-0 flex flex-col">
+                <p className="text-[9px] sm:text-[10px] font-bold text-emerald-400 uppercase tracking-wider">En ruta hacia el cliente</p>
+                <p className="text-xs sm:text-sm font-bold truncate">
+                  {job.details.title}
+                </p>
+                <p className="text-[9px] sm:text-[10px] text-gray-300 truncate" title={activeDestination?.label || activeDestination?.addressText}>
+                  {activeDestination?.label || activeDestination?.addressText || 'Ubicación'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full md:w-auto mt-1 md:mt-0">
+            <input
+              type="text"
+              placeholder="Buscar parada (ej. Ferretería)..."
+              value={destinationInput}
+              onChange={(e) => setDestinationInput(e.target.value)}
+              className="flex-1 md:w-56 text-xs px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
+            />
+            <Button
+              size="sm"
+              className="bg-brand-600 hover:bg-brand-700 text-white shrink-0 text-xs cursor-pointer"
+              onClick={handleSearchCustomDest}
+            >
+              Ir
+            </Button>
+
+            {hasCustomDest && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-emerald-400 border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/50 shrink-0 text-xs cursor-pointer px-2"
+                onClick={handleRestoreOriginal}
+                title="Restaurar destino original"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* PANEL DE INSTRUCCIONES TIPO WAZE */}
+        <div className="self-center w-full sm:w-[450px] flex items-center justify-between gap-3 sm:gap-4 bg-emerald-600/95 backdrop-blur-md px-4 py-3 sm:px-5 sm:py-4 rounded-2xl shadow-2xl border border-emerald-400/30 text-white pointer-events-auto">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="bg-white/20 p-2 rounded-xl shrink-0">
+               <Navigation className="h-5 w-5 sm:h-6 sm:w-6 text-white shrink-0 animate-pulse" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[9px] sm:text-[10px] font-bold text-emerald-100 uppercase tracking-wider">Siguiente paso</p>
+              <p className="text-xs sm:text-sm font-bold truncate text-white">{currentInstruction}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setVoiceEnabled(!voiceEnabled)}
+            className="shrink-0 rounded-xl bg-black/10 p-2 hover:bg-black/20 transition-colors cursor-pointer"
+            title={voiceEnabled ? 'Desactivar voz' : 'Activar voz'}
+          >
+            {voiceEnabled ? <Volume2 className="h-4 w-4 sm:h-5 sm:w-5 text-white" /> : <VolumeX className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-200" />}
+          </button>
         </div>
       </div>
 
-      {/* PANEL DE INSTRUCCIONES TIPO WAZE */}
-      <div className="absolute top-24 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-[450px] z-40 flex items-center justify-between gap-4 bg-emerald-600/95 backdrop-blur-md px-5 py-4 rounded-2xl shadow-2xl border border-emerald-400/30 text-white transition-all pointer-events-auto">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="bg-white/20 p-2 rounded-xl shrink-0">
-             <Navigation className="h-6 w-6 text-white shrink-0 animate-pulse" />
+      {/* =========================================
+          CONTENEDOR INFERIOR (No se superpone)
+      ============================================= */}
+      <div className="absolute bottom-0 left-0 right-0 z-50 flex items-end justify-between p-2 pb-4 sm:p-6 pointer-events-none">
+        
+        {/* TARJETAS FLOTANTES (Velocidad y ETA Real) */}
+        <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-end gap-2 sm:gap-3 max-w-[75%] sm:max-w-none">
+          <div className="bg-gray-900/95 backdrop-blur-md px-3 py-2 sm:px-4 sm:py-3 rounded-2xl shadow-2xl border border-white/10 text-white flex items-center gap-3 sm:gap-4 pointer-events-auto">
+            <div className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-lg shrink-0">
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5 animate-pulse" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[9px] sm:text-[10px] uppercase tracking-wider text-emerald-400 font-bold truncate">Tiempo estimado</p>
+              <p className="text-base sm:text-lg font-black text-white leading-tight truncate">{eta} <span className="text-[10px] sm:text-xs font-medium text-gray-400">({distance})</span></p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider">Siguiente paso</p>
-            <p className="text-sm font-bold truncate text-white">{currentInstruction}</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setVoiceEnabled(!voiceEnabled)}
-          className="shrink-0 rounded-xl bg-black/10 p-2.5 hover:bg-black/20 transition-colors cursor-pointer"
-          title={voiceEnabled ? 'Desactivar voz' : 'Activar voz'}
-        >
-          {voiceEnabled ? <Volume2 className="h-5 w-5 text-white" /> : <VolumeX className="h-5 w-5 text-emerald-200" />}
-        </button>
-      </div>
 
-      {/* TARJETAS FLOTANTES (Velocidad y ETA Real) */}
-      <div className="absolute bottom-6 left-4 right-4 sm:left-6 z-50 flex flex-wrap items-center gap-3 pointer-events-none">
-        <div className="bg-gray-900/95 backdrop-blur-md px-4 py-3 rounded-2xl shadow-2xl border border-white/10 text-white flex items-center gap-4 pointer-events-auto">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-lg">
-            <Clock className="h-5 w-5 animate-pulse" />
+          <div className="bg-gray-900/95 backdrop-blur-md px-3 py-2 sm:px-4 sm:py-3 rounded-2xl shadow-2xl border border-white/10 text-white flex items-center gap-3 sm:gap-4 pointer-events-auto">
+            <div className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-brand-600 text-white shadow-lg shrink-0">
+              <Gauge className="h-4 w-4 sm:h-5 sm:w-5 text-brand-200" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[9px] sm:text-[10px] uppercase tracking-wider text-gray-400 font-bold truncate">Velocidad actual</p>
+              <p className="text-base sm:text-lg font-black text-white leading-tight truncate">{speed} <span className="text-[10px] sm:text-xs font-normal text-gray-300">km/h</span></p>
+            </div>
           </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold">Tiempo estimado</p>
-            <p className="text-lg font-black text-white">{eta} <span className="text-xs font-medium text-gray-400">({distance})</span></p>
-          </div>
-        </div>
 
-        <div className="bg-gray-900/95 backdrop-blur-md px-4 py-3 rounded-2xl shadow-2xl border border-white/10 text-white flex items-center gap-4 pointer-events-auto">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white shadow-lg">
-            <Gauge className="h-5 w-5 text-brand-200" />
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Velocidad actual</p>
-            <p className="text-lg font-black text-white">{speed} <span className="text-xs font-normal text-gray-300">km/h</span></p>
+          <div className="hidden lg:flex items-center gap-2 bg-gray-900/95 backdrop-blur-md px-4 py-3 rounded-2xl shadow-2xl border border-white/10 text-brand-300 text-xs font-semibold pointer-events-auto">
+            <Navigation className="h-4 w-4 animate-spin text-brand-400" />
+            <span>GPS activo</span>
           </div>
         </div>
 
-        <div className="hidden lg:flex items-center gap-2 bg-gray-900/95 backdrop-blur-md px-4 py-3 rounded-2xl shadow-2xl border border-white/10 text-brand-300 text-xs font-semibold pointer-events-auto">
-          <Navigation className="h-4 w-4 animate-spin text-brand-400" />
-          <span>GPS activo</span>
+        {/* BOTONES DE ZOOM */}
+        <div className="flex flex-col gap-2 pointer-events-auto shrink-0">
+          <button
+            onClick={handleZoomIn}
+            title="Acercar mapa"
+            className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-gray-900/95 backdrop-blur-md border border-white/10 text-white shadow-2xl transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+          >
+            <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
+          </button>
+          <button
+            onClick={handleZoomOut}
+            title="Alejar mapa"
+            className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-gray-900/95 backdrop-blur-md border border-white/10 text-white shadow-2xl transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+          >
+            <Minus className="h-5 w-5 sm:h-6 sm:w-6" />
+          </button>
         </div>
-      </div>
 
-      {/* BOTONES DE ZOOM */}
-      <div className="absolute right-6 bottom-28 z-50 flex flex-col gap-2">
-        <button
-          onClick={handleZoomIn}
-          title="Acercar mapa"
-          className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-900/95 backdrop-blur-md border border-white/10 text-white shadow-2xl transition-transform hover:scale-105 active:scale-95 cursor-pointer pointer-events-auto"
-        >
-          <Plus className="h-6 w-6" />
-        </button>
-        <button
-          onClick={handleZoomOut}
-          title="Alejar mapa"
-          className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-900/95 backdrop-blur-md border border-white/10 text-white shadow-2xl transition-transform hover:scale-105 active:scale-95 cursor-pointer pointer-events-auto"
-        >
-          <Minus className="h-6 w-6" />
-        </button>
       </div>
 
       {/* MAPA */}

@@ -24,7 +24,7 @@ import { WorkflowEmptyState } from '@/components/ui/WorkflowEmptyState';
 import { toast } from '@/stores/uiStore';
 import { getErrorMessage } from '@/api/axiosClient';
 import {
-  JOB_STATUS_LABELS,
+  JOB_STATUS_LABELS, 
   JOB_STATUS_STYLES,
 } from '@/utils/constants';
 import { formatCurrency, formatEstimatedTime, formatDate } from '@/utils/formatters';

@@ -70,11 +70,13 @@ export function JobLocationMap({
   };
 
   // Resuelve coordenadas priorizando texto o números
-  const resolveCoords = async (loc: JobMapLocation): Promise<[number, number] | null> => {
+ const resolveCoords = async (loc: JobMapLocation): Promise<[number, number] | null> => {
+    //Usar las coordenadas exactas guardadas en la base de datos
     if (loc.lng !== undefined && loc.lat !== undefined && loc.lng !== 0 && loc.lat !== 0) {
       return [loc.lng, loc.lat];
     }
 
+    //Si no hay coordenadas (ej. destino temporal), buscar por texto
     if (loc.addressText && loc.addressText.trim().length > 0) {
       try {
         const query = encodeURIComponent(`${loc.addressText}, Guatemala`);
