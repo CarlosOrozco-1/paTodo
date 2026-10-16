@@ -11,6 +11,7 @@ export { realCategories, realSkills } from './real-categories';
 export { realJobs } from './real-jobs';
 export { realOffers } from './real-offers';
 export { realReviews } from './real-reviews';
+export { realPayments } from './real-payments';
 export { realNotifications } from './real-notifications';
 export { realConversations, realMessages } from './real-messages';
 export { realAdmin } from './real-admin';

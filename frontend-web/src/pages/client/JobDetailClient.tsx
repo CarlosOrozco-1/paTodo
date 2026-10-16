@@ -31,6 +31,7 @@ import { CounterpartCard } from '@/components/jobs/CounterpartCard';
 import { ReviewForm } from '@/components/reviews/ReviewForm';
 import { ReviewCard } from '@/components/reviews/ReviewCard';
 import { reviewsService } from '@/api/reviews.service';
+import { paymentsService } from '@/api/payments.service';
 import { WorkerLocationMap } from '@/components/ui/WorkerLocationMap';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/uiStore';
@@ -63,7 +64,6 @@ export function JobDetailClient() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewsState, setReviewsState] = useState<{ jobId: string; items: Review[] } | null>(null);
-  const [completing, setCompleting] = useState(false);
 
   // --- ESTADOS PARA LA SIMULACIÓN DEL PAGO ---
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -154,20 +154,7 @@ export function JobDetailClient() {
     }
   };
 
-  const handleComplete = async () => {
-    setCompleting(true);
-    try {
-      const updated = await jobsService.complete(id!);
-      setJob(updated);
-      setReviewOpen(true);
-    } catch (error) {
-      toast('error', getErrorMessage(error));
-    } finally {
-      setCompleting(false);
-    }
-  };
-
-  // --- SIMULAR EL PAGO DESDE EL MODAL ---
+  // --- PAGO SIMULADO VÍA API (el servidor valida, calcula comisión y notifica) ---
   const handleProcessPayment = async () => {
     // Validar datos de tarjeta
     if (paymentMethod === 'demo_card') {
@@ -196,30 +183,27 @@ export function JobDetailClient() {
 
     setProcessingPayment(true);
     try {
-      // Simular tiempo de conexión con el banco
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Guardamos en la orden que se pagó
-      setJob(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          payment: {
-            paymentId: `demo_${Date.now()}`,
-            amount: prev.pricing.proposedPrice,
-            currency: prev.pricing.currency,
-            method: paymentMethod,
-            status: 'paid',
-            isDemo: true
-          }
-        };
-      });
+      if (!id) return;
+      const receipt = await paymentsService.create(id, paymentMethod);
+      // Releer el trabajo: el servidor ya asoció job.payment en la transacción.
+      const fresh = await jobsService.getById(id);
+      setJob(
+        fresh.payment
+          ? fresh
+          : {
+              ...fresh,
+              payment: {
+                ...receipt,
+                amount: job?.pricing.proposedPrice ?? receipt.amount,
+              },
+            },
+      );
 
       toast('success', '¡Pago procesado con éxito!');
-      setPaymentOpen(false); 
-      setReviewOpen(true);  
+      setPaymentOpen(false);
+      setReviewOpen(true);
     } catch (error) {
-      toast('error', 'Error al procesar el pago');
+      toast('error', getErrorMessage(error));
     } finally {
       setProcessingPayment(false);
     }
