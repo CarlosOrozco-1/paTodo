@@ -162,6 +162,8 @@ class _RecoveryStepperState extends State<RecoveryStepper> {
       if (mounted) setState(() => _loading = false);
     }
   }
+
+  Future<void> _resetPassword() async {
     final pass = _newPassword.text;
     final confirm = _confirmPassword.text;
 
@@ -198,8 +200,6 @@ class _RecoveryStepperState extends State<RecoveryStepper> {
       if (mounted) setState(() => _loading = false);
     }
   }
-
-  // ===================== Interfaz gráfica =====================
 
   @override
   Widget build(BuildContext context) {
