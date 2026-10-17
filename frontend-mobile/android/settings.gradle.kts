@@ -20,6 +20,8 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "9.4.1" apply false
     id("org.jetbrains.kotlin.android") version "2.3.20" apply false
+    // Lee frontend-mobile/android/app/google-services.json en el build Android.
+    id("com.google.gms.google-services") version "4.4.2" apply false
     id("org.gradle.toolchains.foojay-resolver-convention") version "0.10.0"
 }
 
