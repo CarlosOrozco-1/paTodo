@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import '../../../core/theme/app_theme.dart';
 
 /// Flujo de recuperación de contraseña en 3 pasos con código OTP de 6 dígitos:
@@ -35,12 +36,18 @@ class _RecoveryStepperState extends State<RecoveryStepper> {
   bool _obscureConfirm = true;
   String? _error;
 
+  // Cooldown para reenviar código (60s)
+  Timer? _resendTimer;
+  int _resendSecondsLeft = 0;
+  bool get _canResend => _resendSecondsLeft == 0 && !_loading && _step == 2;
+
   @override
   void dispose() {
     _email.dispose();
     _code.dispose();
     _newPassword.dispose();
     _confirmPassword.dispose();
+    _resendTimer?.cancel();
     super.dispose();
   }
 
@@ -66,6 +73,7 @@ class _RecoveryStepperState extends State<RecoveryStepper> {
           _step = 2;
           _error = null;
         });
+        _startResendCooldown();
       }
     } catch (e) {
       final msg = e.toString().replaceFirst('Exception: ', '');
@@ -103,7 +111,57 @@ class _RecoveryStepperState extends State<RecoveryStepper> {
     }
   }
 
-  Future<void> _resetPassword() async {
+  void _startResendCooldown({int seconds = 60}) {
+    _resendTimer?.cancel();
+    setState(() {
+      _resendSecondsLeft = seconds;
+    });
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_resendSecondsLeft <= 1) {
+        t.cancel();
+        if (mounted) {
+          setState(() {
+            _resendSecondsLeft = 0;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _resendSecondsLeft--;
+          });
+        }
+      }
+    });
+  }
+
+  Future<void> _resendCode() async {
+    if (!_canResend) return;
+    final email = _email.text.trim();
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await widget.onRequestCode(email);
+      if (mounted) {
+        _code.clear();
+        _startResendCooldown();
+        setState(() {
+          _error = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Código reenviado. Revisa tu correo (incluye Spam/Promociones).'),
+          ),
+        );
+      }
+    } catch (e) {
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      if (mounted) setState(() => _error = msg);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
     final pass = _newPassword.text;
     final confirm = _confirmPassword.text;
 
@@ -341,6 +399,8 @@ class _RecoveryStepperState extends State<RecoveryStepper> {
           keyboardType: TextInputType.number,
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 22, letterSpacing: 6, fontWeight: FontWeight.bold),
+          maxLength: 6,
+          autofillHints: const [AutofillHints.oneTimeCode],
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(6),
@@ -349,11 +409,22 @@ class _RecoveryStepperState extends State<RecoveryStepper> {
           onSubmitted: (_) => _loading ? null : _verifyCode(),
         ),
         const SizedBox(height: 8),
+        Text(
+          'Revisa tu bandeja (o carpeta de Spam/Promociones). El código caduca en 15 minutos.',
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 11, height: 1.3),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
         Align(
-          alignment: Alignment.centerRight,
+          alignment: Alignment.center,
           child: TextButton(
-            onPressed: _loading ? null : _requestCode,
-            child: const Text('¿Reenviar código?', style: TextStyle(fontSize: 12)),
+            onPressed: _canResend ? _resendCode : null,
+            child: Text(
+              _resendSecondsLeft == 0
+                  ? 'Reenviar código'
+                  : 'Reenviar en ${_resendSecondsLeft}s',
+              style: const TextStyle(fontSize: 12),
+            ),
           ),
         ),
         const SizedBox(height: 12),
