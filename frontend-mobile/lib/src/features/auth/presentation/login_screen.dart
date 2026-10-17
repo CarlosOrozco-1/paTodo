@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/auth_repository.dart';
-import 'password_reset_dialog.dart';
+import 'recovery_stepper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -101,8 +101,17 @@ class _LoginScreenState extends State<LoginScreen> {
   void _openRecovery() {
     showDialog(
       context: context,
-      builder:
-          (_) => PasswordResetDialog(onSendResetEmail: _repo.sendPasswordReset),
+      barrierDismissible: false,
+      builder: (_) => RecoveryStepper(
+        onRequestCode: _repo.requestPasswordResetOtp,
+        onVerifyCode: _repo.verifyResetCodeOtp,
+        onResetPassword: (email, code, newPassword) =>
+            _repo.resetPasswordWithOtp(
+          email: email,
+          code: code,
+          newPassword: newPassword,
+        ),
+      ),
     );
   }
 
