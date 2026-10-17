@@ -26,9 +26,16 @@ void main() async {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    // DEV: en Android se omite `options` para que Firebase use la config nativa
+    // de google-services.json (app 1:377828600122:android). Pasar
+    // DefaultFirebaseOptions aquí lo pisaría con la app web y rompe Google Sign-In.
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await Firebase.initializeApp();
+    } else {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     await PushNotificationService.instance.start();
     debugPrint('Firebase inicializado: ${Firebase.app().options.projectId}');

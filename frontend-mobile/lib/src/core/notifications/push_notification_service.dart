@@ -145,7 +145,12 @@ final appMessengerKey = GlobalKey<ScaffoldMessengerState>();
 /// aun cuando la aplicación no esté abierta.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // DEV: igual que en main(): en Android sin opciones (config nativa).
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    await Firebase.initializeApp();
+  } else {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  }
   debugPrint('PUSH_BACKGROUND_RECEIVED: ${message.messageId}');
   if (PushNotificationService._isIncomingCall(message.data)) {
     await IncomingCallNotificationService.instance.showIncomingCall(
