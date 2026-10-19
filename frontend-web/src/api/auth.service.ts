@@ -83,4 +83,29 @@ export const authService = {
     if (isDemoMode()) return demoAuth.logout();
     return realAuth.logout();
   },
+
+  /**
+   * Solicita un código OTP de 6 dígitos para recuperar la contraseña.
+   * El correo lo envía la API REST (Brevo); no depende de Firebase Auth.
+   */
+  async requestPasswordResetOtp(email: string): Promise<void> {
+    if (isDemoMode()) return demoAuth.requestPasswordResetOtp(email);
+    return realAuth.requestPasswordResetOtp(email);
+  },
+
+  /** Valida el código OTP de 6 dígitos antes de permitir cambiar la contraseña. */
+  async verifyResetCodeOtp(email: string, code: string): Promise<void> {
+    if (isDemoMode()) return demoAuth.verifyResetCodeOtp(email, code);
+    return realAuth.verifyResetCodeOtp(email, code);
+  },
+
+  /** Restablece la contraseña con el código OTP ya verificado. */
+  async resetPasswordWithOtp(
+    email: string,
+    code: string,
+    newPassword: string,
+  ): Promise<void> {
+    if (isDemoMode()) return demoAuth.resetPasswordWithOtp(email, code, newPassword);
+    return realAuth.resetPasswordWithOtp(email, code, newPassword);
+  },
 };

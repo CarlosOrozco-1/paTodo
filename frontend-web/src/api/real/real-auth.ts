@@ -4,8 +4,6 @@ import {
   signInWithCredential,
   signInWithEmailAndPassword,
   signOut,
-  sendPasswordResetEmail,
-  confirmPasswordReset,
 } from 'firebase/auth';
 import type { RegisterRole, User } from '@/types/user.types';
 import type {
@@ -200,25 +198,33 @@ export const realAuth = {
   },
 
   /**
-   * Envía el correo de recuperación de contraseña a través de Firebase Auth.
+   * Solicita un código OTP de 6 dígitos por correo (API REST → Brevo).
+   * La API responde 200 de forma genérica aunque el correo no exista, para no
+   * revelar qué cuentas están registradas.
    */
-  async forgotPassword(email: string): Promise<void> {
-    try {
-      await sendPasswordResetEmail(auth, email.trim());
-    } catch (error) {
-      throw new Error(firebaseAuthMessage(error));
-    }
+  async requestPasswordResetOtp(email: string): Promise<void> {
+    await apiPost('/auth/requestPasswordReset', { email: email.trim() });
   },
 
-  /**
-   * Confirma el cambio de contraseña utilizando el código (oobCode) del correo.
-   */
-  async resetPassword(oobCode: string, newPassword: string): Promise<void> {
-    try {
-      await confirmPasswordReset(auth, oobCode, newPassword);
-    } catch (error) {
-      throw new Error(firebaseAuthMessage(error));
-    }
+  /** Valida el código OTP de 6 dígitos con la API. */
+  async verifyResetCodeOtp(email: string, code: string): Promise<void> {
+    await apiPost('/auth/verifyResetCode', {
+      email: email.trim(),
+      code: code.trim(),
+    });
+  },
+
+  /** Restablece la contraseña en Firebase Auth con el código OTP ya verificado. */
+  async resetPasswordWithOtp(
+    email: string,
+    code: string,
+    newPassword: string,
+  ): Promise<void> {
+    await apiPost('/auth/resetPassword', {
+      email: email.trim(),
+      code: code.trim(),
+      newPassword,
+    });
   },
 };
 

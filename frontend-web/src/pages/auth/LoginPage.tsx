@@ -1,11 +1,19 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
-import { FlaskConical, LockKeyhole, Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router';
+import {
+  FlaskConical,
+  LockKeyhole,
+  Mail,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle2,
+  AlertCircle,
+} from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/uiStore';
 import { getErrorMessage } from '@/api/axiosClient';
-import { realAuth } from '@/api/real/real-auth';
+import { authService } from '@/api/auth.service';
 import { isDemoMode } from '@/api/demo';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -41,31 +49,32 @@ export function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [recoveryStep, setRecoveryStep] = useState<1 | 3>(1);
+  const [recoveryStep, setRecoveryStep] = useState<1 | 2 | 3 | 4>(1);
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const [resendSecondsLeft, setResendSecondsLeft] = useState(0);
 
   const authStore = useAuthStore();
   const { login, loginWithGoogle, isLoading } = authStore;
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
   const demoEnabled = isDemoMode();
 
+  // Cooldown de reenvío del código (60s), igual que en la app móvil.
   useEffect(() => {
-    const mode = searchParams.get('mode');
-    const code = searchParams.get('oobCode');
-
-    if (mode === 'resetPassword' && code) {
-      setShowForgotPassword(true);
-      setRecoveryStep(3);
-      setResetCode(code);
-    }
-  }, [searchParams]);
+    if (resendSecondsLeft <= 0) return;
+    const timer = setTimeout(
+      () => setResendSecondsLeft((s) => (s <= 1 ? 0 : s - 1)),
+      1000,
+    );
+    return () => clearTimeout(timer);
+  }, [resendSecondsLeft]);
 
   const redirectUser = (role: string) => {
     const target =
@@ -127,50 +136,111 @@ export function LoginPage() {
     }
   };
 
-  // --- Recuperación de Contraseña Modificada con Verificación en Firestore ---
-  const handleSendResetEmail = async (e: React.FormEvent) => {
+  // --- Recuperación de contraseña: código OTP de 6 dígitos (API REST → Brevo) ---
+  const openRecovery = () => {
+    setRecoveryStep(1);
+    setRecoveryError(null);
+    setShowForgotPassword(true);
+  };
+
+  const closeRecovery = () => {
+    setShowForgotPassword(false);
+    setRecoveryStep(1);
+    setRecoveryError(null);
+    setRecoveryEmail('');
+    setResetCode('');
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setResendSecondsLeft(0);
+  };
+
+  const handleRequestCode = async (e: FormEvent) => {
     e.preventDefault();
-    const trimmedEmail = recoveryEmail.trim();
-    if (!trimmedEmail) {
-      toast('error', 'Ingresa tu correo electrónico');
+    const trimmed = recoveryEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setRecoveryError('Ingresa un correo electrónico válido.');
       return;
     }
-    
+
+    setRecoveryLoading(true);
+    setRecoveryError(null);
     try {
-      // Si el correo sí existe, procedemos a enviar el enlace con Firebase Auth
-      await realAuth.forgotPassword(trimmedEmail);
-      toast('success', '¡Listo! Si tienes una cuenta con nosotros, te enviamos un correo para recuperar tu contraseña.');
-      setShowForgotPassword(false);
-      setRecoveryEmail('');
-    } catch (error: any) {
-      toast('error', error.message || 'Error al procesar la solicitud');
+      await authService.requestPasswordResetOtp(trimmed);
+      setResetCode('');
+      setRecoveryStep(2);
+      setResendSecondsLeft(60);
+    } catch (error) {
+      setRecoveryError(getErrorMessage(error));
+    } finally {
+      setRecoveryLoading(false);
     }
   };
 
-  const handleFinishReset = async (e: React.FormEvent) => {
+  const handleVerifyCode = async (e: FormEvent) => {
     e.preventDefault();
-    if (newPassword.length < 8) {
-      toast('error', 'La contraseña debe tener al menos 8 caracteres');
-      return;
-    }
-    if (newPassword !== confirmNewPassword) {
-      toast('error', 'Las contraseñas no coinciden');
+    if (!/^[0-9]{6}$/.test(resetCode.trim())) {
+      setRecoveryError('El código debe tener 6 dígitos.');
       return;
     }
 
+    setRecoveryLoading(true);
+    setRecoveryError(null);
     try {
-      await realAuth.resetPassword(resetCode.trim(), newPassword);
-      
-      toast('success', '¡Contraseña actualizada con éxito! Ya puedes iniciar sesión.');
-      setShowForgotPassword(false);
-      setRecoveryStep(1);
-      setResetCode('');
-      setNewPassword('');
-      setConfirmNewPassword('');
-      navigate('/login', { replace: true });
-    } catch (error: any) {
-      toast('error', error.message || 'El enlace es inválido o ha expirado.');
+      await authService.verifyResetCodeOtp(recoveryEmail.trim(), resetCode.trim());
+      setRecoveryStep(3);
+    } catch (error) {
+      setRecoveryError(getErrorMessage(error));
+    } finally {
+      setRecoveryLoading(false);
     }
+  };
+
+  const handleResendCode = async () => {
+    if (resendSecondsLeft > 0 || recoveryLoading) return;
+    setRecoveryLoading(true);
+    setRecoveryError(null);
+    try {
+      await authService.requestPasswordResetOtp(recoveryEmail.trim());
+      setResetCode('');
+      setResendSecondsLeft(60);
+      toast('success', 'Código reenviado. Revisa tu correo (incluye Spam/Promociones).');
+    } catch (error) {
+      setRecoveryError(getErrorMessage(error));
+    } finally {
+      setRecoveryLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      setRecoveryError('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setRecoveryError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    setRecoveryLoading(true);
+    setRecoveryError(null);
+    try {
+      await authService.resetPasswordWithOtp(
+        recoveryEmail.trim(),
+        resetCode.trim(),
+        newPassword,
+      );
+      setRecoveryStep(4);
+    } catch (error) {
+      setRecoveryError(getErrorMessage(error));
+    } finally {
+      setRecoveryLoading(false);
+    }
+  };
+
+  const handleFinishRecovery = () => {
+    closeRecovery();
+    toast('success', '¡Contraseña actualizada con éxito! Ya puedes iniciar sesión.');
   };
 
   return (
@@ -220,10 +290,7 @@ export function LoginPage() {
           </label>
           <button
             type="button"
-            onClick={() => {
-              setRecoveryStep(1);
-              setShowForgotPassword(true);
-            }}
+            onClick={openRecovery}
             className="text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors bg-transparent border-none cursor-pointer p-0"
           >
             ¿Olvidaste tu contraseña?
@@ -295,18 +362,39 @@ export function LoginPage() {
       {showForgotPassword && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-xs p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-bold text-gray-900">
-                  {recoveryStep === 1 ? 'Recuperar contraseña' : 'Nueva contraseña'}
-                </h3>
+            {recoveryStep !== 4 && (
+              <div className="mb-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-base font-bold text-gray-900">
+                    {recoveryStep === 1
+                      ? 'Recuperar contraseña'
+                      : recoveryStep === 2
+                        ? 'Verificar código'
+                        : 'Nueva contraseña'}
+                  </h3>
+                  <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-bold text-brand-700">
+                    Paso {recoveryStep} de 3
+                  </span>
+                </div>
+                <div className="flex gap-1.5">
+                  <div className={`h-1 flex-1 rounded-full ${recoveryStep >= 1 ? 'bg-brand-600' : 'bg-gray-200'}`} />
+                  <div className={`h-1 flex-1 rounded-full ${recoveryStep >= 2 ? 'bg-brand-600' : 'bg-gray-200'}`} />
+                  <div className={`h-1 flex-1 rounded-full ${recoveryStep >= 3 ? 'bg-brand-600' : 'bg-gray-200'}`} />
+                </div>
               </div>
-            </div>
+            )}
+
+            {recoveryError && recoveryStep !== 4 && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 p-2.5 text-xs font-medium text-red-700">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{recoveryError}</span>
+              </div>
+            )}
 
             {recoveryStep === 1 && (
-              <form onSubmit={handleSendResetEmail} className="space-y-4">
+              <form onSubmit={handleRequestCode} className="space-y-4">
                 <p className="text-xs text-gray-500">
-                  Ingresa tu correo electrónico registrado y te enviaremos un enlace de recuperación.
+                  Escribe el correo de tu cuenta y te enviaremos un código de seguridad de 6 dígitos.
                 </p>
                 <Input
                   label="Correo electrónico"
@@ -317,20 +405,68 @@ export function LoginPage() {
                   leftIcon={<Mail className="h-4 w-4 text-gray-400" />}
                 />
                 <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="outline" fullWidth onClick={() => setShowForgotPassword(false)}>
+                  <Button type="button" variant="outline" fullWidth onClick={closeRecovery}>
                     Cancelar
                   </Button>
-                  <Button type="submit" fullWidth className="bg-brand-600 hover:bg-brand-700 font-bold">
-                    Enviar enlace <ArrowRight className="ml-1.5 h-4 w-4" />
+                  <Button type="submit" fullWidth loading={recoveryLoading} className="bg-brand-600 hover:bg-brand-700 font-bold">
+                    Enviar código <ArrowRight className="ml-1.5 h-4 w-4" />
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {recoveryStep === 2 && (
+              <form onSubmit={handleVerifyCode} className="space-y-3">
+                <p className="text-xs text-gray-500">
+                  Enviamos un código de 6 dígitos a{' '}
+                  <span className="font-bold text-gray-800">{recoveryEmail.trim()}</span>. Ingrésalo a continuación:
+                </p>
+                <Input
+                  label="Código de 6 dígitos"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="••••••"
+                  maxLength={6}
+                  value={resetCode}
+                  onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  leftIcon={<LockKeyhole className="h-4 w-4 text-gray-400" />}
+                  className="text-center text-xl font-bold tracking-[0.4em]"
+                />
+                <p className="text-center text-[11px] leading-snug text-gray-500">
+                  Revisa tu bandeja (o carpeta de Spam/Promociones). El código caduca en 15 minutos.
+                </p>
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={handleResendCode}
+                    disabled={resendSecondsLeft > 0 || recoveryLoading}
+                    className="bg-transparent border-none p-0 text-xs font-semibold text-brand-600 hover:text-brand-700 disabled:text-gray-400 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    {resendSecondsLeft === 0 ? 'Reenviar código' : `Reenviar en ${resendSecondsLeft}s`}
+                  </button>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setRecoveryStep(1);
+                      setRecoveryError(null);
+                    }}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <Button type="submit" fullWidth loading={recoveryLoading} className="bg-brand-600 hover:bg-brand-700 font-bold">
+                    Verificar código
                   </Button>
                 </div>
               </form>
             )}
 
             {recoveryStep === 3 && (
-              <form onSubmit={handleFinishReset} className="space-y-3">
+              <form onSubmit={handleResetPassword} className="space-y-3">
                 <p className="text-xs text-gray-600 flex items-center gap-1.5 text-emerald-700 bg-emerald-50 p-2.5 rounded-xl border border-emerald-100 font-medium">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> Enlace verificado. Define tu nueva contraseña.
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> Código verificado. Define tu nueva contraseña.
                 </p>
                 <Input
                   label="Nueva contraseña"
@@ -339,6 +475,7 @@ export function LoginPage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   leftIcon={<LockKeyhole className="h-4 w-4 text-gray-400" />}
+                  autoComplete="new-password"
                 />
                 <Input
                   label="Confirmar nueva contraseña"
@@ -347,16 +484,46 @@ export function LoginPage() {
                   value={confirmNewPassword}
                   onChange={(e) => setConfirmNewPassword(e.target.value)}
                   leftIcon={<LockKeyhole className="h-4 w-4 text-gray-400" />}
+                  autoComplete="new-password"
                 />
                 <div className="flex gap-2 pt-2">
-                  <Button type="button" variant="outline" fullWidth onClick={() => setShowForgotPassword(false)}>
-                    Cancelar
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setRecoveryStep(2);
+                      setRecoveryError(null);
+                    }}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
                   </Button>
-                  <Button type="submit" fullWidth className="bg-brand-600 hover:bg-brand-700 font-bold">
+                  <Button type="submit" fullWidth loading={recoveryLoading} className="bg-brand-600 hover:bg-brand-700 font-bold">
                     Actualizar contraseña
                   </Button>
                 </div>
               </form>
+            )}
+
+            {recoveryStep === 4 && (
+              <div className="text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-50">
+                  <CheckCircle2 className="h-9 w-9 text-brand-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">¡Contraseña actualizada!</h3>
+                <p className="mt-2 text-xs text-gray-500 leading-relaxed">
+                  Tu contraseña se restableció exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.
+                </p>
+                <div className="pt-5">
+                  <Button
+                    type="button"
+                    fullWidth
+                    className="bg-brand-600 hover:bg-brand-700 font-bold"
+                    onClick={handleFinishRecovery}
+                  >
+                    Iniciar sesión
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         </div>

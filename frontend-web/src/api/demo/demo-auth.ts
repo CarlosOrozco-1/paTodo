@@ -128,4 +128,41 @@ export const demoAuth = {
   async logout(): Promise<void> {
     await sleep(50);
   },
+
+  /**
+   * En demo no se envía correo real. Se simula el envío sin revelar si el
+   * correo existe (mismo comportamiento que la API real).
+   */
+  async requestPasswordResetOtp(_email: string): Promise<void> {
+    await sleep(400);
+  },
+
+  /** En demo cualquier código de 6 dígitos es válido. */
+  async verifyResetCodeOtp(_email: string, code: string): Promise<void> {
+    await sleep(400);
+    if (!/^[0-9]{6}$/.test(code.trim())) {
+      throw new Error('El código debe tener 6 dígitos.');
+    }
+  },
+
+  async resetPasswordWithOtp(
+    email: string,
+    code: string,
+    newPassword: string,
+  ): Promise<void> {
+    await sleep(500);
+    if (!/^[0-9]{6}$/.test(code.trim())) {
+      throw new Error('Código inválido o expirado. Solicita uno nuevo.');
+    }
+    if (newPassword.length < 8) {
+      throw new Error('La contraseña debe tener al menos 8 caracteres.');
+    }
+    const user = db().users.find(
+      (u) => u.account.email.toLowerCase() === email.trim().toLowerCase(),
+    );
+    if (user) {
+      user.account.passwordHash = newPassword;
+      saveDb(db());
+    }
+  },
 };
