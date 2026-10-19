@@ -105,11 +105,17 @@ class AuthRepository {
   /// Solicita un código de recuperación de 6 dígitos (OTP) enviado por correo vía API.
   Future<void> requestPasswordResetOtp(String email) async {
     try {
-      await _api.dio.post(
+      final res = await _api.dio.post(
         '/auth/requestPasswordReset',
         data: {'email': email.trim()},
       );
+      // DEV: la API responde 200 de forma genérica aunque el correo falle; para
+      // diagnosticar, revisa aquí y en los logs del servidor (Render).
+      debugPrint('OTP_REQUEST_OK status=${res.statusCode} body=${res.data}');
     } on DioException catch (e) {
+      debugPrint(
+        'OTP_REQUEST_FAIL status=${e.response?.statusCode} body=${e.response?.data}',
+      );
       final msg =
           e.response?.data is Map
               ? (e.response?.data['error'] as String?)
