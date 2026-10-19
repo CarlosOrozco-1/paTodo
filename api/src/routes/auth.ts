@@ -21,18 +21,34 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CODE_REGEX = /^[0-9]{6}$/;
 
 /**
- * Envía el código de recuperación mediante el servicio de correo Resend.
- * Si RESEND_API_KEY no está configurada (ej. entorno de desarrollo local),
+ * Extrae nombre y correo de un remitente con formato "Nombre <correo@dominio>".
+ * Brevo exige el correo por separado y el nombre es opcional.
+ */
+function parseSender(raw: string): { name?: string; email: string } {
+  const match = raw.match(/^(.*)<([^>]+)>$/);
+  if (match) {
+    const name = (match[1] ?? "").trim().replace(/^"|"$/g, "");
+    const email = (match[2] ?? "").trim();
+    return name ? { name, email } : { email };
+  }
+  return { email: raw.trim() };
+}
+
+/**
+ * Envía el código de recuperación mediante el servicio de correo Brevo
+ * (API transaccional v3 sobre HTTPS: Render bloquea el SMTP saliente en plan free).
+ * Si BREVO_API_KEY no está configurada (ej. entorno de desarrollo local),
  * imprime el código en la consola del servidor para permitir pruebas sin fricción.
  */
 async function sendRecoveryEmail(email: string, code: string): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.EMAIL_FROM?.trim() || "PaTodo <onboarding@resend.dev>";
+  const apiKey = process.env.BREVO_API_KEY?.trim();
+  const rawFrom = process.env.EMAIL_FROM?.trim() || "PaTodo <no-reply@patodo.me>";
+  const { name: senderName, email: senderEmail } = parseSender(rawFrom);
 
   if (!apiKey) {
     console.log("\n=======================================================");
     console.log(`[DEV OTP RECOVERY] Correo: ${email} | Código: ${code}`);
-    console.log("[DEV NOTE] Configura RESEND_API_KEY en api/.env para envío de correos reales.");
+    console.log("[DEV NOTE] Configura BREVO_API_KEY en api/.env para envío de correos reales.");
     console.log("=======================================================\n");
     return true;
   }
@@ -77,30 +93,31 @@ async function sendRecoveryEmail(email: string, code: string): Promise<boolean> 
   `;
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        "api-key": apiKey,
+        accept: "application/json",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from,
-        to: [email],
+        sender: senderName ? { name: senderName, email: senderEmail } : { email: senderEmail },
+        to: [{ email }],
         subject: `Tu código de recuperación de PaTodo: ${code}`,
-        html: htmlContent,
+        htmlContent,
       }),
     });
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error("Resend API error:", res.status, errText);
+      console.error("Brevo API error:", res.status, errText);
       // Registramos en log como respaldo para no bloquear al usuario en pruebas
       console.log(`[BACKUP OTP LOG] Código para ${email}: ${code}`);
       return false;
     }
     return true;
   } catch (error) {
-    console.error("Error conectando con Resend:", error);
+    console.error("Error conectando con Brevo:", error);
     console.log(`[BACKUP OTP LOG] Código para ${email}: ${code}`);
     return false;
   }
@@ -168,7 +185,7 @@ authRouter.post("/auth/requestPasswordReset", async (req, res) => {
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // 5. Enviar el correo mediante Resend
+    // 5. Enviar el correo mediante Brevo
     await sendRecoveryEmail(normalizedEmail, code);
 
     res.status(200).json({

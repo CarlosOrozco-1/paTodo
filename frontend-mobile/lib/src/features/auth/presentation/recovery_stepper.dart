@@ -4,7 +4,7 @@ import 'dart:async';
 import '../../../core/theme/app_theme.dart';
 
 /// Flujo de recuperación de contraseña en 3 pasos con código OTP de 6 dígitos:
-/// 1. Ingresar correo registrado → Envío de código de 6 dígitos por email (Resend / API).
+/// 1. Ingresar correo registrado → Envío de código de 6 dígitos por email (Brevo / API).
 /// 2. Ingresar y verificar el código de 6 dígitos.
 /// 3. Definir y confirmar la nueva contraseña → Actualización en Firebase Auth.
 class RecoveryStepper extends StatefulWidget {
