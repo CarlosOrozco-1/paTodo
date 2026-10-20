@@ -300,11 +300,11 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \caption{Proceso de autenticación y gestión de cuentas}\\
 \hline
 \textbf{Nombre} & Autenticación y gestión de cuentas \\ \hline
-\textbf{Descripción} & Registro e inicio de sesión de clientes y trabajadores mediante correo electrónico y contraseña, así como mediante Google Sign-In. Una vez autenticado, el usuario completa su perfil (nombre, teléfono, foto de perfil) y selecciona el rol con el que operar (\texttt{client}, \texttt{worker} o \texttt{both}), lo que genera el documento \texttt{users/\{uid\}} y asigna el Custom Claim \texttt{role}. \\ \hline
+\textbf{Descripción} & Registro e inicio de sesión de clientes y trabajadores mediante correo electrónico y contraseña, así como mediante Google Sign-In; incluye la recuperación de la contraseña olvidada mediante un código de verificación enviado al correo. Una vez autenticado, el usuario completa su perfil (nombre, teléfono, foto de perfil) y selecciona el rol con el que operar (\texttt{client}, \texttt{worker} o \texttt{both}), lo que genera el documento \texttt{users/\{uid\}} y asigna el Custom Claim \texttt{role}. \\ \hline
 \textbf{Actores} & Cliente, Trabajador, API REST \\ \hline
 \textbf{Entradas} & Correo electrónico, contraseña, o credenciales de Google; nombre, teléfono y rol seleccionado. \\ \hline
 \textbf{Salidas} & Sesión iniciada con ID token; documento de usuario creado; Custom Claim \texttt{role} asignado. \\ \hline
-\textbf{Especificaciones de funcionamiento} & El registro y el inicio de sesión se resuelven directamente contra Firebase Authentication desde el cliente. La creación del perfil se realiza mediante \texttt{POST /createUser}, que valida que el \texttt{uid} y el correo coincidan con los del token, crea el documento de usuario y asigna el rol como \textit{Custom Claim}. Al finalizar, el cliente debe refrescar su ID token (\texttt{getIdToken(true)}) para que el rol viaje en las peticiones. Los usuarios previos a la asignación del rol se actualizan con la utilidad de sincronización de claims. \\ \hline
+\textbf{Especificaciones de funcionamiento} & El registro y el inicio de sesión se resuelven directamente contra Firebase Authentication desde el cliente. La creación del perfil se realiza mediante \texttt{POST /createUser}, que valida que el \texttt{uid} y el correo coincidan con los del token, crea el documento de usuario y asigna el rol como \textit{Custom Claim}. Al finalizar, el cliente debe refrescar su ID token (\texttt{getIdToken(true)}) para que el rol viaje en las peticiones. Los usuarios previos a la asignación del rol se actualizan con la utilidad de sincronización de claims. La recuperación de contraseña funciona por código OTP: \texttt{POST /auth/requestPasswordReset} envía al correo un código de 6 dígitos mediante el proveedor de envío, \texttt{POST /auth/verifyResetCode} lo valida con un tiempo de espera y pocas tentativas, y \texttt{POST /auth/resetPassword} lo canjea por la contraseña nueva. Para no revelar qué correos existen, la solicitud del código siempre responde con éxito, envíe o no el mensaje. \\ \hline
 \textbf{Restricciones adicionales} & Un usuario no puede publicar trabajos con el rol \texttt{worker} ni enviar ofertas con el rol \texttt{client}. No puede crearse un segundo perfil para el mismo \texttt{uid}. El teléfono es obligatorio para completar el perfil. \\ \hline
 \end{longtable}
 
@@ -364,7 +364,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \textbf{Actores} & Trabajador, Cliente \\ \hline
 \textbf{Entradas} & \texttt{jobId}, precio, tiempo estimado, moneda, mensaje. \\ \hline
 \textbf{Salidas} & Documento \texttt{offers/\{id\}} en estado \texttt{pending}, visible para el cliente dueño del trabajo. \\ \hline
-\textbf{Especificaciones de funcionamiento} & El envío se realiza con escritura directa del cliente. La regla exige rol \texttt{worker} o \texttt{both}, que \texttt{workerId} coincida con el \texttt{uid} del token, que la oferta nazca en estado \texttt{pending} y que el trabajo referenciado esté en estado \texttt{pending} y \textbf{no pertenezca al propio trabajador}. El trabajador puede editar precio, mensaje, tiempo estimado, moneda y estado de su propia oferta; el único cambio de estado permitido por escritura directa es de \texttt{pending} a \texttt{withdrawn}. \\ \hline
+\textbf{Especificaciones de funcionamiento} & El envío se realiza por escritura directa del trabajador en la base de datos (como hace la interfaz web) o mediante \texttt{POST /createOffer}, que evita propuestas duplicadas y notifica al cliente (ruta que usa la aplicación móvil). La regla exige rol \texttt{worker} o \texttt{both}, que \texttt{workerId} coincida con el \texttt{uid} del token, que la oferta nazca en estado \texttt{pending} y que el trabajo referenciado esté en estado \texttt{pending} y \textbf{no pertenezca al propio trabajador}. El trabajador puede editar precio, mensaje, tiempo estimado, moneda y estado de su propia oferta; el único cambio de estado permitido por escritura directa es de \texttt{pending} a \texttt{withdrawn}. El cliente también puede rechazar una propuesta pendiente de forma individual con \texttt{POST /rejectOffer}, que la marca \texttt{rejected} y avisa al trabajador, sin esperar a aceptar otra propuesta. \\ \hline
 \textbf{Restricciones adicionales} & Un trabajador no puede ofertar por su propio trabajo. No puede modificar el \texttt{jobId} ni el \texttt{workerId}, ni auto-aceptar su oferta. Las ofertas no se borran: se retiran mediante el estado \texttt{withdrawn}. \\ \hline
 \end{longtable}
 
@@ -409,7 +409,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \textbf{Actores} & Cliente, Trabajador \\ \hline
 \textbf{Entradas} & Mensajes de texto con indicación de tipo y, opcionalmente, respuesta a un mensaje previo. \\ \hline
 \textbf{Salidas} & Mensajes almacenados en la conversación; indicador de mensajes no leídos y resumen del último mensaje. \\ \hline
-\textbf{Especificaciones de funcionamiento} & Existe exactamente una conversación por trabajo, creada por la API al aceptar la oferta. Los mensajes se escriben directamente por los participantes mediante el SDK del cliente, y la regla de seguridad exige que el remitente sea participante de la conversación. El resumen del último mensaje y la marca de última lectura solo pueden actualizarse por los participantes; los mensajes son inmutables una vez escritos. \\ \hline
+\textbf{Especificaciones de funcionamiento} & Existe exactamente una conversación por trabajo, creada por la API al aceptar la oferta. Los mensajes los escriben los participantes por escritura directa mediante el SDK del cliente o mediante \texttt{POST /sendMessage}, que además avisa al otro participante (ruta que usa la aplicación móvil); en ambos casos la regla de seguridad exige que el remitente sea participante de la conversación. El resumen del último mensaje y la marca de última lectura solo pueden actualizarse por los participantes; los mensajes son inmutables una vez escritos. \\ \hline
 \textbf{Restricciones adicionales} & Solo los participantes pueden leer y escribir en la conversación y sus mensajes; no pueden consultarla ni terceras partes. El tamaño de cada documento está limitado para evitar abuso. No es posible editar ni eliminar mensajes. \\ \hline
 \end{longtable}
 
@@ -435,12 +435,12 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \caption{Proceso de finalización del trabajo y calificación}\\
 \hline
 \textbf{Nombre} & Finalización del trabajo y calificación \\ \hline
-\textbf{Descripción} & Cuando el servicio se presta, el trabajo se marca como completado por cualquiera de las dos partes y ambos pueden dejar una calificación sobre la contraparte. \\ \hline
+\textbf{Descripción} & Cuando el servicio se presta, el trabajo se marca como completado por cualquiera de las dos partes —directamente o mediante el código de llegada que presenta el trabajador— y ambos pueden dejar una calificación sobre la contraparte. \\ \hline
 \textbf{Actores} & Cliente, Trabajador, API REST \\ \hline
-\textbf{Entradas} & \texttt{jobId}; para la reseña, puntuación de 1 a 5 y comentario opcional. \\ \hline
+\textbf{Entradas} & \texttt{jobId}; para la finalización por código, el código de 6 dígitos; para la reseña, puntuación de 1 a 5 y comentario opcional. \\ \hline
 \textbf{Salidas} & Trabajo en estado \texttt{completed}; reseña registrada; calificación promedio y número de reseñas actualizados en el perfil del evaluado; notificación a la contraparte. \\ \hline
-\textbf{Especificaciones de funcionamiento} & La finalización se ejecuta mediante \texttt{POST /completeJob}, en una transacción que valida que el llamante sea el cliente o el trabajador asignado y que el trabajo esté aceptado. La calificación se registra mediante \texttt{POST /createReview}, que valida que el autor sea participante del trabajo, que el trabajo esté completado y que el autor no haya calificado previamente ese mismo trabajo; escribe la reseña, recalcula la calificación promedio y el conteo del perfil del evaluado y genera la notificación correspondiente. \\ \hline
-\textbf{Restricciones adicionales} & Solo los participantes de un trabajo completado pueden calificar, y una sola vez por trabajo y por persona. Las reseñas son inmutables: no pueden modificarse ni eliminarse. La calificación influye directamente en la reputación del profesional. \\ \hline
+\textbf{Especificaciones de funcionamiento} & La finalización se ejecuta mediante \texttt{POST /completeJob}, en una transacción que valida que el llamante sea el cliente o el trabajador asignado y que el trabajo esté aceptado. Alternativamente, el cliente dueño obtiene con \texttt{GET /jobs/\{jobId\}/arrivalCode} un código de 6 dígitos calculado a partir del trabajo y se lo comunica al trabajador al llegar al lugar; este último lo envía con \texttt{POST /verifyArrivalCode}, que exige que sea el trabajador asignado, que el trabajo esté activo, que el código coincida y que su ubicación reportada esté a 20 metros o menos del punto de servicio; al validar, marca el trabajo como completado, registra el momento de llegada y el vehículo utilizado, y avisa al cliente. La calificación se registra mediante \texttt{POST /createReview}, que valida que el autor sea participante del trabajo, que el trabajo esté completado y que el autor no haya calificado previamente ese mismo trabajo; escribe la reseña, recalcula la calificación promedio y el conteo del perfil del evaluado y genera la notificación correspondiente. \\ \hline
+\textbf{Restricciones adicionales} & Solo los participantes de un trabajo completado pueden calificar, y una sola vez por trabajo y por persona. Las reseñas son inmutables: no pueden modificarse ni eliminarse. La calificación influye directamente en la reputación del profesional. El código de llegada solo puede consultarlo el cliente dueño del trabajo activo y solo puede verificarlo el trabajador asignado dentro del radio de 20 metros; el código de una llamada incorrecta rechaza la operación. \\ \hline
 \end{longtable}
 
 % ---------------------------------------------------------------------
@@ -898,10 +898,11 @@ de ellos.
     \item El servicio verifica la participación del usuario y el estado del trabajo.
     \item El servicio registra la finalización con la fecha, libera el seguimiento de ubicación y genera las notificaciones para ambas partes.
     \item Ambas partes pueden proceder a calificar el servicio.
+    \item \textit{Alternativa con código de llegada:} al llegar al lugar, el trabajador le solicita al cliente el código de 6 dígitos que este consulta en el detalle del trabajo; el trabajador lo ingresa en la aplicación y, si el código coincide y su ubicación está a 20 metros o menos del punto de servicio, el servicio completa el trabajo, registra el momento de llegada y el vehículo utilizado, y avisa al cliente.
 \end{enumerate} \\ \hline
-\textbf{Requerimientos especiales} & La finalización solo es válida para trabajos aceptados. Un trabajo cancelado no puede completarse. \\ \hline
-\textbf{Salida} & Trabajo en estado completado, con la fecha de finalización registrada. \\ \hline
-\textbf{Excepciones} & Usuario no participante o estado inválido: se rechaza la operación. \\ \hline
+\textbf{Requerimientos especiales} & La finalización solo es válida para trabajos aceptados. Un trabajo cancelado no puede completarse. El código de llegada solo lo consulta el cliente dueño del trabajo activo, y la verificación solo la puede realizar el trabajador asignado dentro del radio de 20 metros. \\ \hline
+\textbf{Salida} & Trabajo en estado completado, con la fecha de finalización registrada (y, si se usó el código, el momento de llegada y el vehículo empleado). \\ \hline
+\textbf{Excepciones} & Usuario no participante o estado inválido: se rechaza la operación. Código de llegada incorrecto, o ubicación del trabajador a más de 20 metros del punto de servicio: se rechaza la verificación y el trabajo permanece activo. \\ \hline
 \end{longtable}
 
 % ---------------------------------------------------------------------
@@ -1733,6 +1734,12 @@ técnica en \texttt{docs/}.}
 
 GET & \texttt{/} & Health check del servicio. \\ \hline
 POST & \texttt{/createUser} & Crea el perfil del usuario autenticado y asigna su rol. \\ \hline
+POST & \texttt{/auth/requestPasswordReset} & Envía por correo un código de 6 dígitos para recuperar la contraseña. \\ \hline
+POST & \texttt{/auth/verifyResetCode} & Valida el código de recuperación enviado. \\ \hline
+POST & \texttt{/auth/resetPassword} & Canjea el código válido por una contraseña nueva. \\ \hline
+POST & \texttt{/createOffer} & Registra una propuesta del trabajador, evita duplicados y avisa al cliente. \\ \hline
+POST & \texttt{/rejectOffer} & El cliente dueño rechaza una propuesta pendiente y avisa al trabajador. \\ \hline
+POST & \texttt{/sendMessage} & Guarda un mensaje en la conversación y avisa al otro participante. \\ \hline
 POST & \texttt{/acceptOffer} & Acepta una oferta: asigna al trabajador y abre la conversación. \\ \hline
 POST & \texttt{/cancelJob} & Cancela un trabajo pendiente o aceptado. \\ \hline
 POST & \texttt{/completeJob} & Marca un trabajo aceptado como completado. \\ \hline
@@ -1742,6 +1749,8 @@ POST & \texttt{/createPayment} & Registra el pago del servicio. \\ \hline
 POST & \texttt{/createVoiceSession} & Crea una sesión de llamada de voz y toma el cerrojo. \\ \hline
 POST & \texttt{/endVoiceCall} & Cierra la llamada y libera el cerrojo. \\ \hline
 GET & \texttt{/jobs/nearby} & Busca trabajos pendientes cercanos por proximidad. \\ \hline
+GET & \texttt{/jobs/\{jobId\}/arrivalCode} & Entrega al cliente dueño el código de 6 dígitos de llegada. \\ \hline
+POST & \texttt{/verifyArrivalCode} & El trabajador confirma el código a menos de 20 metros y completa el trabajo. \\ \hline
 GET & \texttt{/admin/stats} & Métricas de operación del tablero. \\ \hline
 GET & \texttt{/admin/users} & Listado paginado y filtrado de usuarios. \\ \hline
 PATCH & \texttt{/admin/users/\{uid\}/role} & Cambia el rol operativo de un usuario. \\ \hline
@@ -1776,7 +1785,7 @@ Trabajo & \textit{Pendiente} $\rightarrow$ \textit{Aceptado} (al aceptar una ofe
 Pago & \textit{Pagado} al registrarse el pago simulado del trabajo: único estado previsto, sin transiciones posteriores. \\ \hline
 
 Oferta & \textit{Pendiente} $\rightarrow$ \textit{Aceptada} (al aceptar el cliente esa oferta);
-\textit{Pendiente} $\rightarrow$ \textit{Rechazada} (al aceptar el cliente otra oferta);
+\textit{Pendiente} $\rightarrow$ \textit{Rechazada} (al aceptar el cliente otra oferta, o al rechazarla de forma individual con \texttt{POST /rejectOffer});
 \textit{Pendiente} $\rightarrow$ \textit{Retirada} (por el propio trabajador). No se admiten otras transiciones. \\ \hline
 
 Conversación & \textit{Activa} al crearse al aceptar la oferta. \\ \hline

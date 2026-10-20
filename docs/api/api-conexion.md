@@ -61,18 +61,21 @@ La fuente de verdad está en `firestore.rules` (ya desplegado y endurecido).
 
 | Operación | Vía | ¿Quién? |
 |---|---|---|
-| Registro/login, token, reset contraseña | **Firebase Auth SDK** | Cliente |
+| Registro/login y token | **Firebase Auth SDK** | Cliente |
+| Recuperar contraseña (OTP por correo) | **API REST** (`POST /auth/requestPasswordReset`, `/auth/verifyResetCode`, `/auth/resetPassword`, correo vía **Brevo**) | Cliente (la API envía el código; Firebase solo valida/cambia la contraseña) |
 | Crear perfil (`users/{uid}`) | **`POST /createUser`** | Cliente (con token; asigna el Custom Claim `role`) |
 | Publicar trabajo (`jobs`) | **Firestore SDK directo** | Cliente (rol `client`/`both`; regla: `clientId == uid` y `status: pending`) |
-| Crear oferta (`offers`) | **`POST /createOffer`** | Trabajador (rol `worker`/`both`; valida trabajo pendiente y avisa al cliente) |
+| Crear oferta (`offers`) | **Firestore SDK directo** (web) o **`POST /createOffer`** (móvil) | Trabajador (rol `worker`/`both`; regla: trabajo pendiente y ajeno; la API evita duplicados y avisa al cliente) |
+| Rechazar oferta | **`POST /rejectOffer`** | Cliente (dueño del job, solo mientras job y oferta están `pending`) |
 | Aceptar oferta | **`POST /acceptOffer`** | Cliente (dueño del job) |
 | Cancelar trabajo | **`POST /cancelJob`** | Cliente (dueño del job) |
 | Completar trabajo | **`POST /completeJob`** | Cliente (job o worker) |
+| Código de llegada | **`GET /jobs/{jobId}/arrivalCode`** (cliente dueño) y **`POST /verifyArrivalCode`** (trabajador asignado, a ≤ 20 m del punto de servicio) | Trabajador con el código que le da el cliente; al verificar, el trabajo queda `completed` |
 | Crear reseña | **`POST /createReview`** | Cliente (participante, job completado) |
 | Calcular ruta | **`POST /computeRoute`** | Cliente |
 | Compartir ubicación actual del trabajo (`jobs/{jobId}/tracking/current`) | **Firestore SDK directo** | Solo el trabajador asignado, mientras el trabajo está aceptado/en curso; lectura limitada al cliente dueño y trabajador asignado |
 | Enviar mensajes (`conversations.messages`) | **`POST /sendMessage`** | Cliente o trabajador participante; crea el mensaje y avisa al otro usuario |
-| Señalización de llamadas (`conversations.calls`) | **Firestore SDK directo** | Cliente participante, solo trabajo `accepted`/`in_progress`; reglas limitan offer/answer e ICE |
+| Señalización de llamadas (`calls/{callId}/signals`) | **Firestore SDK directo** | Los dos participantes de la llamada; solo trabajo `accepted`/`in_progress`; reglas limitan offer/answer e ICE. El documento `calls/{callId}` y el cerrojo `callLocks/{jobId}` **solo** los escribe la API |
 | Leer conversaciones/notificaciones propias | **Firestore SDK directo** | Cliente |
 | `users.role/stats`, `notifications`, `conversations`, `reviews` | **Solo la API** | API (roles/stats/estados) |
 | `users.status` (suspender/activar), `users.verified`, `users.role` (admin) | **`POST /admin/suspendUser`**, `activateUser`, `verifyWorker`, `makeAdmin`, `removeAdmin`, `PATCH /admin/users/{uid}/role` | Admin (token con claim `role: admin`) |
@@ -88,13 +91,16 @@ La fuente de verdad está en `firestore.rules` (ya desplegado y endurecido).
 > rol. El cliente no puede modificar su propio `role` (la regla lo bloquea).
 
 Las llamadas de voz usan WebRTC de audio; Firestore solo intercambia la señalización
-(offer/answer e ICE) bajo `conversations/{conversationId}/calls`. La llamada solo
-puede iniciarse o contestarse cuando el trabajo está `accepted` o `in_progress`.
-La recepción requiere que quien contesta tenga abierto el chat; para llamadas
-entrantes en segundo plano o fuera del chat se necesita integrar notificaciones
-de llamada. La configuración
-actual usa STUN público y requiere un servidor TURN para conexiones fiables en
-redes móviles o NAT restrictivos.
+(offer/answer e ICE) bajo **`calls/{callId}/signals`**, y el documento de la llamada
+`calls/{callId}` (junto con el cerrojo transaccional `callLocks/{jobId}`) lo escribe y
+borra **solo la API** (`POST /createVoiceSession` / `POST /endVoiceCall`).
+La llamada solo puede iniciarse o contestarse cuando el trabajo está `accepted`
+o `in_progress`. En Android la llamada entrante se atiende desde la notificación
+de alta prioridad aunque la app esté en segundo plano; en iOS la recepción en
+segundo plano queda fuera de la primera versión. La configuración actual usa
+STUN público y requiere un servidor TURN para conexiones fiables en redes
+móviles o NAT restrictivos (fase TURN pendiente; ver `docs/voz/llamadas-voz.md`).
+La llamada fue validada de extremo a extremo el 19-oct-2026.
 
 La ubicación de seguimiento se guarda como un documento único en
 `jobs/{jobId}/tracking/current`; el cliente asignado la observa con un listener
@@ -120,11 +126,17 @@ Contrato:
 | Endpoint | Body | Respuesta esperada |
 |---|---|---|
 | `POST /createUser` | `{uid, email, role, profile, contact}` (`uid` y `email` deben coincidir con el token) | `201` o `409` si ya existe |
+| `POST /auth/requestPasswordReset` | `{email}` | `200 {message}` — misma respuesta si el correo no existe (evita enumerar correos); envía el OTP por Brevo |
+| `POST /auth/verifyResetCode` | `{email, code}` (código de 6 dígitos) | `200 {valid:true, message}` o `400` si es inválido/expirado |
+| `POST /auth/resetPassword` | `{email, code, newPassword}` (≥ 8 caracteres) | `200 {message}` — cambia la contraseña en Firebase Auth |
 | `POST /acceptOffer` | `{jobId, offerId}` | `200` job con `status: "accepted"` |
 | `POST /createOffer` | `{jobId, price, estimatedTime, note?}` | `201` propuesta creada y aviso al cliente |
+| `POST /rejectOffer` | `{jobId, offerId}` | `200 {id, status:"rejected"}` — solo job y oferta `pending`; avisa al trabajador |
 | `POST /sendMessage` | `{conversationId, content}` | `201` mensaje creado y aviso al otro participante |
 | `POST /cancelJob` | `{jobId, reason?}` | `200` job `status: "cancelled"` |
 | `POST /completeJob` | `{jobId}` | `200` job `status: "completed"` |
+| `GET /jobs/{jobId}/arrivalCode` | — (solo cliente dueño; job `accepted`/`in_progress`) | `200 {code}` código de 6 dígitos para el trabajador |
+| `POST /verifyArrivalCode` | `{jobId, code}` | `200 {id, status:"completed"}` — exige ser el trabajador asignado y estar ≤ 20 m del punto de servicio; deja al trabajador `offline`, cierra la conversación y avisa al cliente |
 | `POST /createReview` | `{jobId, rating(1-5), comment?}` | `201` review |
 | `POST /computeRoute` | `{jobId}` | `200` trazo de ruta (con `geometry`, `distance`, `duration`, `legs`; ver §5.1) |
 | `GET /jobs/nearby` | query: `lat`, `lng`, `radiusKm`(≤50), `categoryId?`, `limit?` | `200 {items}` trabajos `pending` ordenados por `distanceKm` (ver §5.2) |

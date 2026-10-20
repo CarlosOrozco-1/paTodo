@@ -49,6 +49,12 @@ ese archivo define `FIRESTORE_EMULATOR_HOST` y `FIREBASE_AUTH_EMULATOR_HOST`.
 | `FIRESTORE_EMULATOR_HOST` | Apunta al emulador de Firestore (**solo local**). | `127.0.0.1:8081` |
 | `FIREBASE_AUTH_EMULATOR_HOST` | Apunta al emulador de Auth (**solo local**). | `127.0.0.1:9099` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Alternativa a `FIREBASE_SERVICE_ACCOUNT`: ruta a un JSON de service account. | `/ruta/service-account.json` |
+| `BREVO_API_KEY` | Clave de la **API de Brevo** (prefijo `xkeysib-`). Envía los correos de recuperación de contraseña. Una clave `xsmtpsib-` (SMTP) **no** sirve aquí. | `xkeysib-...` |
+| `EMAIL_FROM` | Remitente de esos correos, formato `Nombre <correo>`. Debe ser una identidad verificada en Brevo. | `PaTodo <no-reply@patodo.me>` |
+
+> Sin `BREVO_API_KEY` la API responde igual `200` en
+> `/auth/requestPasswordReset` (el envío es un efecto secundario), así que un
+> usuario "no recibe el correo" casi siempre es esto o un bloqueo de credenciales.
 
 > En Render la API usa el Admin SDK con `FIREBASE_SERVICE_ACCOUNT` y **no** apunta a ningún
 > emulador.

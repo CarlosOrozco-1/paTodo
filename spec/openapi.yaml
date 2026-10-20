@@ -411,7 +411,7 @@ paths:
     post:
       tags: [offers]
       summary: Rechazar una propuesta
-      description: Solo el cliente dueÃ±o del trabajo puede rechazar una propuesta pendiente. Notifica al trabajador.
+      description: Solo el cliente dueño del trabajo puede rechazar una propuesta pendiente. Notifica al trabajador.
       requestBody:
         required: true
         content:
@@ -640,15 +640,15 @@ paths:
   /jobs/{jobId}/arrivalCode:
     get:
       tags: [jobs]
-      summary: Obtener cÃ³digo de llegada
-      description: El cliente dueÃ±o obtiene un cÃ³digo de seis dÃ­gitos cuando el trabajador estÃ¡ cerca del lugar del servicio.
+      summary: Obtener código de llegada
+      description: El cliente dueño obtiene un código de seis dígitos cuando el trabajador está cerca del lugar del servicio.
       parameters:
         - in: path
           name: jobId
           required: true
           schema: { type: string }
       responses:
-        '200': { description: CÃ³digo de llegada. }
+        '200': { description: Código de llegada. }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/PermissionDenied' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -658,7 +658,7 @@ paths:
     post:
       tags: [jobs]
       summary: Verificar llegada del trabajador
-      description: El trabajador asignado confirma el cÃ³digo a menos de 20 metros del servicio y finaliza el traslado.
+      description: El trabajador asignado confirma el código a menos de 20 metros del servicio y finaliza el traslado.
       requestBody:
         required: true
         content:
