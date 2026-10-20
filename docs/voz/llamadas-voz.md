@@ -1,10 +1,13 @@
 # Llamadas de voz entre cliente y trabajador — decisión técnica
 
-> **Estado: fases I, II y III listas, probadas y desplegadas (sin TURN).**
+> **Estado: fases I, II, III y V listas; llamadas de voz validadas de extremo
+> a extremo (19-oct-2026). API funcionando en solo STUN (TURN pendiente).**
 > Contrato: `spec/schemas/calls.json`, `spec/schemas/call-signal.json` y
 > `spec/openapi.yaml`. Reglas + tests en `firestore.rules` y
 > `tests/rules/calls.test.mjs`; `calls` no necesita índice compuesto.
 > Prueba real de la carrera: `npm run test:voice` en `api/`.
+> Prueba E2E: llamada creada, push entrante, audio conectado y cierre por
+> `POST /endVoiceCall` — funcional (el usuario confirmó la validación).
 > Reparto: infraestructura (este equipo) y app (equipo de desarrollo app).
 > Infraestructura lista y en producción; falta que la app tenga el botón.
 
@@ -203,7 +206,7 @@ Errores: `400` falta `jobId` · `403` no es parte del trabajo · `404` trabajo i
 | II | **Reglas** | `calls` + `signals` + `callLocks` en `firestore.rules`, tests en `tests/rules/calls.test.mjs` (16 casos) | I | **Hecha y desplegada** |
 | III | **API** | `api/src/routes/calls.ts`, tipo de notificación, credenciales TURN efímeras, vars de entorno en Render | I, II | **Hecha y desplegada** |
 | IV | **TURN** | Runbook en `docs/voz/turn-coturn.md` + `npm run verify:turn` (validados contra coturn 4.18.0 real); falta la VM | — (paralelo) | **Parcial** (sin VM) |
-| V | **Prueba E2E** | `api/test/calls.e2e.js`: abre sesiones simultáneas y verifica transiciones | III, IV | **Parcial** (sin TURN real) |
+| V | **Prueba E2E** | Llamada real entre dos clientes: sesión `201`, push entrante, audio conectado y cierre con `POST /endVoiceCall` | III, IV | **Hecha y validada** (19-oct-2026) |
 
 ### Cómo probar la voz
 
@@ -221,9 +224,10 @@ la autorización de terceros. Sale con código ≠ 0 si algo falla, así que sir
 como puerta antes de desplegar. Requiere el CLI de Firebase en el PATH (el mismo
 que usa `firebase deploy`).
 
-> Cuando haya TURN real, la fase V se completa con una llamada entre dos
-> navegadores o entre la app y un navegador, midiendo además si el TURN hizo
-> falta (`mediaRelay: "turn"`).
+> **Fase V completada (19-oct-2026):** la llamada se probó con dos clientes
+> reales y funcionó de extremo a extremo (sesión, push, audio y cierre). Si se
+> quiere saber si el TURN hizo falta, revisar `mediaRelay` (`p2p` | `turn`) del
+> registro de la llamada en Firestore.
 
 > Las fases I, II y III están **desplegadas**: reglas e índices publicados con
 > `firebase deploy --only firestore:rules,indexes` y la API en Render actualizada

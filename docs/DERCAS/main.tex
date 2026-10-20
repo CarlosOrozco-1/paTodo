@@ -20,6 +20,7 @@
 \usepackage{array}
 \usepackage{longtable}
 \usepackage{booktabs}
+\usepackage{etoolbox}
 \usepackage{multirow}
 \usepackage{tabularx}
 \usepackage{float}
@@ -96,8 +97,21 @@
 % Figuras APA 7: rotulo en negrita y titulo en cursiva, debajo
 \captionsetup[figure]{labelfont=bf,textfont=it,labelsep=newline}
 
+% Tablas APA 7: rotulo "Tabla N." en negrita y titulo en cursiva, arriba
+\captionsetup[table]{labelfont=bf,textfont=it,labelsep=newline,
+  position=top,skip=6pt}
+\setlength{\LTcapwidth}{\textwidth}
+
+% Celdas de tabla a espacio sencillo (el documento va a doble espacio)
+\AtBeginEnvironment{longtable}{\linespread{1.0}\selectfont
+  \renewcommand{\arraystretch}{1.15}}
+
 % --- Página de título ----------------------------------------------
 \begin{document}
+
+% babel-spanish nombra las tablas "Cuadro" al fijar el idioma;
+% la DERCAS usa el rótulo "Tabla N." (se reintenta aquí a propósito)
+\renewcommand{\tablename}{Tabla}
 
 % =====================================================================
 % Portada (APA 7)
@@ -142,9 +156,11 @@ Documento de Especificaciones, Requerimientos y Criterios de Aceptación de Soft
 \section{Definiciones, acrónimos y abreviaturas}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Definiciones, acrónimos y abreviaturas del sistema}\\
 \hline
 \textbf{Término} & \textbf{Concepto} \\ \hline
 \endfirsthead
+\caption[]{Definiciones, acrónimos y abreviaturas del sistema (continuación)}\\
 \hline
 \textbf{Término} & \textbf{Concepto} \\ \hline
 \endhead
@@ -243,9 +259,11 @@ El desarrollo se apoya, además, en un modelo de desarrollo orientado a especifi
 \section{Definición de actores}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Definición de actores del sistema}\\
 \hline
 \textbf{Nombre del actor} & \textbf{Descripción} \\ \hline
 \endfirsthead
+\caption[]{Definición de actores del sistema (continuación)}\\
 \hline
 \textbf{Nombre del actor} & \textbf{Descripción} \\ \hline
 \endhead
@@ -279,6 +297,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Autenticación y gestión de cuentas}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de autenticación y gestión de cuentas}\\
 \hline
 \textbf{Nombre} & Autenticación y gestión de cuentas \\ \hline
 \textbf{Descripción} & Registro e inicio de sesión de clientes y trabajadores mediante correo electrónico y contraseña, así como mediante Google Sign-In. Una vez autenticado, el usuario completa su perfil (nombre, teléfono, foto de perfil) y selecciona el rol con el que operar (\texttt{client}, \texttt{worker} o \texttt{both}), lo que genera el documento \texttt{users/\{uid\}} y asigna el Custom Claim \texttt{role}. \\ \hline
@@ -293,6 +312,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Configuración del catálogo de servicios}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de configuración del catálogo de servicios}\\
 \hline
 \textbf{Nombre} & Configuración del catálogo de servicios \\ \hline
 \textbf{Descripción} & Administración de las colecciones maestras \texttt{categories} y \texttt{skills}, que sustentan la clasificación de los trabajos publicados. Cada habilidad se asocia a una o más categorías mediante \texttt{categoryIds}. \\ \hline
@@ -307,6 +327,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Publicación de trabajos}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de publicación de trabajos}\\
 \hline
 \textbf{Nombre} & Publicación de trabajos \\ \hline
 \textbf{Descripción} & El cliente publica una solicitud de servicio indicando en qué necesita ayuda, en qué categoría, qué habilidades se requieren, dónde se prestará el servicio (lugar de recogida), si hay un punto de entrega, cuánto está dispuesto a pagar y, opcionalmente, la fecha en que se requiere. \\ \hline
@@ -321,6 +342,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Búsqueda de trabajos cercanos y notificación}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de búsqueda de trabajos cercanos y notificación}\\
 \hline
 \textbf{Nombre} & Búsqueda de trabajos cercanos y notificación \\ \hline
 \textbf{Descripción} & El trabajador consulta los trabajos pendientes próximos a su ubicación, filtrados por radio de búsqueda y, opcionalmente, por categoría. \\ \hline
@@ -335,6 +357,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Envío y gestión de ofertas}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de envío y gestión de ofertas}\\
 \hline
 \textbf{Nombre} & Envío y gestión de ofertas \\ \hline
 \textbf{Descripción} & El trabajador envía una oferta económica y operativa para un trabajo cercano: precio propuesto, tiempo estimado de ejecución y mensaje para el cliente. \\ \hline
@@ -349,6 +372,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Aceptación de oferta y asignación}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de aceptación de oferta y asignación}\\
 \hline
 \textbf{Nombre} & Aceptación de oferta y asignación \\ \hline
 \textbf{Descripción} & El cliente selecciona, entre las ofertas recibidas, la que mejor le conviene según precio, tiempo estimado, perfil y calificación del trabajador. \\ \hline
@@ -363,6 +387,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Cálculo de rutas y seguimiento en tiempo real}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de cálculo de rutas y seguimiento en tiempo real}\\
 \hline
 \textbf{Nombre} & Cálculo de rutas y seguimiento en tiempo real \\ \hline
 \textbf{Descripción} & Cuando un trabajador consulta un trabajo pendiente, la plataforma le muestra una vista previa de la distancia y del trayecto para decidir si le interesa. Una vez asignado, la ruta definitiva se calcula y se persiste para que el cliente pueda ver el trayecto. Durante la ejecución, el trabajador reporta su ubicación y el cliente la sigue en tiempo real. \\ \hline
@@ -377,6 +402,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Conversación y coordinación}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de conversación y coordinación}\\
 \hline
 \textbf{Nombre} & Conversación y coordinación \\ \hline
 \textbf{Descripción} & Al aceptar una oferta se abre un chat privado entre el cliente y el trabajador asignado para coordinar los detalles del servicio. \\ \hline
@@ -391,6 +417,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Llamada de voz entre las partes}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de llamada de voz entre las partes}\\
 \hline
 \textbf{Nombre} & Llamada de voz entre las partes \\ \hline
 \textbf{Descripción} & El cliente y el trabajador asignado pueden iniciar una llamada de voz directa mientras el trabajo se encuentra en curso. La señalización se persiste en la base de datos y el audio viaja directamente entre los dispositivos mediante WebRTC. \\ \hline
@@ -405,6 +432,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Finalización del trabajo y calificación}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de finalización del trabajo y calificación}\\
 \hline
 \textbf{Nombre} & Finalización del trabajo y calificación \\ \hline
 \textbf{Descripción} & Cuando el servicio se presta, el trabajo se marca como completado por cualquiera de las dos partes y ambos pueden dejar una calificación sobre la contraparte. \\ \hline
@@ -419,6 +447,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Pago simulado del trabajo}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de pago simulado del trabajo}\\
 \hline
 \textbf{Nombre} & Pago simulado del trabajo \\ \hline
 \textbf{Descripción} & Cuando el trabajo está aceptado, en ejecución o completado, el cliente registra el pago del servicio mediante un módulo demostrativo que no mueve dinero real. \\ \hline
@@ -433,6 +462,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Notificaciones}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de notificaciones}\\
 \hline
 \textbf{Nombre} & Notificaciones \\ \hline
 \textbf{Descripción} & El sistema avisa a los usuarios sobre los eventos relevantes de sus trabajos y ofertas. \\ \hline
@@ -447,6 +477,7 @@ A continuación se describen los procesos de negocio que el sistema debe automat
 \subsection{Administración del sistema}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Proceso de administración del sistema}\\
 \hline
 \textbf{Nombre} & Administración del sistema \\ \hline
 \textbf{Descripción} & El administrador gestiona las cuentas de la plataforma, supervisa la operación y mantiene el catálogo de servicios. \\ \hline
@@ -709,6 +740,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-01: Registrarse / Iniciar sesión''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-01: Registrarse o iniciar sesión}\\
 \hline
 \textbf{Descripción} & El usuario crea una cuenta nueva o inicia sesión con su correo electrónico y contraseña, o bien mediante su cuenta de Google. \\ \hline
 \textbf{Actores primarios} & Cliente, Trabajador. \\ \hline
@@ -733,6 +765,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-02: Crear perfil de usuario''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-02: Crear perfil de usuario}\\
 \hline
 \textbf{Descripción} & El usuario autenticado completa su perfil y selecciona el rol con el que desea operar. \\ \hline
 \textbf{Actores primarios} & Cliente, Trabajador, Ambos. \\ \hline
@@ -756,6 +789,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-03: Refrescar token de identidad''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-03: Refrescar token de identidad}\\
 \hline
 \textbf{Descripción} & El usuario renueva su token de identidad para que las reglas de seguridad y la API reconozcan su rol y sus privilegios actuales. \\ \hline
 \textbf{Actores primarios} & Cliente, Trabajador, Ambos, Administrador. \\ \hline
@@ -779,6 +813,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-04: Publicar trabajo''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-04: Publicar trabajo}\\
 \hline
 \textbf{Descripción} & El cliente publica una solicitud de servicio para recibir ofertas de trabajadores cercanos. \\ \hline
 \textbf{Actores primarios} & Cliente. \\ \hline
@@ -803,6 +838,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-05: Buscar trabajos cercanos''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-05: Buscar trabajos cercanos}\\
 \hline
 \textbf{Descripción} & El trabajador consulta los trabajos pendientes próximos a su ubicación, filtrados por distancia y, opcionalmente, por categoría. \\ \hline
 \textbf{Actores primarios} & Trabajador. \\ \hline
@@ -825,6 +861,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-06: Cancelar trabajo''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-06: Cancelar trabajo}\\
 \hline
 \textbf{Descripción} & El cliente cancela un trabajo que ya no necesita, siempre que no haya sido completado. \\ \hline
 \textbf{Actores primarios} & Cliente. \\ \hline
@@ -847,6 +884,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-07: Completar trabajo''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-07: Completar trabajo}\\
 \hline
 \textbf{Descripción} & Una vez prestado el servicio, el cliente o el trabajador asignado marcan el trabajo como completado. \\ \hline
 \textbf{Actores primarios} & Cliente, Trabajador. \\ \hline
@@ -872,6 +910,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-08: Enviar oferta''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-08: Enviar oferta}\\
 \hline
 \textbf{Descripción} & El trabajador envía una oferta para un trabajo cercano, con un precio, un tiempo estimado y un mensaje para el cliente. \\ \hline
 \textbf{Actores primarios} & Trabajador. \\ \hline
@@ -894,6 +933,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-09: Aceptar oferta''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-09: Aceptar oferta}\\
 \hline
 \textbf{Descripción} & El cliente selecciona la mejor oferta, asigna al trabajador y abre la conversación de coordinación. \\ \hline
 \textbf{Actores primarios} & Cliente. \\ \hline
@@ -920,6 +960,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-10: Calcular ruta (vista previa)''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-10: Calcular ruta (vista previa)}\\
 \hline
 \textbf{Descripción} & El trabajador no asignado consulta la distancia y el trayecto desde su ubicación hasta un trabajo pendiente, para decidir si le interesa. \\ \hline
 \textbf{Actores primarios} & Trabajador. \\ \hline
@@ -941,6 +982,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-11: Calcular ruta oficial''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-11: Calcular ruta oficial}\\
 \hline
 \textbf{Descripción} & Con el trabajo ya aceptado, se calcula y almacena la ruta definitiva que sigue el trabajador, dividida en el trayecto hacia la recogida y, si existe, hacia el punto de entrega. \\ \hline
 \textbf{Actores primarios} & Cliente, Trabajador. \\ \hline
@@ -965,6 +1007,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-12: Crear reseña''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-12: Crear reseña}\\
 \hline
 \textbf{Descripción} & Tras completar el trabajo, el cliente y el trabajador califican mutuamente el servicio prestado. \\ \hline
 \textbf{Actores primarios} & Cliente, Trabajador. \\ \hline
@@ -992,6 +1035,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-13: Seguimiento en tiempo real y chat''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-13: Seguimiento en tiempo real y chat}\\
 \hline
 \textbf{Descripción} & Durante la ejecución del trabajo, el trabajador reporta su ubicación y el cliente la sigue en tiempo real; además, ambas partes se comunican por mensajes dentro de la conversación del trabajo. \\ \hline
 \textbf{Actores primarios} & Cliente, Trabajador. \\ \hline
@@ -1018,6 +1062,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-14: Recibir y consultar notificaciones''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-14: Recibir y consultar notificaciones}\\
 \hline
 \textbf{Descripción} & El sistema avisa al usuario, mediante una notificación push y una entrada en su bandeja, sobre los eventos de los trabajos, ofertas, mensajes, reseñas, pagos y llamadas de voz en los que participa. \\ \hline
 \textbf{Actores primarios} & Cliente, Trabajador. \\ \hline
@@ -1044,6 +1089,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-15: Iniciar llamada de voz''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-15: Iniciar llamada de voz}\\
 \hline
 \textbf{Descripción} & El cliente o el trabajador asignado inician una llamada de voz directa con la contraparte del trabajo en curso. \\ \hline
 \textbf{Actores primarios} & Cliente, Trabajador. \\ \hline
@@ -1067,6 +1113,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-16: Finalizar llamada de voz''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-16: Finalizar llamada de voz}\\
 \hline
 \textbf{Descripción} & Cualquiera de las dos partes cuelga la llamada y el sistema registra el desenlace. \\ \hline
 \textbf{Actores primarios} & Cliente, Trabajador. \\ \hline
@@ -1092,6 +1139,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-17: Consultar panel de métricas''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-17: Consultar panel de métricas}\\
 \hline
 \textbf{Descripción} & El administrador consulta el tablero principal con los indicadores de operación de la plataforma. \\ \hline
 \textbf{Actores primarios} & Administrador. \\ \hline
@@ -1113,6 +1161,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-18/UC-19: Gestionar usuarios y roles''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Casos de uso UC-18 y UC-19: Gestionar usuarios y roles}\\
 \hline
 \textbf{Descripción} & El administrador consulta el listado de usuarios, aplica filtros de búsqueda y modifica el rol operativo de cada cuenta. \\ \hline
 \textbf{Actores primarios} & Administrador. \\ \hline
@@ -1136,6 +1185,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-20: Promover / revocar administrador''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-20: Promover o revocar administrador}\\
 \hline
 \textbf{Descripción} & El administrador otorga el rol administrador a una cuenta existente o lo revoca, degradándola a cliente. \\ \hline
 \textbf{Actores primarios} & Administrador. \\ \hline
@@ -1157,6 +1207,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-21: Suspender / activar cuenta''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-21: Suspender o activar cuenta}\\
 \hline
 \textbf{Descripción} & El administrador suspende temporalmente una cuenta para impedir su operación, o la reactiva. \\ \hline
 \textbf{Actores primarios} & Administrador. \\ \hline
@@ -1178,6 +1229,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-22: Verificar profesional''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-22: Verificar profesional}\\
 \hline
 \textbf{Descripción} & El administrador revisa a los trabajadores pendientes de verificación y marca o retira la condición de profesional verificado. \\ \hline
 \textbf{Actores primarios} & Administrador. \\ \hline
@@ -1199,6 +1251,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-23: Mantener catálogo de categorías y habilidades''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-23: Mantener catálogo de categorías y habilidades}\\
 \hline
 \textbf{Descripción} & El administrador crea, edita, activa, desactiva y elimina categorías y habilidades del catálogo de servicios. \\ \hline
 \textbf{Actores primarios} & Administrador. \\ \hline
@@ -1221,6 +1274,7 @@ de ellos.
 \subsubsection{Caso de uso ``UC-24: Consultar registro de auditoría''}
 
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-24: Consultar registro de auditoría}\\
 \hline
 \textbf{Descripción} & El administrador consulta el registro de las acciones administrativas realizadas en la plataforma. \\ \hline
 \textbf{Actores primarios} & Administrador. \\ \hline
@@ -1576,9 +1630,11 @@ una convención única (colecciones en plural, campos en notación \emph{camelCa
 \section{Planificación de ciclos de desarrollo}
 
 \begin{longtable}{|P{2.2cm}|L{8.4cm}|P{3.4cm}|}
+\caption{Planificación de ciclos de desarrollo}\\
 \hline
 \textbf{Ciclo} & \textbf{Qué abarca} & \textbf{Fechas} \\ \hline
 \endfirsthead
+\caption[]{Planificación de ciclos de desarrollo (continuación)}\\
 \hline
 \textbf{Ciclo} & \textbf{Qué abarca} & \textbf{Fechas} \\ \hline
 \endhead
@@ -1605,9 +1661,11 @@ Ocho & Despliegue en producción de la interfaz web, de la API y de las reglas e
 \subsection{Estado de avance}
 
 \begin{longtable}{|P{5.6cm}|L{8.4cm}|}
+\caption{Estado de avance del proyecto}\\
 \hline
 \textbf{Componente} & \textbf{Estado} \\ \hline
 \endfirsthead
+\caption[]{Estado de avance del proyecto (continuación)}\\
 \hline
 \textbf{Componente} & \textbf{Estado} \\ \hline
 \endhead
@@ -1621,7 +1679,7 @@ Funcionalidades de tiempo real, mensajería y notificaciones & Completado \\ \hl
 Interfaz web & Completado y publicado \\ \hline
 Interfaz móvil & En desarrollo \\ \hline
 Módulo de administración & Completado \\ \hline
-Comunicación de voz & Backend completado y probado; interfaz móvil en desarrollo \\ \hline
+Comunicación de voz & Completado y validado de extremo a extremo (llamada funcional) \\ \hline
 \end{longtable}
 
 % =====================================================================
@@ -1662,9 +1720,11 @@ técnica en \texttt{docs/}.}
 
 \small
 \begin{longtable}{|P{3.0cm}|P{6.0cm}|L{5.0cm}|}
+\caption{Catálogo de la interfaz REST}\\
 \hline
 \textbf{Método} & \textbf{Ruta} & \textbf{Descripción} \\ \hline
 \endfirsthead
+\caption[]{Catálogo de la interfaz REST (continuación)}\\
 \hline
 \textbf{Método} & \textbf{Ruta} & \textbf{Descripción} \\ \hline
 \endhead
@@ -1697,9 +1757,11 @@ GET & \texttt{/admin/activityLog} & Registro de acciones administrativas. \\ \hl
 \section*{Anexo B. Estados y sus transiciones}
 
 \begin{longtable}{|P{3.4cm}|L{10.6cm}|}
+\caption{Estados y transiciones permitidas}\\
 \hline
 \textbf{Entidad} & \textbf{Estados y transiciones permitidas} \\ \hline
 \endfirsthead
+\caption[]{Estados y transiciones permitidas (continuación)}\\
 \hline
 \textbf{Entidad} & \textbf{Estados y transiciones permitidas} \\ \hline
 \endhead
