@@ -54,26 +54,6 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
-  void _showHelpSupportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.support_agent, size: 48, color: Colors.orange),
-        title: const Text('Ayuda y Soporte'),
-        content: const Text(
-          'Nuestro equipo de soporte se encuentra actualmente en desarrollo y pronto estará disponible para asistirte.\n\nPara dudas inmediatas, puedes contactar al administrador del proyecto.',
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Entendido'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAvatar(User? user, Map<String, dynamic>? profile, BuildContext context) {
     final photoUrl = user?.photoURL ?? profile?['avatarUrl'] as String?;
     final email = user?.email ?? '';
@@ -198,12 +178,6 @@ class ProfileScreen extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const SettingsScreen()),
                 );
               },
-            ),
-            _ProfileOption(
-              icon: Icons.help_outline,
-              title: 'Ayuda y Soporte',
-              subtitle: 'Información y soporte técnico',
-              onTap: () => _showHelpSupportDialog(context),
             ),
             _ProfileOption(
               icon: Icons.logout,
