@@ -207,6 +207,8 @@ OpenAPI 3 & Especificación estándar (YAML) que describe de forma formal las op
 
 OSRM & \textit{Open Source Routing Machine}. Motor de cálculo de rutas por carretera. PaTodo lo consulta la API REST para obtener la geometría, la distancia y la duración del trayecto. \\ \hline
 
+OTP & \textit{One-Time Password} (contraseña de un solo uso): código temporal que sirve una sola vez para autenticar o recuperar el acceso. En PaTodo es el código de 6 dígitos enviado por correo para recuperar la contraseña. \\ \hline
+
 Patrón MVC & \textit{Modelo-Vista-Controlador}. Separación del software en modelo (datos), vista (interfaz) y controlador (lógica). \\ \hline
 
 PWA / SPA & \textit{Progressive Web Application} / \textit{Single Page Application}: aplicación web que ejecuta su contenido en una sola página, sin recargas completas. \\ \hline
@@ -249,7 +251,7 @@ Se solicita el desarrollo e implementación de una plataforma de servicios bajo 
     \item Un módulo de administración para la gestión de usuarios, verificación de profesionales, suspensión y activación de cuentas, promoción de administradores y mantenimiento del catálogo de categorías y habilidades.
 \end{itemize}
 
-El sistema se construirá sobre una arquitectura de servicios gestionados en la nube: autenticación, base de datos de documentos, notificaciones push y almacenamiento en Firebase, más una API REST transaccional propia en Node.js/Express responsable de las operaciones atómicas. Las interfaces de usuario se comunican con estos servicios mediante los SDK oficiales y la API REST.
+El sistema se construirá sobre una arquitectura de servicios gestionados en la nube: autenticación, base de datos de documentos y notificaciones push de Firebase, más una API REST transaccional propia en Node.js/Express responsable de las operaciones atómicas y del envío de correos transaccionales. Las interfaces de usuario se comunican con estos servicios mediante los SDK oficiales y la API REST.
 
 El desarrollo se apoya, además, en un modelo de desarrollo orientado a especificaciones (\textit{Spec-Driven Development}), de modo que los contratos de datos y de API se documentan formalmente antes de implementarse y constituyen la fuente única de verdad del proyecto.
 
@@ -664,12 +666,13 @@ de ellos.
     \node[usecase] (cu13) at (7.0, -3.2) {UC-13 Seguimiento y chat};
     \node[usecase] (cu15) at (7.0, -4.8) {UC-15 Iniciar llamada};
     \node[usecase] (cu16) at (7.0, -6.4) {UC-16 Finalizar llamada};
+    \node[usecase] (cu25) at (7.0, -8.0) {UC-25 Registrar pago};
 
-    \node[draw,fit=(cu4)(cu16),inner sep=12pt,label=above:{\textbf{PaTodo}}] (sis1) {};
+    \node[draw,fit=(cu4)(cu25),inner sep=12pt,label=above:{\textbf{PaTodo}}] (sis1) {};
 
-    \foreach \a in {cu4,cu6,cu9,cu7,cu11,cu12,cu13,cu15,cu16} \draw[flowarrow] (cliente.east) to[out=0,in=180] (\a.west);
+    \foreach \a in {cu4,cu6,cu9,cu7,cu11,cu12,cu13,cu15,cu16,cu25} \draw[flowarrow] (cliente.east) to[out=0,in=180] (\a.west);
 \end{tikzpicture}
-\captionof{figure}{Diagrama de casos de uso del cliente: publica trabajos, gestiona las ofertas recibidas, da seguimiento, finaliza y califica.}
+\captionof{figure}{Diagrama de casos de uso del cliente: publica trabajos, gestiona las ofertas recibidas, da seguimiento, finaliza, califica y registra el pago.}
 \label{fig:casosdeuso-cliente}
 \end{figure}
 
@@ -756,10 +759,11 @@ de ellos.
     \item Si las credenciales son válidas, el sistema genera un token de sesión y lo entrega a la aplicación.
     \item Si el método es Google y la cuenta es nueva, el sistema solicita completar el perfil (teléfono y rol).
     \item El sistema muestra la pantalla de bienvenida correspondiente al rol seleccionado.
+    \item \textit{Flujo alternativo (recuperación de contraseña):} si el usuario olvidó su contraseña, solicita al sistema un código de 6 dígitos enviado a su correo, lo valida y lo canjea por una contraseña nueva. La solicitud responde siempre con éxito, exista o no la cuenta, para no revelar qué correos están registrados.
 \end{enumerate} \\ \hline
-\textbf{Requerimientos especiales} & Las contraseñas nunca se almacenan en el cliente ni se envían a la API. La sesión se mantiene mediante el token de identidad. \\ \hline
-\textbf{Salida} & El usuario cuenta con sesión iniciada y token de identidad válido. \\ \hline
-\textbf{Excepciones} & Credenciales inválidas: se muestra un mensaje de autenticación fallida sin revelar si el correo existe. Fallo del proveedor de Google: se muestra un mensaje de error y se ofrece reintentar. \\ \hline
+\textbf{Requerimientos especiales} & Las contraseñas nunca se almacenan en el cliente ni se envían a la API. La sesión se mantiene mediante el token de identidad. Los códigos de recuperación son de un solo uso, caducan en pocos minutos y admiten un número limitado de intentos. \\ \hline
+\textbf{Salida} & El usuario cuenta con sesión iniciada y token de identidad válido, o con una contraseña nueva si usó la recuperación. \\ \hline
+\textbf{Excepciones} & Credenciales inválidas: se muestra un mensaje de autenticación fallida sin revelar si el correo existe. Fallo del proveedor de Google: se muestra un mensaje de error y se ofrece reintentar. Código de recuperación inválido o expirado: se informa y se permite solicitar uno nuevo. \\ \hline
 \end{longtable}
 
 \subsubsection{Caso de uso ``UC-02: Crear perfil de usuario''}
@@ -923,7 +927,7 @@ de ellos.
     \item Opcionalmente, consulta la vista previa de la ruta para valorar el trayecto.
     \item El trabajador selecciona la opción de ofertar.
     \item El trabajador ingresa el precio que propone, el tiempo estimado de ejecución y un mensaje para el cliente.
-    \item La aplicación escribe la oferta directamente en la base de datos, en estado pendiente.
+    \item La aplicación registra la oferta en estado pendiente: la interfaz web escribe directamente en la base de datos y la aplicación móvil usa el servicio REST, que además evita propuestas duplicadas.
     \item El cliente recibe una notificación de la nueva oferta y puede revisarla junto con las demás.
 \end{enumerate} \\ \hline
 \textbf{Requerimientos especiales} & La oferta debe incluir trabajo, trabajador, precio, tiempo estimado y estado. No se puede ofertar por un trabajo propio ni por un trabajo que ya no esté pendiente. No es posible modificar el trabajo ni el trabajador de la oferta. \\ \hline
@@ -936,7 +940,7 @@ de ellos.
 \begin{longtable}{|P{3.3cm}|L{11.2cm}|}
 \caption{Caso de uso UC-09: Aceptar oferta}\\
 \hline
-\textbf{Descripción} & El cliente selecciona la mejor oferta, asigna al trabajador y abre la conversación de coordinación. \\ \hline
+\textbf{Descripción} & El cliente selecciona la mejor oferta, asigna al trabajador y abre la conversación de coordinación. También puede descartar propuestas concretas sin aceptar otra. \\ \hline
 \textbf{Actores primarios} & Cliente. \\ \hline
 \textbf{Contexto} & Detalle del trabajo, sección de ofertas recibidas. \\ \hline
 \textbf{Condiciones previas} & El usuario debe ser el cliente dueño del trabajo, el trabajo debe estar pendiente y debe existir al menos una oferta. \\ \hline
@@ -949,10 +953,11 @@ de ellos.
     \item El servicio ejecuta una transacción que marca la oferta seleccionada como aceptada, el resto de ofertas como rechazadas y el trabajo como aceptado, registrando al trabajador asignado.
     \item El servicio crea la conversación privada entre ambas partes en estado activa.
     \item El servicio notifica la asignación al trabajador y notifica al cliente.
+    \item \textit{Flujo alternativo (descartar una propuesta):} el cliente rechaza una oferta concreta; el servicio la marca como rechazada, avisa al trabajador y las demás ofertas y el estado del trabajo no cambian.
 \end{enumerate} \\ \hline
-\textbf{Requerimientos especiales} & La operación es atómica: si la transacción falla, ninguno de los cambios se aplica, evitando trabajos aceptados sin trabajador asignado. \\ \hline
-\textbf{Salida} & Trabajo aceptado con trabajador asignado, conversación creada y notificaciones enviadas. \\ \hline
-\textbf{Excepciones} & El trabajo ya fue aceptado por otro usuario: la operación se rechaza por conflicto. El usuario no es el dueño del trabajo: se rechaza por permisos insuficientes. \\ \hline
+\textbf{Requerimientos especiales} & La operación es atómica: si la transacción falla, ninguno de los cambios se aplica, evitando trabajos aceptados sin trabajador asignado. Para rechazar una oferta de forma individual, tanto el trabajo como la oferta deben seguir pendientes. \\ \hline
+\textbf{Salida} & Trabajo aceptado con trabajador asignado, conversación creada y notificaciones enviadas; o bien la oferta descartada y el trabajador notificado. \\ \hline
+\textbf{Excepciones} & El trabajo ya fue aceptado por otro usuario: la operación se rechaza por conflicto. El usuario no es el dueño del trabajo: se rechaza por permisos insuficientes. La oferta ya fue procesada (aceptada, rechazada o retirada) o el trabajo ya no está pendiente: se rechaza el rechazo individual. \\ \hline
 \end{longtable}
 
 % ---------------------------------------------------------------------
@@ -1072,7 +1077,7 @@ de ellos.
 \textbf{Condiciones previas} & El usuario debe tener sesión iniciada. Para recibir push es necesario que su perfil tenga al menos un token FCM registrado; sin tokens, el aviso queda únicamente en la bandeja. \\ \hline
 \textbf{Flujo básico} &
 \begin{enumerate}
-    \item Ocurre un evento para el usuario: nueva oferta en un trabajo publicado, oferta aceptada o rechazada, trabajo iniciado, completado o cancelado, mensaje nuevo, reseña recibida, pago registrado o llamada de voz entrante.
+    \item Ocurre un evento para el usuario: nueva oferta en un trabajo publicado, oferta aceptada o rechazada, trabajo completado o cancelado, mensaje nuevo, reseña recibida, pago registrado o llamada de voz entrante.
     \item La API guarda el aviso en la colección \texttt{notifications} y envía el push por FCM a los tokens del usuario; la llamada entrante usa prioridad alta para que el teléfono la atienda de inmediato.
     \item La aplicación muestra el aviso según su tipo y, en una llamada entrante, presenta la pantalla de llamada con la orientación correspondiente.
     \item El usuario abre la notificación; la aplicación navega al recurso relacionado (trabajo, oferta, conversación o llamada) y marca el aviso como leído.
@@ -1294,6 +1299,34 @@ de ellos.
 \textbf{Excepciones} & El usuario no es administrador: se rechaza por permisos insuficientes. \\ \hline
 \end{longtable}
 
+% ---------------------------------------------------------------------
+\subsection{Casos de uso del módulo de pagos}
+
+\subsubsection{Caso de uso ``UC-25: Registrar pago del servicio''}
+
+\begin{longtable}{|P{3.3cm}|L{11.2cm}|}
+\caption{Caso de uso UC-25: Registrar pago del servicio}\\
+\hline
+\textbf{Descripción} & El cliente registra el pago del servicio mediante un módulo demostrativo que no mueve dinero real. \\ \hline
+\textbf{Actores primarios} & Cliente. \\ \hline
+\textbf{Actores secundarios} & API REST (registro y notificación), Firebase Cloud Messaging (aviso). \\ \hline
+\textbf{Contexto} & Detalle del trabajo con trabajador asignado. \\ \hline
+\textbf{Condiciones previas} & El usuario debe ser el cliente dueño del trabajo, el trabajo debe estar aceptado, en curso o completado, debe existir un trabajador asignado y el trabajo no debe haber sido pagado antes. \\ \hline
+\textbf{Flujo básico} &
+\begin{enumerate}
+    \item El cliente abre el detalle del trabajo y selecciona la opción de pagar.
+    \item El cliente elige un método demostrativo: tarjeta, efectivo o transferencia; ninguno procesa dinero real.
+    \item La aplicación envía la solicitud de pago al servicio REST.
+    \item El servicio verifica la propiedad del trabajo, el trabajador asignado, el estado y que no exista un pago previo.
+    \item En una transacción, el servicio calcula el monto a partir del precio de la oferta aceptada o del precio propuesto, aplica la comisión de plataforma del 10\,\% y obtiene el pago neto.
+    \item El servicio registra el pago en estado pagado con la marca de demostración, lo asocia al trabajo y notifica al trabajador.
+    \item La aplicación muestra la confirmación con el monto y el desglose de la comisión.
+\end{enumerate} \\ \hline
+\textbf{Requerimientos especiales} & El módulo es demostrativo: no intervienen pasarelas de pago ni se transfiere dinero. Cada trabajo admite un único pago. \\ \hline
+\textbf{Salida} & Pago registrado y asociado al trabajo, con el monto, la comisión de plataforma y el pago neto; notificación al trabajador. \\ \hline
+\textbf{Excepciones} & El usuario no es el dueño del trabajo, no hay trabajador asignado o el estado no permite pagar: se rechaza la operación. El trabajo ya fue pagado: se rechaza un segundo intento. \\ \hline
+\end{longtable}
+
 % =====================================================================
 % 7. DIAGRAMA DE SECUENCIA
 % =====================================================================
@@ -1366,7 +1399,7 @@ de ellos.
     \draw[-{Latex}] (4.5,-4.5) -- node[above,font=\scriptsize]{valida y persiste} (9.0,-4.5);
     \draw[-{Latex}] (4.5,-5.5) -- node[above,font=\scriptsize]{recalcula promedio} (13.5,-5.5);
 \end{tikzpicture}}%
-\captionof{figure}{Secuencia de finalización del trabajo y creación de la reseña.}
+\captionof{figure}{Secuencia de finalización del trabajo y creación de la reseña. La variante con código de llegada sustituye el primer mensaje por la consulta del código por parte del cliente y su verificación por el trabajador antes de completar el trabajo.}
 \label{fig:seq-finalizacion}
 \end{figure}
 
@@ -1426,13 +1459,11 @@ de ellos.
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[node distance=2.2cm, on grid, auto]
-    \node[startstop] (inicio) {Recibida};
-    \node[process,below=of inicio] (pendiente) {Pendiente};
+    \node[startstop] (pendiente) {Pendiente};
     \node[process,below=of pendiente] (aceptada) {Aceptada};
     \node[process,below=of pendiente, xshift=-4.0cm] (rechazada) {Rechazada};
     \node[process,below=of pendiente, xshift=4.0cm] (retirada) {Retirada};
 
-    \draw[flowarrow] (inicio) -- (pendiente);
     \draw[flowarrow] (pendiente) -- (aceptada);
     \draw[flowarrow] (pendiente) -- (rechazada);
     \draw[flowarrow] (pendiente) -- (retirada);
@@ -1481,6 +1512,16 @@ principales y sus relaciones.
 \label{fig:er}
 \end{figure}
 
+Además de las entidades principales, el modelo incluye colecciones de apoyo que
+respaldan procesos específicos: \texttt{calls} y su subcolección
+\texttt{signals} para la señalización de las llamadas de voz,
+\texttt{callLocks} para el cerrojo transaccional por trabajo,
+\texttt{passwordResets} para los códigos de recuperación de contraseña,
+\texttt{payments} para los pagos simulados y \texttt{activity} para el registro
+de auditoría administrativa. Las escrituras en estas colecciones las realiza
+exclusivamente la API, salvo la señalización, que escriben los participantes de
+la llamada.
+
 % =====================================================================
 % 10. REQUERIMIENTOS NO FUNCIONALES
 % =====================================================================
@@ -1524,8 +1565,9 @@ puedan aplicarlo sin consultar la base de datos.
     \item Solo los participantes de un trabajo pueden leer su conversación y
           escribir mensajes en ella, y solo el cliente dueño y el trabajador
           asignado pueden leer y escribir el seguimiento de ubicación.
-    \item Las colecciones de servidor (reseñas, notificaciones y conversaciones)
-          solo pueden ser creadas por la API.
+    \item Las colecciones de servidor (reseñas, notificaciones, conversaciones,
+          pagos, llamadas, sus cerrojos transaccionales y los códigos de
+          recuperación de contraseña) solo pueden ser creadas por la API.
     \item Los catálogos de categorías y habilidades son de lectura pública y de
           escritura exclusiva del administrador.
     \item El registro de auditoría es de escritura exclusiva de la API y de
@@ -1588,10 +1630,12 @@ operaciones que requieren despertar el servicio tras un periodo de inactividad
 deben mostrar al usuario una espera informativa y no cancelable.
 
 \paragraph{Disponibilidad e integridad de los archivos.}
-Las fotografías de perfil y de trabajos se almacenan en el servicio de
-almacenamiento con reglas de acceso coherentes con los permisos del sistema; los
-catálogos de categorías y habilidades son legibles públicamente, mientras que el
-resto de los archivos solo es accesible a su propietario.
+Las fotografías de perfil se referencian como una URL de imagen (por ejemplo, la
+foto de la cuenta de Google) y la plataforma no almacena archivos binarios en un
+servicio de almacenamiento propio. La incorporación de fotografías propias de
+perfil o de trabajos queda prevista con reglas de acceso coherentes con los
+permisos del sistema: las imágenes de catálogo serían legibles públicamente y el
+resto solo accesible a su propietario.
 
 \paragraph{Límites de tamaño.}
 Todo documento almacenado tiene un límite de tamaño para evitar el abuso del
@@ -1608,6 +1652,8 @@ El sistema se integra con:
           propia para las operaciones transaccionales.
     \item El servicio de notificaciones push de Firebase, para el envío de avisos
           a los dispositivos.
+    \item El servicio de correo transaccional (Brevo), para el envío de los
+          códigos de recuperación de contraseña.
     \item Un motor de cálculo de rutas, consultado por la API REST para obtener
           la geometría, la distancia y la duración del trayecto.
     \item La plataforma de publicación en la nube, para el despliegue de la
@@ -1678,7 +1724,7 @@ Configuración de los servicios en la nube y reglas de seguridad & Completado \\
 API REST transaccional & Completado \\ \hline
 Funcionalidades de tiempo real, mensajería y notificaciones & Completado \\ \hline
 Interfaz web & Completado y publicado \\ \hline
-Interfaz móvil & En desarrollo \\ \hline
+Interfaz móvil & Funcional y validada en emulador y dispositivo; pendiente de publicación en las tiendas \\ \hline
 Módulo de administración & Completado \\ \hline
 Comunicación de voz & Completado y validado de extremo a extremo (llamada funcional) \\ \hline
 \end{longtable}
@@ -1788,7 +1834,7 @@ Oferta & \textit{Pendiente} $\rightarrow$ \textit{Aceptada} (al aceptar el clien
 \textit{Pendiente} $\rightarrow$ \textit{Rechazada} (al aceptar el cliente otra oferta, o al rechazarla de forma individual con \texttt{POST /rejectOffer});
 \textit{Pendiente} $\rightarrow$ \textit{Retirada} (por el propio trabajador). No se admiten otras transiciones. \\ \hline
 
-Conversación & \textit{Activa} al crearse al aceptar la oferta. \\ \hline
+Conversación & \textit{Activa} al crearse al aceptar la oferta. Pasa a \textit{cerrada} cuando el trabajo se cancela o se completa, sea por finalización directa o por el código de llegada. \\ \hline
 
 Llamada de voz & \textit{Llamando} $\rightarrow$ \textit{En curso} (aceptación);
 \textit{Llamando} $\rightarrow$ \textit{Perdida} (agotamiento de la espera);
