@@ -11,23 +11,44 @@ class MainScaffold extends StatefulWidget {
     this.onCreatePressed,
   });
 
+  static MainScaffoldState? of(BuildContext context) {
+    return context.findAncestorStateOfType<MainScaffoldState>();
+  }
+
+  static void switchTab(BuildContext context, int index) {
+    of(context)?.setIndex(index);
+  }
+
   @override
-  State<MainScaffold> createState() => _MainScaffoldState();
+  State<MainScaffold> createState() => MainScaffoldState();
 }
 
-class _MainScaffoldState extends State<MainScaffold> {
+class MainScaffoldState extends State<MainScaffold> {
   int _currentIndex = 0;
+
+  void setIndex(int index) {
+    if (mounted && index >= 0 && index < widget.screens.length) {
+      setState(() => _currentIndex = index);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: widget.screens,
-      ),
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _currentIndex != 0) {
+          setState(() => _currentIndex = 0);
+        }
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: IndexedStack(
+          index: _currentIndex,
+          children: widget.screens,
+        ),
       floatingActionButton: isKeyboardOpen
           ? null
           : FloatingActionButton(
@@ -79,8 +100,9 @@ class _MainScaffoldState extends State<MainScaffold> {
                     ),
                   ],
                 ),
-              ),
             ),
+          ),
+      ),
     );
   }
 }

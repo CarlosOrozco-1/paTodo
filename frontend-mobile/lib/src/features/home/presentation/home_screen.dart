@@ -13,8 +13,10 @@ import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/category_theme.dart';
 import '../../../core/utils/category_utils.dart';
+import '../../../shared/widgets/main_scaffold.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../notifications/presentation/notifications_screen.dart';
+import '../../profile/presentation/profile_screen.dart';
 import '../../services/data/firebase_service.dart';
 import '../../tracking/presentation/screens/live_tracking_screen.dart';
 
@@ -23,7 +25,9 @@ import '../../tracking/presentation/screens/live_tracking_screen.dart';
 /// - client → sus jobs vía Firestore directo (stream en tiempo real).
 /// - worker/both → trabajos pendientes por Firestore, filtrados a 15 km.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onProfileTap;
+
+  const HomeScreen({super.key, this.onProfileTap});
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -100,6 +104,24 @@ class _HomeScreenState extends State<HomeScreen> {
           _loading = false;
         });
     }
+  }
+
+  void _navigateToProfile() {
+    if (widget.onProfileTap != null) {
+      widget.onProfileTap!();
+      return;
+    }
+    final scaffold = MainScaffold.of(context);
+    if (scaffold != null) {
+      scaffold.setIndex(3);
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ProfileScreen(showBackButton: true),
+      ),
+    );
   }
 
   Future<void> _loadNearby() async {
@@ -259,6 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
               role: _role,
               email: email,
               profileImageUrl: _photoUrl,
+              onProfileTap: _navigateToProfile,
             ),
 
             // ── Contenido principal ──
@@ -403,13 +426,33 @@ class _HeroBanner extends StatelessWidget {
   final String? role;
   final String? email;
   final String? profileImageUrl;
+  final VoidCallback? onProfileTap;
 
   const _HeroBanner({
     required this.displayName,
     required this.role,
     this.email,
     this.profileImageUrl,
+    this.onProfileTap,
   });
+
+  void _handleProfileTap(BuildContext context) {
+    if (onProfileTap != null) {
+      onProfileTap!();
+      return;
+    }
+    final scaffold = MainScaffold.of(context);
+    if (scaffold != null) {
+      scaffold.setIndex(3);
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ProfileScreen(showBackButton: true),
+      ),
+    );
+  }
 
   String _greeting() {
     final hour = DateTime.now().hour;
@@ -496,24 +539,34 @@ class _HeroBanner extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const NotificationBell(),
-                      Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 8,
+                      Tooltip(
+                        message: 'Mi perfil',
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _handleProfileTap(context),
+                            customBorder: const CircleBorder(),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
+                              child: UserAvatar(
+                                photoUrl: profileImageUrl,
+                                name: displayName,
+                                email: email,
+                                radius: 26,
+                                backgroundColor: Colors.white24,
+                                textColor: Colors.white,
+                              ),
                             ),
-                          ],
-                        ),
-                        child: UserAvatar(
-                          photoUrl: profileImageUrl,
-                          name: displayName,
-                          email: email,
-                          radius: 26,
-                          backgroundColor: Colors.white24,
-                          textColor: Colors.white,
+                          ),
                         ),
                       ),
                     ],
